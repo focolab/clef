@@ -1,0 +1,1305 @@
+{
+  "language": "english",
+  "target": "\"C:\\Users\\Leica\\miniconda3\\envs\\wb-live\\python.exe\" -u \"C:\\Users\\Leica\\code\\wb-live\\wb-live-v4\\gooey-setup.py\"",
+  "suppress_gooey_flag": false,
+  "program_name": "wb-live launcher",
+  "program_description": "Application for launching closed-loop experiment!",
+  "sidebar_title": "Actions",
+  "default_size": [
+    900,
+    800
+  ],
+  "auto_start": false,
+  "show_advanced": true,
+  "run_validators": true,
+  "encoding": "utf-8",
+  "show_stop_warning": true,
+  "show_success_modal": true,
+  "show_failure_modal": true,
+  "force_stop_is_error": true,
+  "poll_external_updates": false,
+  "return_to_config": false,
+  "show_restart_button": true,
+  "requires_shell": true,
+  "menu": [],
+  "clear_before_run": false,
+  "fullscreen": false,
+  "use_legacy_titles": true,
+  "num_required_cols": 2,
+  "num_optional_cols": 2,
+  "manual_start": false,
+  "monospace_display": false,
+  "image_dir": "./res/img",
+  "language_dir": "C:\\Users\\Leica\\miniconda3\\envs\\wb-live\\lib\\site-packages\\gooey\\languages",
+  "progress_regex": null,
+  "progress_expr": null,
+  "hide_progress_msg": false,
+  "timing_options": {
+    "show_time_remaining": false,
+    "hide_time_remaining_on_complete": true
+  },
+  "disable_progress_bar_animation": false,
+  "disable_stop_button": false,
+  "navigation": "SIDEBAR",
+  "show_sidebar": false,
+  "tabbed_groups": true,
+  "group_by_type": true,
+  "body_bg_color": "#f0f0f0",
+  "header_bg_color": "#ffffff",
+  "header_height": 80,
+  "header_show_title": true,
+  "header_show_subtitle": true,
+  "header_image_center": false,
+  "footer_bg_color": "#f0f0f0",
+  "sidebar_bg_color": "#f2f2f2",
+  "terminal_panel_color": "#F0F0F0",
+  "terminal_font_color": "#000000",
+  "terminal_font_family": null,
+  "terminal_font_weight": 400,
+  "terminal_font_size": null,
+  "richtext_controls": false,
+  "error_color": "#ea7878",
+  "layout": "standard",
+  "widgets": {
+    "gooey-setup.py": {
+      "command": "::gooey/default",
+      "name": "gooey-setup.py",
+      "help": null,
+      "description": "",
+      "contents": [
+        {
+          "name": "Acquisition controls",
+          "items": [
+            {
+              "id": "output_folder",
+              "type": "DirChooser",
+              "cli_type": "positional",
+              "required": true,
+              "data": {
+                "display_name": "output_folder",
+                "help": "Destination folder for saving data",
+                "required": true,
+                "nargs": "",
+                "commands": [],
+                "choices": [],
+                "default": null,
+                "dest": "output_folder"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input and not user_input.isspace()",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-d",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "total_frames",
+                "help": "Duration (in frames) for the acquisition",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-d",
+                  "--total-frames"
+                ],
+                "choices": [],
+                "default": 30000,
+                "dest": "total_frames"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-cfg",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "mm_configuration_file",
+                "help": "Micro-Manager configuration file",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-cfg",
+                  "--mm-configuration-file"
+                ],
+                "choices": [
+                  "C:\\Program Files\\Micro-Manager-2.0beta\\200212_PRIME_BSI_TIE.cfg",
+                  "C:\\Program Files\\Micro-Manager-2.0beta\\MMConfig_demo.cfg",
+                  "C:\\Program Files\\Micro-Manager-2.0beta\\20201016_PRIME_BSI_TIE.cfg",
+                  "C:\\MMConfigs\\MMConfig_demo.cfg",
+                  "C:\\MMConfigs\\CSUW1.cfg",
+                  "C:\\MMConfigs\\CSUW1-LDI-Polygon.cfg"
+                ],
+                "default": "C:\\MMConfigs\\CSUW1-LDI-Polygon.cfg",
+                "dest": "mm_configuration_file"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-z",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "zsize",
+                "help": "Number of z-planes for imaging",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-z",
+                  "--zsize"
+                ],
+                "choices": [],
+                "default": 10,
+                "dest": "zsize"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-mip",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "save_mip",
+                "help": "Save MIP video",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-mip",
+                  "--save-mip"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "save_mip"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-strobe",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "strobe_acquisition",
+                "help": "Strobe illumination during acquisition?",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-strobe",
+                  "--strobe-acquisition"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "strobe_acquisition"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sifi",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "strobe_inter_frame_interval",
+                "help": "Strobed inter-frame interval in ms (must be > exposure!)",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sifi",
+                  "--strobe-inter-frame-interval"
+                ],
+                "choices": [],
+                "default": 80,
+                "dest": "strobe_inter_frame_interval"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-struct",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "save_structural_scan",
+                "help": "Save structural scan?",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-struct",
+                  "--save-structural-scan"
+                ],
+                "choices": [
+                  "none",
+                  "GFP + RFP (torstoscope)",
+                  "GFP + RFP (torstoscope) 1um steps",
+                  "NeuroPAL (innovation core) 1um steps"
+                ],
+                "default": "none",
+                "dest": "save_structural_scan"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            }
+          ],
+          "groups": [],
+          "description": "Settings for experimental acquisition.",
+          "options": {
+            "label_color": "#000000",
+            "description_color": "#363636",
+            "legacy": {
+              "required_cols": 2,
+              "optional_cols": 2
+            },
+            "columns": 2,
+            "padding": 10,
+            "show_border": false
+          }
+        },
+        {
+          "name": "Expr. metadata",
+          "items": [
+            {
+              "id": "-strn",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "subject_strain",
+                "help": "Subject strain",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-strn",
+                  "--subject-strain"
+                ],
+                "choices": [],
+                "default": null,
+                "dest": "subject_strain"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input and not user_input.isspace()",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-preprx",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "subject_condition",
+                "help": "Subject expr. condition",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-preprx",
+                  "--subject-condition"
+                ],
+                "choices": [
+                  "",
+                  "ATR",
+                  "LTM 1x buffer T0",
+                  "LTM 1x butanone T0",
+                  "LTM 3x buffer T0",
+                  "LTM 3x buffer T16",
+                  "LTM 3x butanone T0",
+                  "LTM 3x butanone T16"
+                ],
+                "default": "",
+                "dest": "subject_condition"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-atr",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "atr_concentration",
+                "help": "Concentration of ATR (uM)",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-atr",
+                  "--atr-concentration"
+                ],
+                "choices": [],
+                "default": null,
+                "dest": "atr_concentration"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input and not user_input.isspace()",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-zstp",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "z_step_size",
+                "help": "Step size in Z dimension",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-zstp",
+                  "--z-step-size"
+                ],
+                "choices": [],
+                "default": null,
+                "dest": "z_step_size"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input and not user_input.isspace()",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-nose",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "nose_orientation",
+                "help": "Nose orientation",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-nose",
+                  "--nose-orientation"
+                ],
+                "choices": [
+                  "left",
+                  "right",
+                  "other"
+                ],
+                "default": null,
+                "dest": "nose_orientation"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-vnc",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "vnc_orientation",
+                "help": "VNC orientation",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-vnc",
+                  "--vnc-orientation"
+                ],
+                "choices": [
+                  "up",
+                  "down",
+                  "other"
+                ],
+                "default": null,
+                "dest": "vnc_orientation"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-egg",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "num_eggs",
+                "help": "Number of eggs",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-egg",
+                  "--num-eggs"
+                ],
+                "choices": [],
+                "default": 0,
+                "dest": "num_eggs"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-app",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "microscope_name",
+                "help": "Microscope apparatus",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-app",
+                  "--microscope-name"
+                ],
+                "choices": [
+                  "torstoscope spinning disk",
+                  "innovation core spinning disk",
+                  "innovation core thunderscope"
+                ],
+                "default": "innovation core spinning disk",
+                "dest": "microscope_name"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-notes",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": true,
+              "data": {
+                "display_name": "experimental_notes",
+                "help": "experimental notes",
+                "required": true,
+                "nargs": "",
+                "commands": [
+                  "-notes",
+                  "--experimental-notes"
+                ],
+                "choices": [],
+                "default": null,
+                "dest": "experimental_notes"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "user_input and not user_input.isspace()",
+                  "message": "This field is required"
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            }
+          ],
+          "groups": [],
+          "description": "Metadata for experiment.",
+          "options": {
+            "label_color": "#000000",
+            "description_color": "#363636",
+            "legacy": {
+              "required_cols": 2,
+              "optional_cols": 2
+            },
+            "columns": 2,
+            "padding": 10,
+            "show_border": false
+          }
+        },
+        {
+          "name": "Closed-loop controls",
+          "items": [
+            {
+              "id": "-alg",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "trigger_algorithm",
+                "help": "Closed-loop algorithm to trigger stimulation",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-alg",
+                  "--trigger-algorithm"
+                ],
+                "choices": [
+                  "Dynamic range deriv",
+                  "RoiDeriv",
+                  "StimOnsetFromList",
+                  "Dummy algorithm (does nothing)",
+                  "PointAndClick",
+                  "HammerOfDawn",
+                  "Brainalyzer"
+                ],
+                "default": "Brainalyzer",
+                "dest": "trigger_algorithm"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-gui",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "GUI_mode",
+                "help": "GUI mode",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-gui",
+                  "--GUI-mode"
+                ],
+                "choices": [
+                  "neural_imaging",
+                  "behavior"
+                ],
+                "default": "neural_imaging",
+                "dest": "GUI_mode"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-bl",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "rec_baseline",
+                "help": "Frames at beginning of recording where stimulations are not permitted",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-bl",
+                  "--rec-baseline"
+                ],
+                "choices": [],
+                "default": 0,
+                "dest": "rec_baseline"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-smp",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "save_alg_model_plot",
+                "help": "Save CL algorithm data plot",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-smp",
+                  "--save-alg-model-plot"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "save_alg_model_plot"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            }
+          ],
+          "groups": [],
+          "description": "Customize the closed-loop experimental acquisition options",
+          "options": {
+            "label_color": "#000000",
+            "description_color": "#363636",
+            "legacy": {
+              "required_cols": 2,
+              "optional_cols": 2
+            },
+            "columns": 2,
+            "padding": 10,
+            "show_border": false
+          }
+        },
+        {
+          "name": "Stimulus settings",
+          "items": [
+            {
+              "id": "-stint",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "stim_interface",
+                "help": "Stimulus interface",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-stint",
+                  "--stim-interface"
+                ],
+                "choices": [
+                  "LMM5_561",
+                  "Polygon1000_470",
+                  "Polygon1000_590",
+                  "InvCore-LDI-Polygon-640",
+                  "solenoid",
+                  "InvCore-ThunderscopeLED3",
+                  "no stim"
+                ],
+                "default": "InvCore-LDI-Polygon-640",
+                "dest": "stim_interface"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-stroi",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "use_static_stim_roi",
+                "help": "Upload initial static ROI (for Polygon1000, requires struct. images)",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-stroi",
+                  "--use-static-stim-roi"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "use_static_stim_roi"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sfo",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "frames_to_stimulate_for_options",
+                "help": "Frames to stimulate for, can be list with multiple comma-separated entries",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sfo",
+                  "--frames-to-stimulate-for-options"
+                ],
+                "choices": [],
+                "default": "48",
+                "dest": "frames_to_stimulate_for_options"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sio",
+              "type": "TextField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "stim_intensity_options",
+                "help": "Stimulation intensity (0-100%), can be list with multiple comma-separated entries",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sio",
+                  "--stim-intensity-options"
+                ],
+                "choices": [],
+                "default": "10",
+                "dest": "stim_intensity_options"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sdia",
+              "type": "IntegerField",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "stimulus_diameter",
+                "help": "If using PointAndClick, stim ROI diameter",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sdia",
+                  "--stimulus-diameter"
+                ],
+                "choices": [],
+                "default": 10,
+                "dest": "stimulus_diameter"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            }
+          ],
+          "groups": [],
+          "description": "Controls for stimulus e.g. LMM5-controlled lasers or arduino-controlled microfluidic valves",
+          "options": {
+            "label_color": "#000000",
+            "description_color": "#363636",
+            "legacy": {
+              "required_cols": 2,
+              "optional_cols": 2
+            },
+            "columns": 2,
+            "padding": 10,
+            "show_border": false
+          }
+        },
+        {
+          "name": "Dev ops",
+          "items": [
+            {
+              "id": "-i",
+              "type": "FileChooser",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "input_recording",
+                "help": "File to simulate recording",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-i",
+                  "--input-recording"
+                ],
+                "choices": [],
+                "default": null,
+                "dest": "input_recording"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-be",
+              "type": "Dropdown",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "acquisition_backend",
+                "help": "Acquisition backend",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-be",
+                  "--acquisition-backend"
+                ],
+                "choices": [
+                  "micromanager compiled MMCorePy bindings",
+                  "micromanager pymmcore",
+                  "pycromanager"
+                ],
+                "default": "pycromanager",
+                "dest": "acquisition_backend"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-nsi",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "no_save_images",
+                "help": "DO NOT save output image data",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-nsi",
+                  "--no-save-images"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "no_save_images"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-nsm",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "no_save_metadata",
+                "help": "DO NOT save output metadata",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-nsm",
+                  "--no-save-metadata"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "no_save_metadata"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sgd",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "save_gooey_defaults",
+                "help": "Save gooey config settings",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sgd",
+                  "--save-gooey-defaults"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "save_gooey_defaults"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-pfwb",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "prefill_wb_ops",
+                "help": "Prefill wboptions.mat and meta.mat",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-pfwb",
+                  "--prefill-wb-ops"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "prefill_wb_ops"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            },
+            {
+              "id": "-sms",
+              "type": "CheckBox",
+              "cli_type": "optional",
+              "required": false,
+              "data": {
+                "display_name": "send_sms",
+                "help": "Send SMS to Ray when done",
+                "required": false,
+                "nargs": "",
+                "commands": [
+                  "-sms",
+                  "--send-sms"
+                ],
+                "choices": [],
+                "default": false,
+                "dest": "send_sms"
+              },
+              "options": {
+                "error_color": "#ea7878",
+                "label_color": "#000000",
+                "help_color": "#363636",
+                "full_width": false,
+                "validator": {
+                  "type": "ExpressionValidator",
+                  "test": "True",
+                  "message": ""
+                },
+                "external_validator": {
+                  "cmd": ""
+                }
+              }
+            }
+          ],
+          "groups": [],
+          "description": "Useful options for ongoing development, testing, and evaluation of wb-live",
+          "options": {
+            "label_color": "#000000",
+            "description_color": "#363636",
+            "legacy": {
+              "required_cols": 2,
+              "optional_cols": 2
+            },
+            "columns": 2,
+            "padding": 10,
+            "show_border": false
+          }
+        }
+      ]
+    }
+  }
+}
