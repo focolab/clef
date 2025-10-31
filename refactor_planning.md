@@ -270,7 +270,6 @@ Purpose: Real-time microscopy data acquisition and closed-loop experimental cont
 
 ## 4. Architecture & Design Decisions
 
-{
 HERE ARE A FEW THINGS THAT I NEED TO INTEGRATE INTO THIS SECTIONS ORGANIZATION:
 
 1. Current State Analysis (Section 2)
@@ -302,8 +301,6 @@ Hardcoded refs: ~35 → 0
 Test coverage: 0% → 60%
 Demo runtime: N/A → <2 min
 
-
-
 3. Architecture & Design Decisions (Section 4)
 
 Target Architecture: Component diagram with clear responsibilities
@@ -311,7 +308,6 @@ Target Architecture: Component diagram with clear responsibilities
 ConfigManager (NEW): YAML loading/validation
 HardwareManager (REFACTORED): Backend abstraction
 ClosedLoopEngine (REFACTORED): Config-driven orchestration
-
 
 Design Patterns: 4 patterns selected
 
@@ -329,8 +325,6 @@ Backend abstraction (pycromanager/pymmcore/dummy)
 Package defaults + user overrides
 Incremental migration strategy
 
-
-
 4. Configuration Templates Created
 
 Full Templates: 3 comprehensive YAML files
@@ -346,7 +340,7 @@ hardware_minimal.yaml: Dummy backend, no real devices
 experiment_minimal.yaml: 100 frames, single Z, no saves
 algorithm_minimal.yaml: DummyAlg, no GUI, no randomization
 
-}
+END INFORMATION WE STILL NEED TO INTEGRATE
 
 ### Target Architecture
 ```
