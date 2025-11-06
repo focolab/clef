@@ -270,122 +270,183 @@ Purpose: Real-time microscopy data acquisition and closed-loop experimental cont
 
 ## 4. Architecture & Design Decisions
 
-HERE ARE A FEW THINGS THAT I NEED TO INTEGRATE INTO THIS SECTIONS ORGANIZATION:
-
-1. Current State Analysis (Section 2)
-
-Pain Points Identified: 7 major categories
-
-Hardware-specific references (35+ locations)
-Worm/neuron terminology throughout
-Scattered configuration management
-Legacy code (~4,250 LOC to refactor or deprecate)
-No testing infrastructure
-Absolute file paths everywhere
-No algorithm architecture consistency
-
-
-
-2. Refactoring Objectives (Section 3)
-
-Primary Goals: 3 must-have deliverables
-
-Hardware abstraction (0 hardcoded device strings)
-Distributable package (pip install clef)
-Demo mode functional (reviewers can validate)
-
-
-Success Metrics Defined: 6 measurable targets
-
-Hardcoded refs: ~35 → 0
-Test coverage: 0% → 60%
-Demo runtime: N/A → <2 min
-
-3. Architecture & Design Decisions (Section 4)
-
-Target Architecture: Component diagram with clear responsibilities
-
-ConfigManager (NEW): YAML loading/validation
-HardwareManager (REFACTORED): Backend abstraction
-ClosedLoopEngine (REFACTORED): Config-driven orchestration
-
-Design Patterns: 4 patterns selected
-
-Configuration Object (replace args dict)
-Adapter (hardware backends)
-Factory (stimulus/algorithm creation)
-Strategy (future algorithm base class)
-
-
-Key Decisions: 5 major technical choices
-
-YAML + Pydantic validation
-Keep Gooey as config generator
-Backend abstraction (pycromanager/pymmcore/dummy)
-Package defaults + user overrides
-Incremental migration strategy
-
-4. Configuration Templates Created
-
-Full Templates: 3 comprehensive YAML files
-
-hardware.yaml: Device mappings, MM configs, illumination channels
-experiment.yaml: Acquisition params, subject metadata, output settings
-algorithm.yaml: CL algorithm selection, stimulus parameters
-
-
-Minimal Templates: 3 bare-bones test configs
-
-hardware_minimal.yaml: Dummy backend, no real devices
-experiment_minimal.yaml: 100 frames, single Z, no saves
-algorithm_minimal.yaml: DummyAlg, no GUI, no randomization
-
-END INFORMATION WE STILL NEED TO INTEGRATE
-
 ### Target Architecture
 ```
-[High-level architecture description or diagram]
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLEF Application                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐      ┌──────────────────────────────────┐   │
+│  │ Entry Points │      │     Configuration Layer          │   │
+│  ├──────────────┤      ├──────────────────────────────────┤   │
+│  │ CLI Runner   │─────>│  ConfigManager (NEW)             │   │
+│  │ Gooey GUI    │      │  - YAML loader                   │   │
+│  │ (optional)   │      │  - Pydantic validation           │   │
+│  └──────────────┘      │  - Schema enforcement            │   │
+│                        │  - Merge defaults + user configs │   │
+│                        └──────────────┬───────────────────┘   │
+│                                       │                        │
+│  ┌────────────────────────────────────▼───────────────────┐   │
+│  │          ClosedLoopEngine (REFACTORED)                 │   │
+│  ├────────────────────────────────────────────────────────┤   │
+│  │  - Config-driven orchestration (no hardcoded strings)  │   │
+│  │  - Acquisition loop coordination                       │   │
+│  │  - Algorithm/Stimulus dispatching                      │   │
+│  │  - Metadata collection & saving                        │   │
+│  └───┬──────────────────────┬──────────────────────┬──────┘   │
+│      │                      │                      │           │
+│  ┌───▼──────────┐   ┌───────▼─────────┐   ┌───────▼────────┐ │
+│  │ Hardware     │   │ Algorithm        │   │ Stimulus       │ │
+│  │ Manager      │   │ Factory (NEW)    │   │ Factory        │ │
+│  │ (REFACTORED) │   │                  │   │ (EXISTING)     │ │
+│  ├──────────────┤   ├──────────────────┤   ├────────────────┤ │
+│  │ Backend      │   │ Creates:         │   │ Creates:       │ │
+│  │ Abstraction: │   │ - Brainalyzer    │   │ - LDIPolygon   │ │
+│  │ • pycromanager│   │ - DummyAlg       │   │ - SpinningDisk │ │
+│  │ • pymmcore   │   │ - (Future algs)  │   │ - Dummy        │ │
+│  │ • DummyMMC   │   │                  │   │                │ │
+│  └───┬──────────┘   └──────────────────┘   └────────────────┘ │
+│      │                                                          │
+│  ┌───▼──────────────────────────────────────────────────────┐  │
+│  │            Real or Simulated Hardware                    │  │
+│  ├──────────────────────────────────────────────────────────┤  │
+│  │  Micro-Manager Devices | Camera | Stages | Stim Devices │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 
 Key components:
-- Component A: [Responsibility]
-- Component B: [Responsibility]
-- Component C: [Responsibility]
+- Component ConfigManager (NEW): Centralized configuration loading, validation, and access. Load YAML files (hardware, experiment, algorithm), Validate against Pydantic schemas, Provide typed configuration objects to other components. New file clef/config/config_manager.py.
+- Component HardwareManager (REFACTORED from MMSubroutines.py): Abstract hardware backend selection and device control. Initialize backend (pycromanager/pymmcore/dummy) from hardware.yaml, Map logical device names to physical device properties, Provide unified interface for device interaction. clef/hardware/hardware_manager.py (refactored from MMSubroutines.py)
+- Component ClosedLoopEngine (REFACTORED): Orchestrate acquisition loop using configuration objects. Accept Config objects instead of args dict. Dispatch to algorithm and stimulus based on config. Collect metadata from config for saving. No hardcoded device names or conditionals on microscope names. clef/engine/closed_loop_engine.py (refactored from ClosedLoopEngine.py)
+- Component AlgorithmFactory (NEW): Instantiate trigger algorithms based on config. Registry of available algorithms (Brainalyzer, DummyAlg, future algorithms), Create algorithm instance with parameters from algorithm.yaml, (Future) enforce AlgorithmBaseClass interface. New file clef/algorithms/algorithm_factory.py
+- Component StimulusFactory (EXISTING, enhanced): Instantiate stimulus interfaces based on config. Registry from StimBaseClass.initialize_stim_interface(). Create stimulus instance from hardware.yaml stim_interface field. Pass device mappings from config instead of hardcoded strings. clef/stimulus/stim_base_class.py
 
 Data flow:
-[Describe how data flows through the system]
+
+Configuration phase:
+User → Entry Point → ConfigManager → [hardware.yaml, experiment.yaml, algorithm.yaml]
+                                      ↓
+                               Pydantic Validation
+                                      ↓
+                         [HardwareConfig, ExperimentConfig, AlgorithmConfig]
+
+Initialization phase:
+ClosedLoopEngine ← Config Objects
+           ↓
+   HardwareManager.initialize(HardwareConfig)
+           ↓
+   Backend Selection (pycromanager/pymmcore/dummy)
+           ↓
+   Load MM Config from path in hardware.yaml
+           ↓
+   AlgorithmFactory.create(AlgorithmConfig)
+           ↓
+   StimulusFactory.create(HardwareConfig.stim_interface)
+
+Acquisition Loop phase:
+┌─> HardwareManager.snap_image()
+   │            ↓
+   │   Algorithm.process_frame(image, metadata)
+   │            ↓
+   │   Algorithm.check_stim() → stimulus_params?
+   │            ↓
+   │   StimulusInterface.trigger(stimulus_params)
+   │            ↓
+   │   Save data/metadata (ExperimentConfig.output_dir)
+   └────────────┘ (repeat for N frames)
+
 ```
 
 ### Design Patterns to Implement
-1. **[Pattern Name]**
-   - Where: [Which modules]
-   - Why: [Rationale]
-   - Example: [Brief example]
+1. **Configuration Object Pattern**
+   - Where: Throughout codebase, replacing args dict
+   - Why: Type safety and IDE autocomplete. Clear schema enforcement.
+   - Example: 
+    ```
+    def run_acquisition(args):
+        num_frames = args["num-frames"]  # string key, no validation
+        scope_name = args["microscope_name"]  # hardcoded conditional later
+    
+    # AFTER (refactored):
+    def run_acquisition(config: ExperimentConfig):
+        num_frames = config.acquisition.num_frames  # typed, validated
+        # No scope_name needed - hardware abstracted in HardwareManager
+    ```
+
+2. **Adapter Pattern**
+   - Where: HardwareManager backend abstraction
+   - Why: Uniform interface across pycromanager, pymmcore, DummyMMC, Easy to add new backends (e.g., future hardware control libraries), Reviewers can use DummyMMC without changing any other code
+   - Example: 
+   ```
+   class HardwareBackend(ABC):
+      @abstractmethod
+      def snap_image(self) -> np.ndarray: ...
+      @abstractmethod
+      def set_property(self, device: str, prop: str, value: Any): ...
+  
+  class PycromanagerBackend(HardwareBackend):
+      def snap_image(self): return self.bridge.snap_image()
+  
+  class DummyBackend(HardwareBackend):
+      def snap_image(self): return self.image_generator.next_frame()
+  
+  # HardwareManager selects backend from hardware.yaml:
+  backend = BackendFactory.create(config.hardware.backend)
+  ```
+
+3. **Factory Pattern**
+   - Where: Algorithm and Stimulus instantiation
+   - Why: Decouple creation logic from usage, Centralized registry of available algorithms/stimuli, Config-driven selection without if/elif chains
+   - Example: 
+   ```
+   # AlgorithmFactory
+  ALGORITHM_REGISTRY = {
+      "brainalyzer": Brainalyzer,
+      "dummy": DummyAlg,
+      # Future: "dynamic_range": DynamicRangeAlgorithm
+  }
+  
+  def create_algorithm(config: AlgorithmConfig):
+      alg_class = ALGORITHM_REGISTRY[config.algorithm_type]
+      return alg_class(config.algorithm_params)
+  
+  # In ClosedLoopEngine:
+  algorithm = AlgorithmFactory.create(algorithm_config)
+  # No hardcoded if algorithm_name == "brainalyzer": ...
+  ```
 
 ### Key Technical Decisions
 
-#### Decision 1: [Decision Title]
-- **Context:** [What problem are we solving?]
+#### Decision 1: YAML + Pydantic for Configuration
+- **Context:** Need to move all hardware-specific and experiment-specific parameters out of code. Must be human-readable, validatable, and support nested structures (devices, channels, acquisition settings).
 - **Options Considered:**
-  - Option A: [Pros/Cons]
-  - Option B: [Pros/Cons]
-- **Decision:** [Chosen option]
-- **Rationale:** [Why we chose this]
-- **Trade-offs:** [What we're giving up]
+  - Option A: JSON with JSON Schema validation. Pros: Native Python support, good for serialization, widely used. Cons: No comments, verbose for nested configs, less human-friendly for editing.
+  - Option B: TOML with custom validation. Pros: Comments supported, clean nested tables, gaining popularity. Cons: Limited complex validation, fewer libraries, less familiar to users.
+  - Option C: YAML + Pydantic models. Pros: Comments supported, most readable for humans, Pydantic provides rich validation and type hints, supports complex nested structures. Cons: YAML parsing quirks (tabs vs spaces), requires PyYAML dependency. 
+- **Decision:** YAML + Pydantic. 
+- **Rationale:** YAML readability critical for scientists/reviewers editing configs manually. Pydantic provides: Automatic type coercion ("100" → int(100)), Rich error messages pointing to exact config line. IDE autocomplete for config objects in code, Easy to define nested models (e.g., HardwareConfig.devices.camera.properties), Comments in YAML essential for documenting hardware-specific settings. Widely adopted in scientific Python tools (e.g., Snakemake, Nextflow)
+- **Trade-offs:** YAML indentation sensitivity could frustrate some users (mitigate with examples and schema docs). PyYAML dependency adds ~500KB (acceptable for target users with conda/pip environments).
 
-#### Decision 2: [Decision Title]
-- **Context:** [What problem are we solving?]
+#### Decision 2: Backend/hardware Abstraction Layer for Hardware
+- **Context:** Currently MMSubroutines.py has if/elif conditionals on microscope names and directly uses pymmcore/pycromanager. Need hardware abstraction for dummy mode and future extensibility. 
 - **Options Considered:**
-  - Option A: [Pros/Cons]
-  - Option B: [Pros/Cons]
-- **Decision:** [Chosen option]
-- **Rationale:** [Why we chose this]
-- **Trade-offs:** [What we're giving up]
+  - Option A: Mock objects (DummyMMC) with same interface as pymmcore. Pros: Minimal code changes, existing DummyMMC already works. Cons: Tightly coupled to pymmcore API, can't switch backends easily
+  - Option B: Abstract backend interface with adapter implementations. Pros: Clean separation, extensible to future hardware libraries, testable. Cons: Additional abstraction layer, more upfront engineering
+  - Option C: Dependency injection with protocols (Python 3.8+ typing.Protocol). Pros: Duck typing, no explicit base class needed, very Pythonic. Cons: Less explicit for other developers, IDE support varies
+- **Decision:** Option B - Abstract Backend Interface with Adapters
+- **Rationale:** Adapters (PycromanagerBackend, PycoreBackend, DummyBackend) selected by config. 
+- **Trade-offs** Fair amount of refactoring necessary. 
 
-### Migration Strategy
-- **Approach:** [Incremental / Big-bang / Hybrid]
-- **Backward Compatibility:** [Required / Not required]
-- **Feature Flags:** [Yes / No - describe strategy]
-- **Deployment Strategy:** [Blue-green / Rolling / Canary / etc.]
+#### Decision 3: Keep Gooey as Optional Config Generator
+- **Context:** Current entry point is Gooey GUI that directly launches acquisition. Need to decouple config generation from execution for CLI-based workflows and testing.
+- **Options Considered:**
+  - Option A: Remove Gooey entirely, CLI-only. Pros: Simpler dependency tree, forces config-centric design. Cons: Loses user-friendly GUI that current lab members rely on. 
+  - Option B: Refactor Gooey to call CLI runner with generated configs. Pros: Preserves GUI familiarity, enforces config decoupling. Cons: Additional engineering effort, Gooey becomes wrapper around CLI.
+  - Option C: Keep Gooey as config writer, separate CLI runner. Pros: Minimal refactoring, GUI users generate YAML then run separately, reviewers use CLI directly. Cons: Two-step workflow (write config, then run) may confuse current users. 
+- **Decision:** Option C - Gooey as Config Writer + Separate CLI Runner
+- **Rationale:** Preserves value of GUI for non-technical users (postdocs, new students). Gooey naturally writes to files already (gooey_config_reload.json) - just change to YAML output. CLI runner (clef-run) becomes primary entry point. Testable in CI/CD without GUI. Scriptable for batch experiments. Works on headless servers. Gooey becomes optional dependency (pip install clef[gui]). Two-step workflow actually benefits reproducibility: saved YAML configs = audit trail. 
+- **Trade-offs** Current users must adapt to "generate config → run config" workflow (mitigate with migration guide). Gooey code must be maintained separately (but no core logic changes, just YAML serialization).
 
 ---
 
