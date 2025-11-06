@@ -1,0 +1,31 @@
+# CLEF Minimal Algorithm Configuration
+# Place this in: config/defaults/algorithm_default.yaml
+# For comprehensive defaults with all gooey fields, see algorithm_default_comprehensive.yaml
+
+# Algorithm selection
+algorithm_type: "dummy"  # Options: dummy, Brainalyzer, PointAndClick, etc.
+
+# GUI settings
+enable_gui: false
+gui_mode: "neural_imaging"  # Options: neural_imaging, behavior
+save_algorithm_plot: false
+
+# Algorithm-specific parameters
+algorithm_params:
+  stim_threshold_pos: 0.06
+  stim_threshold_neg: 0.06
+  stim_cooldown_frames: 900
+  skip_stimulation_probability: 0.1
+  delay_stimulation_probability: 0.4
+  stim_delay_frames_options: [200, 400]
+  stim_onset_list: []
+  stimulus_diameter_pixels: 10
+
+# Stimulus parameters
+stimulus_params:
+  enabled: false
+  randomize: false
+  duration_frames_options: [48]
+  intensity_percent_options: [10]
+  duration_frames: 48
+  intensity_percent: 10

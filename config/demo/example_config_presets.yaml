@@ -1,0 +1,271 @@
+# ============================================================================
+# PRESET 1: Innovation Core with LDI-Polygon (most common setup)
+# config/examples/hardware_invcore_ldi_polygon.yaml
+# ============================================================================
+backend: "pycromanager"
+mm_config_path: "C:\\MMConfigs\\CSUW1-LDI-Polygon.cfg"
+stim_interface: "InvCore-LDI-Polygon-640"
+microscope_name: "innovation core spinning disk"
+
+strobe_acquisition: false
+use_static_stim_roi: false
+
+polygon_calibration_path: "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+
+devices:
+  camera:
+    device_name: "Prime BSI"
+    device_type: "camera"
+    properties:
+      Binning: 1
+
+illumination_channels:
+  - name: "488nm GFP"
+    device: "DAC488"
+    wavelength: 488
+    power: 50.0
+  - name: "561nm RFP"
+    device: "DAC561" 
+    wavelength: 561
+    power: 50.0
+  - name: "640nm Stim"
+    device: "LDI"
+    wavelength: 640
+    power: 10.0
+
+---
+# ============================================================================
+# PRESET 2: Torstoscope with Polygon
+# config/examples/hardware_torstoscope_polygon.yaml
+# ============================================================================
+backend: "pycromanager"
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\20201016_PRIME_BSI_TIE.cfg"
+stim_interface: "Polygon1000_590"
+microscope_name: "torstoscope spinning disk"
+
+strobe_acquisition: false
+use_static_stim_roi: true  # Torstoscope often uses static ROIs
+
+polygon_calibration_path: "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+
+devices:
+  camera:
+    device_name: "Prime BSI"
+    device_type: "camera"
+
+illumination_channels:
+  - name: "470nm"
+    device: "Polygon470"
+    wavelength: 470
+    power: 50.0
+  - name: "590nm"
+    device: "Polygon590"
+    wavelength: 590
+    power: 50.0
+
+---
+# ============================================================================
+# PRESET 3: Innovation Core Thunderscope with LED
+# config/examples/hardware_invcore_thunderscope.yaml
+# ============================================================================
+backend: "pycromanager"
+mm_config_path: "C:\\MMConfigs\\CSUW1.cfg"
+stim_interface: "InvCore-ThunderscopeLED3"
+microscope_name: "innovation core thunderscope"
+
+strobe_acquisition: false
+use_static_stim_roi: false
+
+devices:
+  camera:
+    device_name: "Camera"
+    device_type: "camera"
+
+illumination_channels:
+  - name: "LED Channel 3"
+    device: "LED3"
+    wavelength: null
+    power: 50.0
+
+---
+# ============================================================================
+# PRESET 4: Demo/Testing Configuration (no hardware)
+# config/examples/hardware_demo.yaml
+# ============================================================================
+backend: "dummy"
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\MMConfig_demo.cfg"
+stim_interface: "no stim"
+microscope_name: "innovation core spinning disk"
+
+strobe_acquisition: false
+use_static_stim_roi: false
+
+devices:
+  camera:
+    device_name: "DemoCamera"
+    device_type: "camera"
+    properties:
+      Exposure: 100.0
+      Binning: 1
+
+illumination_channels:
+  - name: "Simulated"
+    device: "DemoLED"
+    wavelength: null
+    power: 100.0
+
+---
+# ============================================================================
+# EXPERIMENT PRESET: Typical C. elegans neural imaging
+# config/examples/experiment_celegans_neural.yaml
+# ============================================================================
+experiment_name: "neural_imaging_001"
+experimenter: "Lab Member"
+output_dir: "./data/neural_imaging"
+save_images: true
+save_metadata: true
+save_mip_video: true
+
+acquisition:
+  num_frames: 30000  # ~50 min at 10 fps
+  frame_rate: null
+  z_stack: true
+  z_planes: 10
+  z_step: 1.0
+  baseline_frames: 300  # 30 sec baseline at 10 fps
+  save_structural_scan: "NeuroPAL (innovation core) 1um steps"
+
+subject:
+  subject_type: "C. elegans"
+  genotype: "OH15500"  # Example strain
+  treatment_details:
+    condition: "ATR"
+    atr_concentration_uM: 1.0
+  orientation:
+    nose: "left"
+    vnc: "down"
+  num_eggs: 0
+  notes: "Young adult, well-fed"
+
+z_step_size_um: 1.0
+input_recording_path: null
+
+---
+# ============================================================================
+# EXPERIMENT PRESET: Behavior tracking (no z-stack)
+# config/examples/experiment_behavior.yaml
+# ============================================================================
+experiment_name: "behavior_001"
+experimenter: "Lab Member"
+output_dir: "./data/behavior"
+save_images: true
+save_metadata: true
+save_mip_video: false
+
+acquisition:
+  num_frames: 18000  # 30 min at 10 fps
+  frame_rate: 10.0
+  z_stack: false
+  z_planes: 1
+  z_step: 0.0
+  baseline_frames: 0
+  save_structural_scan: "none"
+
+subject:
+  subject_type: "C. elegans"
+  genotype: "N2"
+  treatment_details:
+    condition: ""
+    atr_concentration_uM: 0.0
+  orientation:
+    nose: "other"
+    vnc: "other"
+  num_eggs: 3
+  notes: "Hermaphrodite with eggs"
+
+---
+# ============================================================================
+# ALGORITHM PRESET: Brainalyzer with active stimulation
+# config/examples/algorithm_brainalyzer_stim.yaml
+# ============================================================================
+algorithm_type: "Brainalyzer"
+enable_gui: true
+gui_mode: "neural_imaging"
+save_algorithm_plot: true
+
+algorithm_params:
+  stim_threshold_pos: 0.06
+  stim_threshold_neg: 0.06
+  stim_cooldown_frames: 900  # 90 sec at 10 fps
+  skip_stimulation_probability: 0.1
+  delay_stimulation_probability: 0.4
+  stim_delay_frames_options: [200, 400]
+
+stimulus_params:
+  enabled: true
+  randomize: true
+  duration_frames_options: [48, 96]
+  intensity_percent_options: [10, 20, 30]
+  duration_frames: 48
+  intensity_percent: 10
+
+---
+# ============================================================================
+# ALGORITHM PRESET: Point and click manual stimulation
+# config/examples/algorithm_point_click.yaml
+# ============================================================================
+algorithm_type: "PointAndClick"
+enable_gui: true
+gui_mode: "neural_imaging"
+save_algorithm_plot: false
+
+algorithm_params:
+  stimulus_diameter_pixels: 10
+
+stimulus_params:
+  enabled: true
+  randomize: false
+  duration_frames_options: [48]
+  intensity_percent_options: [20]
+  duration_frames: 48
+  intensity_percent: 20
+
+---
+# ============================================================================
+# ALGORITHM PRESET: Fixed timing stimulation
+# config/examples/algorithm_fixed_timing.yaml
+# ============================================================================
+algorithm_type: "StimOnsetFromList"
+enable_gui: false
+gui_mode: "neural_imaging"
+save_algorithm_plot: true
+
+algorithm_params:
+  # Stimulate at these specific frames
+  stim_onset_list: [1000, 2000, 3000, 4000, 5000]
+
+stimulus_params:
+  enabled: true
+  randomize: false
+  duration_frames_options: [48]
+  intensity_percent_options: [15]
+  duration_frames: 48
+  intensity_percent: 15
+
+---
+# ============================================================================
+# ALGORITHM PRESET: Dummy (no closed-loop, just record)
+# config/examples/algorithm_dummy.yaml
+# ============================================================================
+algorithm_type: "Dummy algorithm (does nothing)"
+enable_gui: false
+gui_mode: "neural_imaging"
+save_algorithm_plot: false
+
+algorithm_params: {}
+
+stimulus_params:
+  enabled: false
+  randomize: false
+  duration_frames_options: []
+  intensity_percent_options: []
