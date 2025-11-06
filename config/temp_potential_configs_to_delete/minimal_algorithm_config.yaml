@@ -1,0 +1,26 @@
+# Minimal Algorithm Configuration for CLEF Testing
+# Bare-bones template showing only essential fields
+
+closed_loop:
+  algorithm:
+    name: "DummyAlg"  # No-op algorithm for testing
+    enabled: true
+    
+  gui:
+    mode: "neural_imaging"
+    show_realtime_plot: false  # Disable for headless testing
+    save_algorithm_plot: false
+    
+  stimulus:
+    interface: "DummyStim"  # Must match hardware.yaml
+    duration_frames_options: [10]
+    intensity_percent_options: [10]
+    
+    timing:
+      cooldown_frames: 100
+      delay_probability: 0.0  # No delays for simple testing
+      skip_probability: 0.0
+
+# Algorithm-specific params (empty for DummyAlg)
+algorithms:
+  DummyAlg: {}

@@ -1,0 +1,85 @@
+# Experiment Configuration for CLEF
+# This file contains experimental parameters and metadata
+# Create a new experiment.yaml for each experimental session or condition
+
+experiment:
+  # Output and data management
+  output:
+    directory: "C:\\Data\\experiments"
+    save_images: true
+    save_metadata: true
+    save_mip_video: false  # Maximum intensity projection video
+  
+  # Acquisition timing and duration
+  acquisition:
+    total_frames: 30000
+    baseline_frames: 0  # Frames before closed-loop can trigger (warm-up period)
+    
+  # Imaging parameters
+  imaging:
+    z_planes: 10  # Number of Z slices per volume
+    z_step_size_um: 3.0  # Microns between Z planes
+    exposure_ms: 50
+    binning: "1x1"
+    roi: [0, 0, 2048, 2048]  # [x, y, width, height] or null for full frame
+    
+    # Strobed acquisition (optional - for reducing motion blur)
+    strobe:
+      enabled: false
+      inter_frame_interval_ms: 80  # Must be > exposure
+  
+  # Structural/reference imaging
+  structural_scan:
+    enabled: true
+    timing: "both"  # Options: "start", "end", "both", "none"
+    channels: ["488", "561", "405"]  # Which illumination channels to capture
+    z_step_size_um: 1.0  # Can be finer than functional imaging
+    num_z_planes: 40
+    exposure_per_channel:
+      "405": 100
+      "488": 50
+      "561": 100
+      "639": 150
+
+# Subject/Sample Metadata
+# NOTE: This section is application-specific - customize for your experiments
+# Example fields are for C. elegans neuroscience, but can be adapted to any domain
+subject:
+  # Generic fields (applicable to most experiments)
+  species: "Caenorhabditis elegans"  # Or "Drosophila", "mouse", "cell culture", etc.
+  genotype: "N2"  # Strain, cell line, or genetic background
+  
+  # Treatment/condition
+  condition: ""  # e.g., "drug treatment", "heat shock", "control"
+  condition_details:
+    # Add experiment-specific metadata here
+    # Example for optogenetics:
+    # photosensitizer: "ATR"
+    # photosensitizer_concentration_um: 10.0
+  
+  # Orientation/positioning (if applicable)
+  mounting:
+    orientation: "ventral"  # or "dorsal", "lateral", "other"
+    notes: ""
+  
+  # Developmental stage or other temporal info
+  age: "young adult"
+  
+  # Health/quality indicators
+  quality_notes:
+    eggs_count: 0  # Or other health markers
+    mobility: "normal"
+
+# Experimental notes
+notes: |
+  Add detailed experimental notes here.
+  Multiple lines are supported.
+
+# Notifications (optional)
+notifications:
+  sms:
+    enabled: false
+    recipients: []  # List of phone numbers
+  email:
+    enabled: false
+    recipients: []
