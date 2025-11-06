@@ -1,0 +1,48 @@
+# CLEF Minimal Hardware Configuration
+# Place this in: config/defaults/hardware_default.yaml
+# For comprehensive defaults with all gooey fields, see hardware_default_comprehensive.yaml
+
+# Hardware backend selection
+backend: "dummy"  # Options: pycromanager, pymmcore, dummy
+
+# Micro-Manager configuration (ignored for dummy backend)
+mm_config_path: null
+
+# Stimulus interface class
+stim_interface: "dummy"  # Options: InvCoreLDIPolygon, InvCoreSpinningDisk639, dummy, etc.
+
+# Microscope name (temporary, backward compatibility)
+microscope_name: null
+
+# Strobe settings
+strobe_acquisition: false
+strobe_inter_frame_interval_ms: 80
+
+# Static ROI
+use_static_stim_roi: false
+
+# Device configurations
+devices:
+  camera:
+    device_name: "Camera"
+    device_type: "camera"
+    properties:
+      Exposure: 100.0
+      Binning: 1
+      
+  stage:
+    device_name: "XYStage"
+    device_type: "stage"
+    properties:
+      Speed: 1.0
+
+# Illumination channels
+illumination_channels:
+  - name: "Brightfield"
+    device: "LED"
+    wavelength: null
+    power: 50.0
+    exposure_ms: 100.0
+
+# Calibration files
+polygon_calibration_path: null
