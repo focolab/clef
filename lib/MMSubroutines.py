@@ -5,12 +5,10 @@ import tifffile as tf
 from datetime import datetime
 import logging
 import os
-import serial
+# import serial
 
 import time
 import json
-from pycromanager import Core
-from pycromanager import JavaObject
 
 try:
     from lib import DummyMMC
@@ -31,7 +29,10 @@ def initialize_mmc(
     acquisition_backend = args["gooey_args"]["acquisition_backend"]
     microscope_name = args["gooey_args"]["microscope_name"]
 
-    if acquisition_backend == "pycromanager":
+    if acquisition_backend == 'test':
+        return DummyMMC.DummyMMC()
+
+    elif acquisition_backend == "pycromanager":
 
         # simple single image acquisition example with snap
 
@@ -41,7 +42,7 @@ def initialize_mmc(
         # bridge = Bridge(convert_camel_case=False)
         # mmc = bridge.get_core()
         # elif microscope_name == "innovation core thunderscope":
-        from pycromanager import Core
+        from pycromanager import Core, JavaObject
         mmc = Core(convert_camel_case=False)
 
         return mmc
@@ -114,6 +115,7 @@ def initialize_mmc(
                 mmc = MMCorePy.CMMCore()
                 mmc.loadSystemConfiguration(config_file)
                 os.chdir(curr_path)
+        
 
         return mmc
 
@@ -686,6 +688,7 @@ def upload_asi_stage_program(my_program, mmc, args, stage_port="COM6", stage_bau
             program_lines = f.readlines()
 
         # load serial connection
+        import serial
         ser = serial.Serial(stage_port, stage_baud, timeout=0)
 
         # loop on individual lines in doc
