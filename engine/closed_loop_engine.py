@@ -56,15 +56,21 @@ class ClosedLoopEngine:
         
         # Components (initialized later)
         self.mmc = None
+        self.xsize = 200 # default for unit tests
+        self.ysize = 200 # default for unit tests
+        self.roi = (0, 0, 200, 200)
+        self.args["id"] = 11111111-11-11-11
+        self.args["saveroot"] = 'C:/Users/rldun/Downloads/'
         self.alg = None
         self.stim = None
+        self.t0 = 1. # default for unit tests
         
         # Data storage
         self.frames: np.ndarray | None = None
         self.frame_time_list: list[float] = []
         
         # Timing
-        self.t0: float | None = None
+
         self.next_call: float | None = None
         
         # Paths and metadata
@@ -208,7 +214,7 @@ class ClosedLoopEngine:
         self.args["id"] = self.session_id
         self.args["saveroot"] = self.saveroot
         
-        # Initialize frame storage
+        # Initialize frame storage, requires hardware initialization (ysize, xsize)
         self.frames = np.zeros(
             (self.frames_to_grab, self.ysize, self.xsize), 
             dtype=np.uint16
