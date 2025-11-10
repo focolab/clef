@@ -16,3 +16,6 @@ class DummyStim(StimBaseClass.StimBaseClass):
 
     def inactivate_stim(self):
         pass
+
+
+

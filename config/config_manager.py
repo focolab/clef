@@ -100,6 +100,7 @@ class AcquisitionConfig(BaseModel):
         if values.get('z_stack') and values.get('z_planes', 1) > 1:
             if v <= values.get('z_start', 0):
                 raise ValueError("z_end must be greater than z_start for z-stack acquisition")
+
         return v
 
 
