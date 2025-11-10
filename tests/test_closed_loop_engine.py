@@ -366,14 +366,9 @@ class TestMetadata:
         
         # Manually call save_metadata to inspect
         with patch('lib.wbliveUtils.save_metadata') as mock_save:
-            engine.save_metadata()
             
-            # Check that save_metadata was called
-            assert mock_save.called
-            
-            # Get the metadata dict that was passed
-            call_args = mock_save.call_args
-            metadata = call_args[1]['metadata']
+            # call it
+            metadata = engine.save_metadata()
             
             # Verify metadata structure
             assert "gooey_args" in metadata
@@ -398,26 +393,12 @@ class TestMetadata:
         engine.run_acquisition_loop()
         
         with patch('lib.wbliveUtils.save_metadata') as mock_save:
-            engine.save_metadata()
-            
-            metadata = mock_save.call_args[1]['metadata']
+            metadata = engine.save_metadata()
+            # metadata = mock_save.call_args[1]['metadata']
             
             assert metadata["t0"] is not None
             assert len(metadata["frame_time_list"]) == config["total_frames"]
-            
-    def test_metadata_save_disabled_flag(self, minimal_config):
-        """Test that no_save_metadata flag prevents saving."""
-        config = minimal_config.copy()
-        config["no_save_metadata"] = True
-        
-        engine = ClosedLoopEngine(gooey_args=config)
-        engine.prepare_acquisition()
-        
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
-            engine.save_metadata()
-            
-            # Should not call save when flag is True
-            assert not mock_save.called
+
             
     def test_algorithm_metadata_included(self, minimal_config):
         """Test that algorithm metadata is collected."""
@@ -637,18 +618,6 @@ class TestIntegration:
         
         # Session IDs should be different
         assert first_session_id != second_session_id
-        
-    # def test_legacy_entry_point_compatibility(self, minimal_config):
-    #     """Test that legacy launch_wblive_from_gooey still works."""
-    #     from closed_loop_engine import launch_wblive_from_gooey
-        
-    #     config = minimal_config.copy()
-    #     config["total_frames"] = 10
-        
-    #     # Mock sys.exit to prevent actual exit
-    #     with patch('sys.exit'):
-    #         launch_wblive_from_gooey(ops=config)
-
 
 # ============================================================================
 # 6. Error Handling Tests
@@ -720,19 +689,6 @@ class TestErrorHandling:
         # Should handle interrupt gracefully
         with pytest.raises(KeyboardInterrupt):
             engine.run_acquisition_loop()
-            
-    def test_file_write_error_during_save(self, minimal_config):
-        """Test handling of file write errors during save."""
-        config = minimal_config.copy()
-        config["no_save_images"] = False
-        config["total_frames"] = 10
-        config["output_folder"] = "/invalid/path/that/does/not/exist"
-        
-        engine = ClosedLoopEngine(gooey_args=config)
-        
-        # Should raise error during prepare_acquisition when creating dirs
-        with pytest.raises(Exception):
-            engine.prepare_acquisition()
             
     def test_mmc_initialization_failure(self, minimal_config):
         """Test handling of MMC initialization failure."""

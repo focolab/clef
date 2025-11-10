@@ -13,6 +13,7 @@ class DummyMMC:
         self.xsize = None
         self.ysize = None
         self.is_dummy = True
+        self.exposure = 10
 
         # if we're supplying frames, load the data file
         if self.fname:
@@ -86,6 +87,7 @@ class DummyMMC:
 
 
     def setExposure(self, exposure):
+        self.exposure = exposure
         pass
 
     def getImage(self):
@@ -99,3 +101,16 @@ class DummyMMC:
 
     def setShutterOpen(self, shutter_state):
         pass
+
+    def getProperty(self, dev, val):
+
+        # get property of pseudo device
+        if val == "Binnning":
+            return "1x1"
+        
+    def getCameraDevice(self):
+        return 'test'
+    
+    def getExposure(self):
+        return self.exposure
+

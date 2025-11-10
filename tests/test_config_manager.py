@@ -125,7 +125,8 @@ def experiment_yaml(temp_config_dir):
             'z_stack': True,
             'z_start': 0.0,
             'z_end': 10.0,
-            'z_step': 2.0
+            'z_step': 2.0,
+            'z_planes': 5
         },
         'subject': {
             'subject_id': 'subject_001',
@@ -330,7 +331,8 @@ def test_z_stack_validation_invalid_range(temp_config_dir):
             'num_frames': 100,
             'z_stack': True,
             'z_start': 10.0,
-            'z_end': 5.0  # end < start - invalid
+            'z_end': 5.0,  # end < start - invalid
+            'z_planes': 5
         }
     }
     
