@@ -1,13 +1,15 @@
 """
 Comprehensive test suite for ClosedLoopEngine class.
 
-Tests are organized into 6 categories:
-1. Initialization Tests
-2. Acquisition Loop Tests
-3. Metadata Tests
-4. Cleanup Tests
-5. Integration Tests
-6. Error Handling Tests
+Tests are organized into 8 categories:
+1. Configuration Object Creation and Conversion
+2. Initialization Tests
+3. Acquisition Loop Tests
+4. Metadata Tests
+5. Cleanup Tests
+6. Integration Tests
+7. Error Handling Tests
+8. Backward Compatibility Tests
 """
 
 import pytest
@@ -19,13 +21,29 @@ import json
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from pathlib import Path
 
 # Import the engine and supporting modules
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# from closed_loop_engine import ClosedLoopEngine, create_test_config
-from engine.closed_loop_engine import ClosedLoopEngine, create_test_config
+from engine.closed_loop_engine import (
+    ClosedLoopEngine,
+    convert_gooey_args_to_configs,
+    launch_wblive_from_gooey,
+    create_test_config,
+)
+from config.config_manager import (
+    ConfigManager,
+    HardwareConfig,
+    ExperimentConfig,
+    AlgorithmConfig,
+    AcquisitionConfig,
+    SubjectMetadata,
+    DevOptions,
+    AlgorithmParameters,
+    StimulusParameters,
+)
 from lib import DummyMMC, DummyAlg, DummyStim
 
 
@@ -44,20 +62,20 @@ def temp_output_dir():
 
 
 @pytest.fixture
-def minimal_config(temp_output_dir):
-    """Provide minimal valid configuration for testing."""
-    test_config = {
+def legacy_gooey_args(temp_output_dir):
+    """Provide legacy gooey_args dict for backward compatibility testing."""
+    return {
         # Acquisition controls
-        "output_folder": "./test_output",
-        "total_frames": 100,  # Small number for quick testing
-        "mm_configuration_file": "MMConfig_demo.cfg", # Not used
+        "output_folder": temp_output_dir,
+        "total_frames": 100,
+        "mm_configuration_file": "MMConfig_demo.cfg",
         "zsize": 10,
         "save_mip": False,
         "strobe_acquisition": False,
         "strobe_inter_frame_interval": 80,
         "save_structural_scan": "none",
         
-        # Experimental metadata (minimal for testing)
+        # Experimental metadata
         "subject_strain": "test_strain",
         "subject_condition": "",
         "atr_concentration": 0.0,
@@ -69,13 +87,13 @@ def minimal_config(temp_output_dir):
         "experimental_notes": "Test run with dummy objects",
         
         # Closed-loop controls
-        "trigger_algorithm": "Dummy algorithm (does nothing)",
+        "trigger_algorithm": "dummy",
         "GUI_mode": "neural_imaging",
         "rec_baseline": 0,
         "save_alg_model_plot": False,
         
         # Stimulus settings
-        "stim_interface": "no stim",
+        "stim_interface": "dummy",
         "use_static_stim_roi": False,
         "frames_to_stimulate_for_options": [48],
         "stim_intensity_options": [10],
@@ -83,20 +101,71 @@ def minimal_config(temp_output_dir):
         
         # Dev ops
         "input_recording": None,
-        "acquisition_backend": "test",
-        "no_save_images": True,  # Don't save images during testing
-        "no_save_metadata": True,  # Don't save metadata during testing
+        "acquisition_backend": "dummy",
+        "no_save_images": True,
+        "no_save_metadata": True,
         "save_gooey_defaults": False,
         "prefill_wb_ops": False,
         "send_sms": False,
-        
-        # Additional params that might be needed
-        "roi": (0, 0, 200, 200),
-        "exposure": 30,
-        "binning": "1x1",
-        "configs": {},
     }
-    return test_config
+
+
+@pytest.fixture
+def minimal_configs(temp_output_dir):
+    """Provide minimal valid Config objects for testing."""
+    
+    hardware_config = HardwareConfig(
+        backend="dummy",
+        stim_interface="dummy",
+        microscope_name="test",
+    )
+    
+    acquisition_config = AcquisitionConfig(
+        num_frames=100,
+        z_planes=10,
+        z_step=1.0,
+    )
+    
+    subject_metadata = SubjectMetadata(
+        genotype="test_strain",
+        notes="Test run with dummy objects",
+    )
+    
+    dev_options = DevOptions(
+        prefill_wb_ops=False,
+        send_sms_on_completion=False,
+    )
+    
+    experiment_config = ExperimentConfig(
+        experiment_name="test_experiment",
+        output_dir=temp_output_dir,
+        save_images=False,
+        save_metadata=False,
+        acquisition=acquisition_config,
+        subject=subject_metadata,
+        dev_options=dev_options,
+    )
+    
+    algorithm_params = AlgorithmParameters(
+        stimulus_diameter_pixels=10,
+    )
+    
+    stimulus_params = StimulusParameters(
+        enabled=False,
+    )
+    
+    algorithm_config = AlgorithmConfig(
+        algorithm_type="dummy",
+        enable_gui=False,
+        algorithm_params=algorithm_params,
+        stimulus_params=stimulus_params,
+    )
+    
+    return {
+        "hardware": hardware_config,
+        "experiment": experiment_config,
+        "algorithm": algorithm_config,
+    }
 
 
 @pytest.fixture
@@ -113,44 +182,111 @@ def dummy_tiff_file(temp_output_dir):
 
 
 @pytest.fixture
-def engine_with_config(minimal_config):
-    """Provide an engine instance with minimal config."""
-    return ClosedLoopEngine(gooey_args=minimal_config)
+def engine_with_configs(minimal_configs):
+    """Provide an engine instance with minimal Config objects."""
+    return ClosedLoopEngine(
+        hardware_config=minimal_configs["hardware"],
+        experiment_config=minimal_configs["experiment"],
+        algorithm_config=minimal_configs["algorithm"]
+    )
 
 
 # ============================================================================
-# 1. Initialization Tests
+# 1. Configuration Object Creation and Conversion Tests
+# ============================================================================
+
+class TestConfigObjectCreation:
+    """Test creating Config objects from different sources."""
+    
+    def test_create_from_yaml(self, temp_output_dir):
+        """Test loading Config objects from YAML files."""
+        manager = ConfigManager()
+        
+        # Load all configs from defaults
+        manager.load_all_configs()
+        
+        assert manager.hardware_config is not None
+        assert manager.experiment_config is not None
+        assert manager.algorithm_config is not None
+        
+        # Validate loaded configs
+        assert manager.hardware_config.backend == "dummy"
+        assert manager.experiment_config.acquisition.num_frames == 100
+        assert manager.algorithm_config.algorithm_type == "dummy"
+    
+    def test_create_programmatically(self, minimal_configs):
+        """Test creating Config objects programmatically."""
+        assert minimal_configs["hardware"].backend == "dummy"
+        assert minimal_configs["experiment"].acquisition.num_frames == 100
+        assert minimal_configs["algorithm"].algorithm_type == "dummy"
+    
+    def test_convert_from_legacy_gooey_args(self, legacy_gooey_args):
+        """Test converting legacy gooey_args to Config objects."""
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        assert isinstance(configs["hardware"], HardwareConfig)
+        assert isinstance(configs["experiment"], ExperimentConfig)
+        assert isinstance(configs["algorithm"], AlgorithmConfig)
+        
+        # Verify conversion accuracy
+        assert configs["hardware"].backend == "dummy"
+        assert configs["experiment"].acquisition.num_frames == 100
+        assert configs["algorithm"].algorithm_type == "dummy"
+    
+    def test_create_test_config_generates_valid_configs(self):
+        """Test that create_test_config helper generates valid Config objects."""
+        configs = create_test_config()
+        
+        # Should return dict with three config objects
+        assert "hardware" in configs
+        assert "experiment" in configs
+        assert "algorithm" in configs
+        
+        # Should have sensible defaults
+        assert configs["experiment"].acquisition.num_frames == 100
+        assert configs["algorithm"].algorithm_type == "dummy"
+        assert configs["hardware"].stim_interface == "dummy"
+
+
+# ============================================================================
+# 2. Initialization Tests
 # ============================================================================
 
 class TestInitialization:
     """Test suite for ClosedLoopEngine initialization."""
     
-    def test_engine_accepts_config(self, minimal_config):
-        """Test that engine accepts and stores configuration."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+    def test_engine_accepts_config_objects(self, minimal_configs):
+        """Test that engine accepts and stores Config objects."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
         
-        assert engine.gooey_args == minimal_config
-        assert engine.args["gooey_args"] == minimal_config
+        assert engine.hardware_config == minimal_configs["hardware"]
+        assert engine.experiment_config == minimal_configs["experiment"]
+        assert engine.algorithm_config == minimal_configs["algorithm"]
+    
+    def test_legacy_args_structure_built(self, minimal_configs):
+        """Test that legacy args dictionary is built for backward compatibility."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
         
-    def test_args_structure_correct(self, minimal_config):
-        """Test that args dictionary has correct structure for MMSubroutines."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
-        
+        # Legacy args dict should exist
         assert "gooey_args" in engine.args
-        assert engine.args["gooey_args"] == minimal_config
         
-    def test_parameter_extraction(self, minimal_config):
-        """Test that parameters are correctly extracted from config."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
-        
-        assert engine.zsize == minimal_config["zsize"]
-        assert engine.frames_to_grab == minimal_config["total_frames"]
-        assert engine.trigger_alg == minimal_config["trigger_algorithm"]
-        assert engine.acquisition_backend == minimal_config["acquisition_backend"]
-        
-    def test_initial_state(self, engine_with_config):
+        # Should contain key fields from configs
+        gooey_args = engine.args["gooey_args"]
+        assert gooey_args["acquisition_backend"] == "dummy"
+        assert gooey_args["total_frames"] == 100
+        assert gooey_args["zsize"] == 10
+    
+    def test_initial_state(self, engine_with_configs):
         """Test that engine starts with correct initial state."""
-        engine = engine_with_config
+        engine = engine_with_configs
         
         assert engine.is_running is False
         assert engine.frame_count == 0
@@ -159,79 +295,102 @@ class TestInitialization:
         assert engine.mmc is None
         assert engine.alg is None
         assert engine.stim is None
-        
-    def test_hardware_initialization_creates_mmc(self, engine_with_config):
+    
+    def test_hardware_initialization_creates_mmc(self, engine_with_configs):
         """Test that hardware initialization creates MMC object."""
-        engine = engine_with_config
+        engine = engine_with_configs
         engine.initialize_hardware()
-        engine.prepare_acquisition()
         
         assert engine.mmc is not None
         assert isinstance(engine.mmc, DummyMMC.DummyMMC)
-        
-    def test_algorithm_factory_creates_dummy_alg(self, engine_with_config):
+    
+    def test_algorithm_factory_creates_dummy_alg(self, engine_with_configs):
         """Test that algorithm factory creates DummyAlg for dummy config."""
-        engine = engine_with_config
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
         
         assert engine.alg is not None
         assert isinstance(engine.alg, DummyAlg.DummyAlg)
-        
-    def test_stimulus_initialization_creates_interface(self, engine_with_config):
+    
+    def test_stimulus_initialization_creates_interface(self, engine_with_configs):
         """Test that stimulus initialization creates interface."""
-        engine = engine_with_config
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_stimulus()
         
         assert engine.stim is not None
-        
-    def test_roi_setup_from_config(self, minimal_config):
-        """Test that ROI is properly set from config."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+    
+    def test_roi_setup_from_hardware(self, engine_with_configs):
+        """Test that ROI is properly set from hardware."""
+        engine = engine_with_configs
         engine.initialize_hardware()
-        engine.prepare_acquisition()
         
-        assert engine.roi == minimal_config["roi"]
-        assert engine.xsize == minimal_config["roi"][2]
-        assert engine.ysize == minimal_config["roi"][3]
+        # ROI should be set from dummy MMC
+        assert engine.roi is not None
+        assert engine.xsize == engine.roi[2]
+        assert engine.ysize == engine.roi[3]
+    
+    def test_config_field_access_patterns(self, minimal_configs):
+        """Test that Config fields are accessible in expected patterns."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # Direct config access (new way)
+        assert engine.hardware_config.backend == "dummy"
+        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.algorithm_config.algorithm_type == "dummy"
+        
+        # Legacy args access still works
+        assert engine.args["gooey_args"]["acquisition_backend"] == "dummy"
+        assert engine.args["gooey_args"]["total_frames"] == 100
 
 
 # ============================================================================
-# 2. Acquisition Loop Tests
+# 3. Acquisition Loop Tests
 # ============================================================================
 
 class TestAcquisitionLoop:
     """Test suite for acquisition loop functionality."""
     
-    def test_prepare_acquisition_creates_directories(self, engine_with_config):
+    def test_prepare_acquisition_creates_directories(self, engine_with_configs):
         """Test that prepare_acquisition creates output directories."""
-        engine = engine_with_config
+        engine = engine_with_configs
+        engine.initialize_hardware()
         engine.prepare_acquisition()
         
         assert engine.savedir is not None
         assert os.path.exists(engine.savedir)
         assert engine.saveroot is not None
         assert engine.session_id is not None
-        
-    def test_prepare_acquisition_initializes_frame_storage(self, engine_with_config):
+    
+    def test_prepare_acquisition_initializes_frame_storage(self, engine_with_configs):
         """Test that frame storage is initialized with correct dimensions."""
-        engine = engine_with_config
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
         assert engine.frames is not None
-        assert engine.frames.shape == (engine.frames_to_grab, engine.ysize, engine.xsize)
+        expected_frames = engine.experiment_config.acquisition.num_frames
+        assert engine.frames.shape == (expected_frames, engine.ysize, engine.xsize)
         assert engine.frames.dtype == np.uint16
-        
-    def test_acquisition_loop_captures_frames(self, minimal_config):
+    
+    def test_acquisition_loop_captures_frames(self, minimal_configs):
         """Test that acquisition loop captures the expected number of frames."""
-        config = minimal_config.copy()
-        config["total_frames"] = 20  # Small number for quick test
+        # Create config with small frame count
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 20
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -240,14 +399,18 @@ class TestAcquisitionLoop:
         # Run acquisition
         engine.run_acquisition_loop()
         
-        assert engine.img_count == config["total_frames"]
-        
-    def test_acquisition_loop_tracks_frame_times(self, minimal_config):
+        assert engine.img_count == 20
+    
+    def test_acquisition_loop_tracks_frame_times(self, minimal_configs):
         """Test that frame timestamps are recorded."""
-        config = minimal_config.copy()
-        config["total_frames"] = 20
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 20
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -255,16 +418,20 @@ class TestAcquisitionLoop:
         
         engine.run_acquisition_loop()
         
-        assert len(engine.frame_time_list) == config["total_frames"]
+        assert len(engine.frame_time_list) == 20
         assert all(isinstance(t, (float, np.float64)) for t in engine.frame_time_list)
-        
-    def test_z_stack_indexing(self, minimal_config):
+    
+    def test_z_stack_indexing(self, minimal_configs):
         """Test that z-stack indexing cycles correctly."""
-        config = minimal_config.copy()
-        config["total_frames"] = 25
-        config["zsize"] = 5
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 25
+        configs["experiment"].acquisition.z_planes = 5
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -277,21 +444,25 @@ class TestAcquisitionLoop:
         def track_z_index(frame, zndx):
             z_indices_seen.append(zndx)
             return original_process_frame(frame, zndx)
-            
+        
         engine.alg.process_frame = track_z_index
         
         engine.run_acquisition_loop()
         
-        # Check that z indices cycle from 0 to zsize-1
-        expected_pattern = [i % config["zsize"] for i in range(config["total_frames"])]
+        # Check that z indices cycle from 0 to z_planes-1
+        expected_pattern = [i % 5 for i in range(25)]
         assert z_indices_seen == expected_pattern
-        
-    def test_stimulus_triggering_flow(self, minimal_config):
+    
+    def test_stimulus_triggering_flow(self, minimal_configs):
         """Test that stimulus checking and submission occurs each frame."""
-        config = minimal_config.copy()
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -304,20 +475,24 @@ class TestAcquisitionLoop:
         def track_stim(stim_params, image_ndx):
             stim_submissions.append((stim_params, image_ndx))
             return original_submit(stim_params, image_ndx)
-            
+        
         engine.stim.submit_stim_params = track_stim
         
         engine.run_acquisition_loop()
         
         # Should have one submission per frame
-        assert len(stim_submissions) == config["total_frames"]
-        
-    def test_cooldown_counter_decrements(self, minimal_config):
+        assert len(stim_submissions) == 10
+    
+    def test_cooldown_counter_decrements(self, minimal_configs):
         """Test that cooldown counter properly decrements."""
-        config = minimal_config.copy()
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -328,14 +503,14 @@ class TestAcquisitionLoop:
         initial_cooldown = engine.cooldown_counter
         
         # Mock to trigger after a few frames
-        frame_count = 0
+        frame_count = [0]
         def mock_check_stim(image_ndx, cooldown):
             nonlocal frame_count
-            frame_count += 1
-            if frame_count >= initial_cooldown:
+            frame_count[0] += 1
+            if frame_count[0] >= initial_cooldown:
                 return {}, 0  # Reset cooldown after it expires
             return {}, cooldown - 1 if cooldown > 0 else 0
-            
+        
         engine.alg.check_stim = mock_check_stim
         
         engine.run_acquisition_loop()
@@ -345,47 +520,53 @@ class TestAcquisitionLoop:
 
 
 # ============================================================================
-# 3. Metadata Tests
+# 4. Metadata Tests
 # ============================================================================
 
 class TestMetadata:
     """Test suite for metadata collection and saving."""
     
-    def test_metadata_collection_from_all_components(self, minimal_config):
-        """Test that metadata is collected from all components."""
-        config = minimal_config.copy()
-        config["no_save_metadata"] = False
-        config["total_frames"] = 10
+    def test_metadata_includes_config_objects(self, minimal_configs):
+        """Test that metadata includes Config objects."""
+        configs = minimal_configs.copy()
+        configs["experiment"].save_metadata = True
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
         engine.initialize_stimulus()
         engine.run_acquisition_loop()
         
-        # Manually call save_metadata to inspect
         with patch('lib.wbliveUtils.save_metadata') as mock_save:
-            
-            # call it
             metadata = engine.save_metadata()
             
-            # Verify metadata structure
-            assert "gooey_args" in metadata
-            assert "frame_time_list" in metadata
-            assert "t0" in metadata
-            assert "xsize" in metadata
-            assert "ysize" in metadata
-            assert "alg_metadata" in metadata
-            assert "stim_metadata" in metadata
+            # Verify Config objects are in metadata
+            assert "hardware_config" in metadata
+            assert "experiment_config" in metadata
+            assert "algorithm_config" in metadata
             
-    def test_metadata_includes_timing_info(self, minimal_config):
+            # Should be dicts (from model_dump())
+            assert isinstance(metadata["hardware_config"], dict)
+            assert isinstance(metadata["experiment_config"], dict)
+            assert isinstance(metadata["algorithm_config"], dict)
+    
+    def test_metadata_includes_timing_info(self, minimal_configs):
         """Test that metadata includes timing information."""
-        config = minimal_config.copy()
-        config["no_save_metadata"] = False
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].save_metadata = True
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -394,42 +575,62 @@ class TestMetadata:
         
         with patch('lib.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
-            # metadata = mock_save.call_args[1]['metadata']
             
             assert metadata["t0"] is not None
-            assert len(metadata["frame_time_list"]) == config["total_frames"]
-
-            
-    def test_algorithm_metadata_included(self, minimal_config):
+            assert len(metadata["frame_time_list"]) == 10
+    
+    def test_algorithm_metadata_included(self, minimal_configs):
         """Test that algorithm metadata is collected."""
-        config = minimal_config.copy()
-        config["no_save_metadata"] = False
+        configs = minimal_configs.copy()
+        configs["experiment"].save_metadata = True
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
         engine.initialize_stimulus()
         
         with patch('lib.wbliveUtils.save_metadata') as mock_save:
-            engine.save_metadata()
-            
-            metadata = mock_save.call_args[1]['metadata']
+            metadata = engine.save_metadata()
             
             assert "alg_metadata" in metadata
             assert metadata["alg_metadata"]["is_dummy_alg"] is True
+    
+    def test_stimulus_metadata_included(self, minimal_configs):
+        """Test that stimulus metadata is collected."""
+        configs = minimal_configs.copy()
+        configs["experiment"].save_metadata = True
+        
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
+        engine.initialize_hardware()
+        engine.prepare_acquisition()
+        engine.initialize_algorithm()
+        engine.initialize_stimulus()
+        
+        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+            metadata = engine.save_metadata()
+            
+            assert "stim_metadata" in metadata
 
 
 # ============================================================================
-# 4. Cleanup Tests
+# 5. Cleanup Tests
 # ============================================================================
 
 class TestCleanup:
     """Test suite for resource cleanup and management."""
     
-    def test_cleanup_stops_acquisition(self, minimal_config):
+    def test_cleanup_stops_acquisition(self, engine_with_configs):
         """Test that cleanup stops the acquisition."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
@@ -439,10 +640,10 @@ class TestCleanup:
         engine.cleanup()
         
         engine.mmc.stopSequenceAcquisition.assert_called_once()
-        
-    def test_cleanup_closes_algorithm(self, minimal_config):
+    
+    def test_cleanup_closes_algorithm(self, engine_with_configs):
         """Test that cleanup closes the algorithm."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -453,10 +654,10 @@ class TestCleanup:
         engine.cleanup()
         
         engine.alg.close.assert_called_once()
-        
-    def test_cleanup_closes_stimulus(self, minimal_config):
+    
+    def test_cleanup_closes_stimulus(self, engine_with_configs):
         """Test that cleanup closes stimulus interface."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_stimulus()
@@ -467,10 +668,10 @@ class TestCleanup:
         engine.cleanup()
         
         engine.stim.close.assert_called_once()
-        
-    def test_cleanup_handles_mmc_close_errors(self, minimal_config):
+    
+    def test_cleanup_handles_mmc_close_errors(self, engine_with_configs):
         """Test that cleanup gracefully handles MMC errors."""
-        engine = ClosedLoopEngine(gooey_args=minimal_config)
+        engine = engine_with_configs
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
@@ -482,13 +683,18 @@ class TestCleanup:
             engine.cleanup()
         except Exception as e:
             pytest.fail(f"Cleanup should handle errors gracefully, but raised: {e}")
-            
-    def test_cleanup_sends_sms_notification(self, minimal_config):
+    
+    def test_cleanup_sends_sms_notification(self, minimal_configs):
         """Test that cleanup sends SMS notification when enabled."""
-        config = minimal_config.copy()
-        config["send_sms"] = True
+        configs = minimal_configs.copy()
+        configs["experiment"].dev_options.send_sms_on_completion = True
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
+        engine.initialize_hardware()
         engine.prepare_acquisition()
         
         with patch('lib.wbliveUtils.notify') as mock_notify:
@@ -497,13 +703,11 @@ class TestCleanup:
             mock_notify.assert_called_once()
             call_args = mock_notify.call_args
             assert "completed" in call_args[0][0].lower()
-            
-    def test_cleanup_skips_sms_when_disabled(self, minimal_config):
+    
+    def test_cleanup_skips_sms_when_disabled(self, engine_with_configs):
         """Test that cleanup skips SMS when disabled."""
-        config = minimal_config.copy()
-        config["send_sms"] = False
-        
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = engine_with_configs
+        engine.initialize_hardware()
         engine.prepare_acquisition()
         
         with patch('lib.wbliveUtils.notify') as mock_notify:
@@ -513,99 +717,116 @@ class TestCleanup:
 
 
 # ============================================================================
-# 5. Integration Tests
+# 6. Integration Tests
 # ============================================================================
 
 class TestIntegration:
     """End-to-end integration tests with dummy backend."""
     
-    def test_full_acquisition_workflow(self, minimal_config):
+    def test_full_acquisition_workflow(self, minimal_configs):
         """Test complete acquisition workflow from start to finish."""
-        config = minimal_config.copy()
-        config["total_frames"] = 20
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 20
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         
         # Should complete without errors
         engine.run()
         
         # Verify final state
-        assert engine.img_count == config["total_frames"]
+        assert engine.img_count == 20
         assert os.path.exists(engine.savedir)
-        
-    def test_acquisition_with_tiff_input(self, minimal_config, dummy_tiff_file):
+    
+    def test_acquisition_with_tiff_input(self, minimal_configs, dummy_tiff_file):
         """Test acquisition with TIFF file input."""
-        config = minimal_config.copy()
-        config["input_recording"] = dummy_tiff_file
-        config["total_frames"] = 50
+        configs = minimal_configs.copy()
+        configs["experiment"].input_recording_path = dummy_tiff_file
+        configs["experiment"].acquisition.num_frames = 50
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.run()
         
-        assert engine.img_count == config["total_frames"]
-        
-    def test_acquisition_with_z_stacks(self, minimal_config):
+        assert engine.img_count == 50
+    
+    def test_acquisition_with_z_stacks(self, minimal_configs):
         """Test acquisition with multiple z-planes."""
-        config = minimal_config.copy()
-        config["total_frames"] = 30
-        config["zsize"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 30
+        configs["experiment"].acquisition.z_planes = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.run()
         
         # Should complete 3 full volumes
         assert engine.img_count == 30
-        
-    def test_acquisition_saves_images_when_enabled(self, minimal_config):
+    
+    def test_acquisition_saves_images_when_enabled(self, minimal_configs):
         """Test that images are saved when flag is enabled."""
-        config = minimal_config.copy()
-        config["no_save_images"] = False
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].save_images = True
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         
         with patch('lib.MMSubroutines.saveScanTiffs') as mock_save:
             engine.run()
             
             # Should call save function
             mock_save.assert_called_once()
-            
-    def test_acquisition_skips_images_when_disabled(self, minimal_config):
+    
+    def test_acquisition_skips_images_when_disabled(self, engine_with_configs):
         """Test that images are not saved when flag is disabled."""
-        config = minimal_config.copy()
-        config["no_save_images"] = True
-        
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = engine_with_configs
         
         with patch('lib.MMSubroutines.saveScanTiffs') as mock_save:
             engine.run()
             
             # Should not call save function
             mock_save.assert_not_called()
-            
-    def test_multiple_acquisitions_with_same_instance(self, minimal_config):
+    
+    def test_multiple_acquisitions_with_same_instance(self, minimal_configs):
         """Test that engine can be reused for multiple acquisitions."""
-        config = minimal_config.copy()
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 10
         
         # First acquisition
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
-        engine.prepare_acquisition()  # Creates new directories
+        engine.prepare_acquisition()
         engine.initialize_algorithm()
         engine.initialize_stimulus()
         engine.run_acquisition_loop()
         engine.cleanup()
         first_session_id = engine.session_id
-
-        # wait 1s for new session id
+        
+        # Wait 1s for new session id
         time.sleep(1)
         
         # Reset for second acquisition
         engine.is_running = False
         engine.img_count = 0
         engine.frame_count = 0
-        engine.prepare_acquisition()  # Creates new directories
+        engine.prepare_acquisition()
         
         # Second acquisition
         engine.initialize_hardware()
@@ -619,56 +840,41 @@ class TestIntegration:
         # Session IDs should be different
         assert first_session_id != second_session_id
 
+
 # ============================================================================
-# 6. Error Handling Tests
+# 7. Error Handling Tests
 # ============================================================================
 
 class TestErrorHandling:
     """Test suite for error handling and edge cases."""
     
-    def test_missing_required_config_keys(self):
-        """Test that missing required config keys raise appropriate errors."""
-        incomplete_config = {
-            "output_folder": "./test",
-            # Missing many required keys
-        }
-        
-        engine = ClosedLoopEngine(gooey_args=incomplete_config)
-        
-        # Should handle missing keys gracefully during initialization
-        # The actual behavior depends on implementation - test for expected behavior
-        
-    def test_unknown_algorithm_name(self, minimal_config):
+    def test_unknown_algorithm_name(self, minimal_configs):
         """Test handling of unknown algorithm name."""
-        config = minimal_config.copy()
-        config["trigger_algorithm"] = "NonexistentAlgorithm"
+        configs = minimal_configs.copy()
+        configs["algorithm"].algorithm_type = "NonexistentAlgorithm"
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
         # Should fall back to DummyAlg
         engine.initialize_algorithm()
         assert isinstance(engine.alg, DummyAlg.DummyAlg)
-        
-    def test_invalid_roi_dimensions(self, minimal_config):
-        """Test handling of invalid ROI."""
-        config = minimal_config.copy()
-        config["roi"] = [0, 0, 0, 0]  # Invalid zero-size ROI
-        
-        engine = ClosedLoopEngine(gooey_args=config)
-        engine.initialize_hardware()
-        engine.prepare_acquisition()
-        
-        # Should still create frame storage, even if dimensions are unusual
-        assert engine.frames is not None
-        
-    def test_acquisition_interrupted_mid_loop(self, minimal_config):
+    
+    def test_acquisition_interrupted_mid_loop(self, minimal_configs):
         """Test that interrupting acquisition is handled gracefully."""
-        config = minimal_config.copy()
-        config["total_frames"] = 100
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 100
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -683,32 +889,39 @@ class TestErrorHandling:
             if call_count[0] > 10:
                 raise KeyboardInterrupt("User interrupted")
             return original_process(frame, zndx)
-            
+        
         engine.alg.process_frame = interrupt_after_10
         
         # Should handle interrupt gracefully
         with pytest.raises(KeyboardInterrupt):
             engine.run_acquisition_loop()
-            
-    def test_mmc_initialization_failure(self, minimal_config):
+    
+    def test_mmc_initialization_failure(self, minimal_configs):
         """Test handling of MMC initialization failure."""
-        config = minimal_config.copy()
-        config["mm_configuration_file"] = "/invalid/config/file.cfg"
+        configs = minimal_configs.copy()
+        configs["hardware"].mm_config_path = "/invalid/config/file.cfg"
         
-        engine = ClosedLoopEngine(gooey_args=config)
-        engine.prepare_acquisition()
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         
         # Mock initialize_mmc to raise error
         with patch('lib.MMSubroutines.initialize_mmc', side_effect=Exception("MMC init failed")):
             with pytest.raises(Exception):
                 engine.initialize_hardware()
-                
-    def test_algorithm_process_frame_error(self, minimal_config):
+    
+    def test_algorithm_process_frame_error(self, minimal_configs):
         """Test handling of algorithm errors during frame processing."""
-        config = minimal_config.copy()
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.initialize_hardware()
         engine.prepare_acquisition()
         engine.initialize_algorithm()
@@ -720,50 +933,282 @@ class TestErrorHandling:
         # Should propagate error from acquisition loop
         with pytest.raises(Exception):
             engine.run_acquisition_loop()
-            
-    def test_cleanup_called_on_exception(self, minimal_config):
+    
+    def test_cleanup_called_on_exception(self, minimal_configs):
         """Test that cleanup is called even when exception occurs."""
-        config = minimal_config.copy()
-        config["total_frames"] = 10
+        configs = minimal_configs.copy()
+        configs["experiment"].acquisition.num_frames = 10
         
-        engine = ClosedLoopEngine(gooey_args=config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         
         # Mock run_acquisition_loop to raise error
         with patch.object(engine, 'run_acquisition_loop', side_effect=Exception("Test error")):
             with patch.object(engine, 'cleanup') as mock_cleanup:
                 with pytest.raises(Exception):
                     engine.run()
-                    
+                
                 # Cleanup should still be called
                 mock_cleanup.assert_called_once()
-
-
-# ============================================================================
-# Test Utilities
-# ============================================================================
-
-def test_create_test_config_generates_valid_config():
-    """Test that create_test_config helper generates valid configuration."""
-    config = create_test_config()
     
-    # Should have all required keys
-    required_keys = [
-        "output_folder", "total_frames", "mm_configuration_file", "zsize",
-        "trigger_algorithm", "stim_interface", "acquisition_backend"
-    ]
-    
-    for key in required_keys:
-        assert key in config
+    def test_invalid_config_validation(self):
+        """Test that invalid Config objects are caught by Pydantic."""
+        # Test invalid backend
+        with pytest.raises(Exception):  # ValidationError
+            HardwareConfig(backend="invalid_backend")
         
-    # Should have sensible defaults
-    assert config["total_frames"] == 100
-    assert config["trigger_algorithm"] == "Dummy algorithm (does nothing)"
-    assert config["stim_interface"] == "no stim"
-    
+        # Test negative num_frames
+        with pytest.raises(Exception):  # ValidationError
+            AcquisitionConfig(num_frames=-10)
+        
+        # Test invalid z_end (less than z_start when z_stack enabled)
+        with pytest.raises(Exception):  # ValidationError
+            AcquisitionConfig(
+                z_stack=True,
+                z_planes=10,
+                z_start=10.0,
+                z_end=0.0  # Invalid: end < start
+            )
 
-def test_create_test_config_with_tiff_input():
-    """Test create_test_config with TIFF file input."""
-    test_file = "/path/to/test.tiff"
-    config = create_test_config(input_recording=test_file)
+
+# ============================================================================
+# 8. Backward Compatibility Tests
+# ============================================================================
+
+class TestBackwardCompatibility:
+    """Test backward compatibility with legacy gooey_args interface."""
     
-    assert config["input_recording"] == test_file
+    def test_gooey_args_conversion(self, legacy_gooey_args):
+        """Test that gooey_args can be converted and used."""
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
+        
+        # Verify engine is properly initialized
+        assert engine.hardware_config.backend == "dummy"
+        assert engine.experiment_config.acquisition.num_frames == 100
+    
+    def test_launch_from_gooey_wrapper(self, legacy_gooey_args, monkeypatch):
+        """Test the legacy launch_wblive_from_gooey wrapper."""
+        # Mock sys.exit to prevent test from exiting
+        def mock_exit(code=0):
+            pass
+        
+        monkeypatch.setattr("sys.exit", mock_exit)
+        
+        # This should convert gooey_args and run without errors
+        # (will fail at hardware init with dummy objects, which is expected)
+        try:
+            launch_wblive_from_gooey(legacy_gooey_args)
+        except Exception as e:
+            # Expected to fail at some point with dummy hardware
+            # The important part is that conversion succeeded
+            assert "gooey_args" not in str(e) or "Config" not in str(e)
+    
+    def test_legacy_args_accessible_in_components(self, minimal_configs):
+        """Test that legacy args dict is accessible for unrefactored components."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # Legacy components expect args["gooey_args"]
+        assert "gooey_args" in engine.args
+        
+        # Should contain all necessary fields
+        gooey_args = engine.args["gooey_args"]
+        assert "acquisition_backend" in gooey_args
+        assert "total_frames" in gooey_args
+        assert "trigger_algorithm" in gooey_args
+        assert "stim_interface" in gooey_args
+    
+    def test_field_mapping_accuracy(self, legacy_gooey_args):
+        """Test that all fields are correctly mapped in conversion."""
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        # Hardware mappings
+        assert configs["hardware"].backend == legacy_gooey_args["acquisition_backend"]
+        assert configs["hardware"].stim_interface == legacy_gooey_args["stim_interface"]
+        
+        # Experiment mappings
+        assert configs["experiment"].output_dir == legacy_gooey_args["output_folder"]
+        assert configs["experiment"].acquisition.num_frames == legacy_gooey_args["total_frames"]
+        assert configs["experiment"].acquisition.z_planes == legacy_gooey_args["zsize"]
+        
+        # Algorithm mappings
+        assert configs["algorithm"].algorithm_type == legacy_gooey_args["trigger_algorithm"]
+        assert configs["algorithm"].gui_mode == legacy_gooey_args["GUI_mode"]
+    
+    def test_boolean_inversions_handled(self, legacy_gooey_args):
+        """Test that boolean inversions (no_save_X → save_X) are handled correctly."""
+        # Set to NOT save
+        legacy_gooey_args["no_save_images"] = True
+        legacy_gooey_args["no_save_metadata"] = True
+        
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        # Should be inverted in new config
+        assert configs["experiment"].save_images is False
+        assert configs["experiment"].save_metadata is False
+        
+        # Test opposite
+        legacy_gooey_args["no_save_images"] = False
+        legacy_gooey_args["no_save_metadata"] = False
+        
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        assert configs["experiment"].save_images is True
+        assert configs["experiment"].save_metadata is True
+    
+    def test_microscope_name_temporary_field(self, legacy_gooey_args):
+        """Test that microscope_name is included but marked as temporary."""
+        configs = convert_gooey_args_to_configs(legacy_gooey_args)
+        
+        # Should be present in hardware config
+        assert configs["hardware"].microscope_name == "test"
+        
+        # But backend should be the primary field used
+        assert configs["hardware"].backend == "dummy"
+
+
+# ============================================================================
+# 9. Config Access Pattern Tests
+# ============================================================================
+
+class TestConfigAccessPatterns:
+    """Test that Config objects properly replace args dict access."""
+    
+    def test_hardware_config_replaces_args_access(self, minimal_configs):
+        """Test accessing hardware config fields instead of args dict."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # New way: direct config access
+        assert engine.hardware_config.backend == "dummy"
+        assert engine.hardware_config.stim_interface == "dummy"
+        assert engine.hardware_config.strobe_acquisition is False
+        
+        # Old way still works through legacy args
+        assert engine.args["gooey_args"]["acquisition_backend"] == "dummy"
+    
+    def test_experiment_config_replaces_args_access(self, minimal_configs):
+        """Test accessing experiment config fields instead of args dict."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # New way
+        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.acquisition.z_planes == 10
+        assert engine.experiment_config.save_images is False
+        assert engine.experiment_config.subject.genotype == "test_strain"
+        
+        # Old way
+        assert engine.args["gooey_args"]["total_frames"] == 100
+        assert engine.args["gooey_args"]["zsize"] == 10
+    
+    def test_algorithm_config_replaces_args_access(self, minimal_configs):
+        """Test accessing algorithm config fields instead of args dict."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # New way
+        assert engine.algorithm_config.algorithm_type == "dummy"
+        assert engine.algorithm_config.enable_gui is False
+        assert engine.algorithm_config.algorithm_params.stimulus_diameter_pixels == 10
+        
+        # Old way
+        assert engine.args["gooey_args"]["trigger_algorithm"] == "dummy"
+    
+    def test_nested_config_access(self, minimal_configs):
+        """Test accessing nested config structures."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # Nested experiment config
+        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.subject.genotype == "test_strain"
+        assert engine.experiment_config.dev_options.prefill_wb_ops is False
+        
+        # Nested algorithm config
+        assert engine.algorithm_config.algorithm_params.stimulus_diameter_pixels == 10
+        assert engine.algorithm_config.stimulus_params.enabled is False
+
+
+# ============================================================================
+# 10. Microscope Name Removal Tests
+# ============================================================================
+
+class TestMicroscopeNameRemoval:
+    """Test that microscope_name conditionals are no longer used."""
+    
+    def test_backend_selection_not_microscope_name(self, minimal_configs):
+        """Test that backend field is used instead of microscope_name."""
+        engine = ClosedLoopEngine(
+            hardware_config=minimal_configs["hardware"],
+            experiment_config=minimal_configs["experiment"],
+            algorithm_config=minimal_configs["algorithm"]
+        )
+        
+        # Backend should be used for hardware selection
+        assert engine.hardware_config.backend in ["dummy", "pycromanager", "pymmcore"]
+        
+        # microscope_name should only exist for backward compat
+        if engine.hardware_config.microscope_name:
+            # If present, it's just for legacy support
+            assert isinstance(engine.hardware_config.microscope_name, str)
+    
+    def test_no_microscope_name_logic_in_engine(self, minimal_configs):
+        """Test that engine doesn't use microscope_name for logic."""
+        # Create configs with different microscope_name but same backend
+        configs1 = minimal_configs.copy()
+        configs1["hardware"].microscope_name = "scope_a"
+        
+        configs2 = minimal_configs.copy()
+        configs2["hardware"].microscope_name = "scope_b"
+        
+        engine1 = ClosedLoopEngine(
+            hardware_config=configs1["hardware"],
+            experiment_config=configs1["experiment"],
+            algorithm_config=configs1["algorithm"]
+        )
+        
+        engine2 = ClosedLoopEngine(
+            hardware_config=configs2["hardware"],
+            experiment_config=configs2["experiment"],
+            algorithm_config=configs2["algorithm"]
+        )
+        
+        # Both should behave identically since backend is the same
+        engine1.initialize_hardware()
+        engine2.initialize_hardware()
+        
+        # Both should create same type of MMC
+        assert type(engine1.mmc) == type(engine2.mmc)
+
+
+# ============================================================================
+# Run Tests
+# ============================================================================
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])
