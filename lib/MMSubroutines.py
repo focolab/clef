@@ -314,7 +314,7 @@ def close(mmc, args):
 def get_metadata(args, mmc):
 
     scope = args["gooey_args"]["microscope_name"]
-    acquisition_backend = args["gooey_args"]["acquisition_backend"]
+    # acquisition_backend = args["gooey_args"]["acquisition_backend"]
 
     # if acquisition backend is pycromanager we need to grab settings because they weren't already sent to wb-live
     cam = mmc.getCameraDevice()

@@ -25,7 +25,7 @@ from pathlib import Path
 
 # Import the engine and supporting modules
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from engine.closed_loop_engine import (
     ClosedLoopEngine,
