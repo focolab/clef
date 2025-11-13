@@ -135,12 +135,27 @@ def prepare_live_acquisition(mmc, args):
 
             if scope == "innovation core spinning disk":
 
+                # Z-stack stage configuration should be done via StageInterface.configure_stage()
+                # or StageInterface.run_z_stack() before calling prepare_live_acquisition().
+                # Example:
+                #   stage.configure_stage({
+                #       "z_start": -(numz - 1) * zStepSize / 2,
+                #       "z_end": (numz - 1) * zStepSize / 2,
+                #       "z_step": zStepSize,
+                #       "pad_z": 0
+                #   })
+                # 
+                # For backward compatibility, if zsize > 1, log a warning that stage
+                # should be configured via stage interface.
                 if args["gooey_args"]["zsize"] > 1:
-
+                    logging.warning(
+                        "Z-stack detected (zsize > 1). Stage configuration should be done "
+                        "via StageInterface.configure_stage() or StageInterface.run_z_stack() "
+                        "before calling prepare_live_acquisition(). Using deprecated "
+                        "set_asi_stage_buffer() for backward compatibility."
+                    )
                     numz = args["gooey_args"]["zsize"]
                     zStepSize = float(args["gooey_args"]["z_step_size"])
-
-                    # upload program using micro-manager api. assumes imaging is in middle
                     set_asi_stage_buffer(
                         mmc,
                         zStart=-(numz - 1) * zStepSize / 2,
@@ -245,12 +260,17 @@ def prepare_live_acquisition(mmc, args):
                         except Exception as e:
                             logging.warning(f"Could not set config {k}: {e}")
 
+                # Z-stack stage configuration should be done via StageInterface.configure_stage()
+                # or StageInterface.run_z_stack() before calling prepare_live_acquisition().
                 if args["gooey_args"]["zsize"] > 1:
-
+                    logging.warning(
+                        "Z-stack detected (zsize > 1). Stage configuration should be done "
+                        "via StageInterface.configure_stage() or StageInterface.run_z_stack() "
+                        "before calling prepare_live_acquisition(). Using deprecated "
+                        "set_asi_stage_buffer() for backward compatibility."
+                    )
                     numz = args["gooey_args"]["zsize"]
                     zStepSize = float(args["gooey_args"]["z_step_size"])
-
-                    # upload program using micro-manager api. assumes imaging is in middle
                     set_asi_stage_buffer(
                         mmc,
                         zStart=-(numz - 1) * zStepSize / 2,
@@ -697,7 +717,20 @@ def upload_asi_stage_program(my_program, mmc, args, stage_port="COM6", stage_bau
 
 
 def set_asi_stage_buffer(mmc, zStart=-16.5, zEnd=16.5, zStepSize=3, padZ=0):
-    """function to upload asi stage positions into internal ring buffer through micro-manager api"""
+    """
+    Upload ASI stage positions into internal ring buffer through micro-manager api.
+    
+    DEPRECATED: This function is kept for backward compatibility only.
+    New code should use StageInterface.configure_stage() or StageInterface.run_z_stack()
+    instead. This provides better abstraction and works with the hardware manager.
+    
+    Args:
+        mmc: Micro-Manager Core object
+        zStart: Starting Z position
+        zEnd: Ending Z position
+        zStepSize: Step size
+        padZ: Number of padding steps at start
+    """
 
     # hardcoded params
     laserTTLs = "TTL1-8"
