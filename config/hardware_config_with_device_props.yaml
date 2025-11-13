@@ -1,0 +1,138 @@
+# CLEF Hardware Configuration with Device Properties
+# Example configuration showing how to configure device-specific settings via YAML
+# This replaces hardcoded device settings in MMSubroutines.py
+
+# Hardware backend selection
+backend: "pycromanager"  # Options: pycromanager, pymmcore, dummy
+
+# Micro-Manager configuration file path
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\200212_PRIME_BSI_TIE.cfg"
+
+# Stimulus interface class
+stim_interface: "InvCoreSpinningDisk639"
+
+# Microscope name (temporary, backward compatibility)
+microscope_name: "innovation core spinning disk"
+
+# Device configurations
+# Each device can have:
+#   - properties: Device-specific properties set via mmc.setProperty()
+#   - configs: Micro-Manager config group presets set via mmc.setConfig()
+devices:
+  camera:
+    device_name: "PrimeBSI"
+    device_type: "camera"
+    properties:
+      ExposeOutMode: "Rolling Shutter"
+      # Note: Exposure and Binning are typically set via CameraInterface methods
+      # but can also be set here if needed
+    configs: {}
+  
+  ttl:
+    device_name: "TTL1-8"
+    device_type: "ttl"
+    properties:
+      Blanking: "On"
+      Sequence: "On"
+    configs: {}
+  
+  triggerscope:
+    device_name: "TriggerScopeMM-Hub"
+    device_type: "triggerscope"
+    properties:
+      UseActionLEDs: "Off"
+    configs: {}
+  
+  # Example: Laser/LMM5 configuration (for torstoscope)
+  lmm5:
+    device_name: "LMM5"
+    device_type: "laser"
+    properties: {}
+    configs:
+      LMM5: "488+561"  # Config group preset
+      "LMM5-561-intensity": "0"  # Note: This might need to be a property instead
+  
+  # Example: DAC voltage settings (for innovation core)
+  dac488:
+    device_name: "DAC488"
+    device_type: "dac"
+    properties:
+      Volts: 0.5
+    configs: {}
+  
+  dac561:
+    device_name: "DAC561"
+    device_type: "dac"
+    properties:
+      Volts: 0.4
+    configs: {}
+
+# System-level Micro-Manager properties
+# These control global Micro-Manager settings
+system_properties:
+  # Auto shutter: false = manual control, true = automatic
+  auto_shutter: false
+  
+  # Circular buffer size in MB (converted to bytes internally)
+  circular_buffer_mb: 10000
+  
+  # Shutter states to set during initialization
+  shutters:
+    - device_name: "LaserShutter"
+      state: true  # true = open, false = closed
+    # Example for torstoscope:
+    # - device_name: "LMM5-Shutter"
+    #   state: true
+
+# Strobe settings
+strobe_acquisition: false
+strobe_inter_frame_interval_ms: 80
+
+# Static ROI
+use_static_stim_roi: false
+
+# Illumination channels
+illumination_channels:
+  - name: "488nm"
+    device: "DAC488"
+    wavelength: 488
+    power: 0.5
+    exposure_ms: 10.0
+  - name: "561nm"
+    device: "DAC561"
+    wavelength: 561
+    power: 0.4
+    exposure_ms: 50.0
+
+# Calibration files
+polygon_calibration_path: null
+
+# ============================================================================
+# Example for "torstoscope spinning disk" configuration:
+# ============================================================================
+# backend: "pymmcore"
+# microscope_name: "torstoscope spinning disk"
+# 
+# devices:
+#   camera:
+#     device_name: "PRIME BSI"
+#     device_type: "camera"
+#     properties:
+#       Binning: 1
+#     configs: {}
+#   
+#   lmm5:
+#     device_name: "LMM5"
+#     device_type: "laser"
+#     properties: {}
+#     configs:
+#       LMM5: "488+561"
+#       "LMM5-561-intensity": "0"
+# 
+# system_properties:
+#   auto_shutter: false
+#   circular_buffer_mb: 10000
+#   shutters:
+#     - device_name: "LMM5-Shutter"
+#       state: true
+

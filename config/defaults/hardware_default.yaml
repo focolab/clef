@@ -29,12 +29,20 @@ devices:
     properties:
       Exposure: 100.0
       Binning: 1
+    configs: {}  # Micro-Manager config group presets (e.g., {"Channel": "488"})
       
   stage:
     device_name: "XYStage"
     device_type: "stage"
     properties:
       Speed: 1.0
+    configs: {}
+
+# System-level Micro-Manager properties
+system_properties:
+  auto_shutter: null  # null = don't set, true/false = set value
+  circular_buffer_mb: null  # null = don't set, integer = buffer size in MB
+  shutters: []  # List of shutter states: [{"device_name": "LaserShutter", "state": true}]
 
 # Illumination channels
 illumination_channels:

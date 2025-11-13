@@ -322,6 +322,11 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._stage = MicroManagerStage(self.mmc, self.config.backend)
         self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend)
         
+        # Apply device properties and system properties from config
+        self._apply_device_properties()
+        self._apply_device_configs()
+        self._apply_system_properties()
+        
         self._initialized = True
         logger.info("Micro-Manager backend initialized")
     
@@ -372,4 +377,98 @@ class MicroManagerBackend(BaseHardwareBackend):
             Micro-Manager Core object
         """
         return self.mmc
+    
+    def _apply_device_properties(self) -> None:
+        """
+        Apply device-specific properties from config.
+        
+        Sets properties using mmc.setProperty() for each device configured
+        in HardwareConfig.devices.
+        """
+        if not self.config.devices:
+            return
+        
+        for device_key, device_config in self.config.devices.items():
+            device_name = device_config.device_name
+            properties = device_config.properties
+            
+            # Convert Pydantic model to dict (handles extra="allow" fields)
+            if hasattr(properties, 'model_dump'):
+                props_dict = properties.model_dump(exclude_unset=True)
+            else:
+                props_dict = dict(properties) if hasattr(properties, '__dict__') else {}
+            
+            for prop_name, prop_value in props_dict.items():
+                try:
+                    self.mmc.setProperty(device_name, prop_name, prop_value)
+                    logger.debug(f"Set {device_name}.{prop_name} = {prop_value}")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not set {device_name}.{prop_name} = {prop_value}: {e}"
+                    )
+    
+    def _apply_device_configs(self) -> None:
+        """
+        Apply device config group presets from config.
+        
+        Sets Micro-Manager config group presets using mmc.setConfig() for each
+        device configured in HardwareConfig.devices.
+        """
+        if not self.config.devices:
+            return
+        
+        for device_key, device_config in self.config.devices.items():
+            configs = device_config.configs
+            
+            for config_group, preset_name in configs.items():
+                try:
+                    self.mmc.setConfig(config_group, preset_name)
+                    logger.debug(f"Set config {config_group} = {preset_name}")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not set config {config_group} = {preset_name}: {e}"
+                    )
+    
+    def _apply_system_properties(self) -> None:
+        """
+        Apply system-level properties from config.
+        
+        Sets system-level Micro-Manager settings like auto_shutter,
+        circular_buffer_memory_footprint, and shutter states.
+        """
+        if not self.config.system_properties:
+            return
+        
+        sys_props = self.config.system_properties
+        
+        # Auto shutter
+        if sys_props.auto_shutter is not None:
+            try:
+                self.mmc.setAutoShutter(sys_props.auto_shutter)
+                logger.debug(f"Set auto_shutter = {sys_props.auto_shutter}")
+            except Exception as e:
+                logger.warning(f"Could not set auto_shutter: {e}")
+        
+        # Circular buffer
+        if sys_props.circular_buffer_mb is not None:
+            try:
+                # Note: setCircularBufferMemoryFootprint unit may vary by Micro-Manager version
+                # Existing code uses values like 10000 directly. We pass MB value as-is to match
+                # existing behavior. If your Micro-Manager version expects bytes, multiply by 1024*1024.
+                self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                logger.debug(f"Set circular_buffer_memory_footprint = {sys_props.circular_buffer_mb}")
+            except Exception as e:
+                logger.warning(f"Could not set circular_buffer_memory_footprint: {e}")
+        
+        # Shutters
+        for shutter_config in sys_props.shutters:
+            try:
+                self.mmc.setShutterOpen(shutter_config.device_name, shutter_config.state)
+                logger.debug(
+                    f"Set shutter {shutter_config.device_name} = {'open' if shutter_config.state else 'closed'}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Could not set shutter {shutter_config.device_name}: {e}"
+                )
 
