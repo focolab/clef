@@ -272,12 +272,36 @@ class TestMicroManagerStage:
         
         mock_mmc.setPosition.assert_called()
     
-    def test_stage_run_z_stack(self, mock_mmc):
+    @patch('hardware.backends.micromanager_backend.JavaObject')
+    def test_stage_run_z_stack(self, mock_java_object, mock_mmc):
         """Test run_z_stack (simplified implementation)."""
+        # Create mock vector objects that JavaObject will return
+        mock_double_vector = MagicMock()
+        mock_string_vector = MagicMock()
+        
+        # Configure JavaObject to return appropriate mocks
+        def java_object_factory(class_name):
+            if "DoubleVector" in class_name:
+                return mock_double_vector
+            elif "StrVector" in class_name:
+                return mock_string_vector
+            return MagicMock()
+        
+        mock_java_object.side_effect = java_object_factory
+        
         stage = MicroManagerStage(mock_mmc, "pycromanager")
         # Should not raise (implementation is simplified)
         stage.run_z_stack(z_start=0.0, z_end=30.0, z_step=3.0, num_planes=11)
-    
+        
+        # Verify JavaObject was called for stage configuration
+        assert mock_java_object.call_count >= 2  # Called for DoubleVector and StrVector
+
+    def test_stage_run_z_stack_pymmcore(self, mock_mmc):
+        """Test run_z_stack with pymmcore backend (doesn't need JavaObject)."""
+        stage = MicroManagerStage(mock_mmc, "pymmcore")
+        # Should not raise
+        stage.run_z_stack(z_start=0.0, z_end=30.0, z_step=3.0, num_planes=11)
+        
     def test_stage_stop_sequence(self, mock_mmc):
         """Test stop_sequence."""
         stage = MicroManagerStage(mock_mmc, "pycromanager")
