@@ -190,31 +190,54 @@ class DummyStage(StageInterface):
 
 
 class DummyStimulus(StimulusInterface):
-    """Dummy stimulus implementation for testing."""
+    """Dummy stimulus interface for testing."""
     
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Initialize dummy stimulus."""
         self._active = False
         self._current_params = None
+        self.stimulus_intensity = 0
+        self.stimulus_config = {}
+        self._configured = False
     
     def activate_stimulus(self, params: Dict[str, Any]) -> None:
-        """Activate stimulus."""
+        """
+        Simulate stimulus activation.
+        
+        Args:
+            params: Dictionary containing stimulus parameters
+                   (intensity, position, diameter, etc.)
+        """
         self._active = True
         self._current_params = params
-        logger.debug(f"Dummy stimulus: Activated with params {params}")
+        self.stimulus_intensity = params.get('intensity', 10)
+        logger.debug(f"Dummy: Activated stimulus with params {params}")
     
     def deactivate_stimulus(self) -> None:
-        """Deactivate stimulus."""
+        """Simulate stimulus deactivation."""
         self._active = False
         self._current_params = None
-        logger.debug("Dummy stimulus: Deactivated")
+        self.stimulus_intensity = 0
+        logger.debug("Dummy: Deactivated stimulus")
     
     def configure_stimulus(self, config: Dict[str, Any]) -> None:
-        """Configure stimulus."""
-        logger.debug(f"Dummy stimulus: Configured with {config}")
+        """
+        Store stimulus configuration.
+        
+        Args:
+            config: Dictionary containing configuration parameters
+        """
+        self.stimulus_config = config
+        self._configured = True
+        logger.debug(f"Dummy: Configured stimulus with {config}")
     
     def is_stimulus_active(self) -> bool:
-        """Check if stimulus is active."""
+        """
+        Check if stimulus is currently active.
+        
+        Returns:
+            True if stimulus is active
+        """
         return self._active
 
 

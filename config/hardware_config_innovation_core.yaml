@@ -11,10 +11,21 @@ mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\200212_PRIME_BSI_TIE.
 
 # Stimulus interface class
 # Common options: "InvCoreSpinningDisk639", "InvCoreLDIPolygon", etc.
-stim_interface: "InvCoreSpinningDisk639"
+stim_interface: "InvCore-SpinningDisk-639"
 
 # Microscope name (temporary, backward compatibility)
 microscope_name: "innovation core spinning disk"
+
+# Stimulus device configuration
+# Defines how to control the widefield 639nm laser stimulus
+stimulus_devices:
+  InvCore-SpinningDisk-639:
+    type: "widefield_laser"
+    voltage_device: "DAC639"
+    voltage_property: "Volts"
+    ttl_device: "TTL1-8"
+    ttl_line: "TTL-4"
+    max_volts: 3.5
 
 # Device configurations
 # Each device can have:
@@ -71,7 +82,7 @@ devices:
     device_name: "DAC639"
     device_type: "dac"
     properties:
-      # Volts: 3.5  # Uncomment and set if needed
+      Volts: 0  # Initialize to 0, will be controlled by stimulus system
     configs: {}
 
 # System-level Micro-Manager properties
@@ -112,12 +123,12 @@ illumination_channels:
     wavelength: 405
     power: 3.5
     exposure_ms: 150.0
-  - name: "639nm"
+  - name: "639nm (imaging)"
     device: "DAC639"
     wavelength: 639
     power: 3.5
     exposure_ms: 150.0
+    # Note: stimulus uses separate control via stimulus_devices config
 
 # Calibration files
 polygon_calibration_path: null
-

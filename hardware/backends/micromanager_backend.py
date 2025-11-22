@@ -5,7 +5,7 @@ Wraps Micro-Manager (MMC) API calls to provide unified hardware interface.
 Supports both pycromanager and pymmcore apis.
 """
 
-import logging
+import logging, json
 import numpy as np
 from typing import Dict, Any, Optional, Tuple, Union
 
@@ -326,49 +326,437 @@ class MicroManagerStimulus(StimulusInterface):
     """
     Stimulus interface wrapping Micro-Manager Core.
     
-    Note: This provides low-level hardware control. Most stimulus operations
-    in CLEF are handled by StimBaseClass subclasses which may access MMC directly.
-    This interface provides a bridge for future refactoring.
+    Supports multiple stimulus types with device mappings from configuration:
+    - Widefield laser (e.g., InvCore-SpinningDisk-639)
+    - Polygon/LDI (e.g., InvCore-LDI-Polygon-640)
+    - LED (e.g., InvCore-ThunderscopeLED3)
     """
     
-    def __init__(self, mmc, backend: str):
+    def __init__(self, mmc, backend: str, hardware_config):
         """
         Initialize Micro-Manager stimulus interface.
         
         Args:
             mmc: Micro-Manager Core object
             backend: Backend type ('pycromanager' or 'pymmcore')
+            hardware_config: HardwareConfig object containing stimulus device configs
         """
         self.mmc = mmc
         self.backend = backend
+        self.hardware_config = hardware_config
         self._active = False
+        self._configured = False
+        self._stim_type = None
+        self._device_config = None
+        self._current_params = None
+        
+        # Polygon-specific attributes
+        self.slm_device = None
+        self.polygon_dims = None
+        self.calibration_points = None
+    
+    def configure_stimulus(self, config: Dict[str, Any]) -> None:
+        """
+        Configure stimulus hardware settings.
+        
+        Args:
+            config: Dictionary containing:
+                   - interface_type: stimulus interface name
+                   - intensity: default intensity
+                   - calibration_path: optional calibration file path
+        """
+        interface_type = config.get("interface_type", "")
+        
+        # Get device configuration from HardwareConfig
+        self._device_config = self.hardware_config.get_stimulus_device_config(interface_type)
+        
+        if self._device_config is None:
+            logger.warning(f"No stimulus device config found for: {interface_type}")
+            return
+        
+        self._stim_type = interface_type
+        stim_type = self._device_config.type
+        
+        logger.info(f"Configuring stimulus for {interface_type} (type: {stim_type})")
+        
+        # Type-specific configuration
+        if stim_type == "widefield_laser":
+            self._configure_widefield_laser(config)
+        elif stim_type == "polygon":
+            self._configure_polygon(config)
+        elif stim_type == "led":
+            self._configure_led(config)
+        elif stim_type == "dummy":
+            logger.info("Dummy stimulus configured (no hardware operations)")
+        else:
+            logger.warning(f"Unknown stimulus type: {stim_type}")
+            return
+        
+        self._configured = True
+        logger.info(f"Stimulus configured for {interface_type}")
+    
+    def _configure_widefield_laser(self, config: Dict[str, Any]) -> None:
+        """Configure widefield laser stimulus."""
+        dev = self._device_config
+        
+        # Set TTL line high to enable
+        if dev.ttl_device and dev.ttl_line:
+            try:
+                self.mmc.setProperty(dev.ttl_device, dev.ttl_line, 1)
+                logger.debug(f"Set {dev.ttl_device}.{dev.ttl_line} = 1")
+            except Exception as e:
+                logger.warning(f"Could not set TTL line: {e}")
+        
+        # Initialize voltage to 0
+        if dev.voltage_device:
+            try:
+                voltage_prop = dev.voltage_property or "Volts"
+                self.mmc.setProperty(dev.voltage_device, voltage_prop, 0)
+                logger.debug(f"Initialized {dev.voltage_device}.{voltage_prop} to 0V")
+            except Exception as e:
+                logger.warning(f"Could not initialize voltage: {e}")
+    
+    def _configure_polygon(self, config: Dict[str, Any]) -> None:
+        """Configure polygon/LDI stimulus."""
+        dev = self._device_config
+        
+        # Get SLM device
+        try:
+            if dev.slm_device:
+                self.slm_device = dev.slm_device
+            else:
+                self.slm_device = self.mmc.getSLMDevice()
+            
+            self.mmc.setSLMDevice(self.slm_device)
+            
+            # Get polygon dimensions
+            width = self.mmc.getSLMWidth(self.slm_device)
+            height = self.mmc.getSLMHeight(self.slm_device)
+            self.polygon_dims = (width, height)
+            
+            logger.info(f"Polygon SLM: {self.slm_device}, dimensions: {self.polygon_dims}")
+        except Exception as e:
+            logger.error(f"Could not configure SLM device: {e}")
+            return
+        
+        # Set config group for simultaneous imaging (if using pymmcore)
+        if self.backend == "micromanager pymmcore":
+            try:
+                self.mmc.setConfig("Mightex-Setup", "640-SP")
+            except Exception as e:
+                logger.warning(f"Could not set Mightex config: {e}")
+        
+        # Initialize LDI off but open shutter
+        try:
+            if dev.intensity_device and dev.intensity_property:
+                self.mmc.setProperty(dev.intensity_device, dev.intensity_property, 0)
+            
+            if self.slm_device:
+                self.mmc.setSLMPixelsTo(self.slm_device, 0)
+            
+            if dev.shutter_device:
+                self.mmc.setShutterOpen(dev.shutter_device, True)
+            
+            logger.debug("Initialized polygon: intensity=0, shutter open, SLM blank")
+        except Exception as e:
+            logger.warning(f"Could not initialize polygon: {e}")
+        
+        # Load calibration points
+        calibration_path = config.get("calibration_path") or self.hardware_config.polygon_calibration_path
+        if calibration_path:
+            self.calibration_points = self._load_polygon_calibration(calibration_path)
+        else:
+            # Try default path
+            default_path = "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+            self.calibration_points = self._load_polygon_calibration(default_path)
+    
+    def _configure_led(self, config: Dict[str, Any]) -> None:
+        """Configure LED stimulus."""
+        dev = self._device_config
+        
+        # Initialize LED off but open shutter
+        try:
+            if dev.intensity_device and dev.intensity_property:
+                self.mmc.setProperty(dev.intensity_device, dev.intensity_property, 0)
+            
+            if dev.shutter_device:
+                self.mmc.setShutterOpen(dev.shutter_device, True)
+            
+            logger.debug("Initialized LED: intensity=0, shutter open")
+        except Exception as e:
+            logger.warning(f"Could not initialize LED: {e}")
     
     def activate_stimulus(self, params: Dict[str, Any]) -> None:
         """
-        Activate stimulus.
+        Activate stimulus with given parameters.
         
-        Note: This is a placeholder. Actual stimulus activation is typically
-        handled by StimBaseClass subclasses (e.g., InvCoreSpinningDisk639).
+        Args:
+            params: Dictionary containing:
+                   - intensity: intensity value (0-100 for %, or device-specific)
+                   - position: optional (x, y) for polygon
+                   - diameter: optional diameter for polygon
         """
+        if not self._configured or self._device_config is None:
+            logger.warning("Stimulus not configured, activation may be undefined")
+        
         self._active = True
-        logger.debug(f"Micro-Manager: Stimulus activated with params {params}")
-        # TODO: Implement based on specific stimulus hardware
+        self._current_params = params
+
+        stim_type = self._device_config.type
+        intensity = params.get("intensity", 10)
+        
+        if stim_type == "widefield_laser":
+            self._activate_widefield_laser(intensity)
+        elif stim_type == "polygon":
+            self._activate_polygon(intensity)
+        elif stim_type == "led":
+            self._activate_led(intensity)
+        elif stim_type == "dummy":
+            logger.debug(f"Dummy stimulus activated: intensity={intensity}")
+        else:
+            logger.warning("No valid stim type found for activation.")
+        
+        
+    
+    def _activate_widefield_laser(self, intensity: float) -> None:
+        """Activate widefield laser."""
+        dev = self._device_config
+        
+        # Convert intensity percent to volts
+        if dev.max_volts is None:
+            logger.error("max_volts not configured for widefield laser")
+            return
+        
+        volts = (intensity / 100.0) * dev.max_volts
+        voltage_prop = dev.voltage_property or "Volts"
+        
+        try:
+            self.mmc.setProperty(dev.voltage_device, voltage_prop, round(volts, 2))
+            logger.debug(f"Activated widefield laser: {volts:.2f}V ({intensity}%)")
+        except Exception as e:
+            logger.error(f"Could not activate widefield laser: {e}")
+    
+    def _activate_polygon(self, intensity: float) -> None:
+        """Activate polygon stimulus."""
+        dev = self._device_config
+        
+        try:
+            self.mmc.setProperty(
+                dev.intensity_device,
+                dev.intensity_property,
+                int(intensity)
+            )
+            logger.debug(f"Activated polygon: intensity={intensity}")
+        except Exception as e:
+            logger.error(f"Could not activate polygon: {e}")
+    
+    def _activate_led(self, intensity: float) -> None:
+        """Activate LED stimulus."""
+        dev = self._device_config
+        
+        try:
+            self.mmc.setProperty(
+                dev.intensity_device,
+                dev.intensity_property,
+                int(intensity)
+            )
+            logger.debug(f"Activated LED: intensity={intensity}")
+        except Exception as e:
+            logger.error(f"Could not activate LED: {e}")
     
     def deactivate_stimulus(self) -> None:
-        """Deactivate stimulus."""
+        """Deactivate currently active stimulus."""
+        if not self._configured or self._device_config is None:
+            return
+        
+        stim_type = self._device_config.type
+        
+        if stim_type == "widefield_laser":
+            self._deactivate_widefield_laser()
+        elif stim_type == "polygon":
+            self._deactivate_polygon()
+        elif stim_type == "led":
+            self._deactivate_led()
+        elif stim_type == "dummy":
+            logger.debug("Dummy stimulus deactivated")
+        
         self._active = False
-        logger.debug("Micro-Manager: Stimulus deactivated")
-        # TODO: Implement based on specific stimulus hardware
+        self._current_params = None
     
-    def configure_stimulus(self, config: Dict[str, Any]) -> None:
-        """Configure stimulus hardware."""
-        logger.debug(f"Micro-Manager: Stimulus configured with {config}")
-        # TODO: Implement based on specific stimulus hardware
+    def _deactivate_widefield_laser(self) -> None:
+        """Deactivate widefield laser."""
+        dev = self._device_config
+        voltage_prop = dev.voltage_property or "Volts"
+        
+        try:
+            self.mmc.setProperty(dev.voltage_device, voltage_prop, 0)
+            logger.debug("Deactivated widefield laser")
+        except Exception as e:
+            logger.error(f"Could not deactivate widefield laser: {e}")
+    
+    def _deactivate_polygon(self) -> None:
+        """Deactivate polygon stimulus."""
+        dev = self._device_config
+        
+        try:
+            self.mmc.setProperty(dev.intensity_device, dev.intensity_property, 0)
+            logger.debug("Deactivated polygon")
+        except Exception as e:
+            logger.error(f"Could not deactivate polygon: {e}")
+    
+    def _deactivate_led(self) -> None:
+        """Deactivate LED stimulus."""
+        dev = self._device_config
+        
+        try:
+            self.mmc.setProperty(dev.intensity_device, dev.intensity_property, 0)
+            logger.debug("Deactivated LED")
+        except Exception as e:
+            logger.error(f"Could not deactivate LED: {e}")
     
     def is_stimulus_active(self) -> bool:
-        """Check if stimulus is active."""
+        """Check if stimulus is currently active."""
         return self._active
-
+    
+    def update_polygon_mask(self, stim_params: Dict[str, Any]) -> None:
+        """
+        Update polygon mask based on stimulus parameters.
+        
+        This is polygon-specific and generates/uploads masks to the SLM.
+        
+        Args:
+            stim_params: Dictionary containing event with mask parameters
+        """
+        if self._device_config is None or self._device_config.type != "polygon":
+            logger.warning("update_polygon_mask called on non-polygon stimulus")
+            return
+        
+        if self.slm_device is None:
+            logger.error("SLM device not configured")
+            return
+        
+        # Import utilities for mask generation
+        try:
+            from lib import wbliveUtils as utils
+        except ImportError:
+            logger.error("Could not import wbliveUtils for mask generation")
+            return
+        
+        event = stim_params.get('event', {})
+        event_type = event.get('event_type')
+        
+        # Get calibration and ROI
+        if self.calibration_points is None:
+            logger.error("Calibration points not loaded")
+            return
+        
+        pcx = self.calibration_points['pcx']
+        pcy = self.calibration_points['pcy']
+        icx = self.calibration_points['icx']
+        icy = self.calibration_points['icy']
+        
+        # Get ROI from config or params
+        roi = stim_params.get('roi', [0, 0])
+        width, height = self.polygon_dims
+        
+        # Generate mask based on event type
+        if event_type in ['circle-click', 'circle-button', 'hammer-of-dawn']:
+            cx = int(event["x"])
+            cy = int(event["y"])
+            diameter = int(event.get("stim_diameter", 20))
+            
+            mask = utils.generate_pg_ellipse_mask(
+                cx, cy, pcx, pcy, icx, icy,
+                diameter, roi[0], roi[1], width, height
+            )
+        
+        elif event_type in ['pulse-rect-roi-list', 'stream-rect-roi-list']:
+            stim_rect_roi_list = event.get('stim_rect_roi_list', {})
+            x_list = np.array(stim_rect_roi_list.get('x', []))
+            y_list = np.array(stim_rect_roi_list.get('y', []))
+            width_list = np.array(stim_rect_roi_list.get('width', []))
+            height_list = np.array(stim_rect_roi_list.get('height', []))
+            
+            mask = utils.generate_pg_multi_rectangle_mask(
+                x_list, y_list, width_list, height_list,
+                pcx, pcy, icx, icy,
+                roi[0], roi[1], width, height
+            )
+        
+        elif event_type == 'full-field-button':
+            mask = np.ones(shape=self.polygon_dims, dtype=np.uint8) * 255
+            self.mmc.setSLMPixelsTo(self.slm_device, 255)
+            logger.debug("Set polygon to full-field mask")
+            return
+        
+        else:
+            logger.warning(f"Unknown polygon event type: {event_type}")
+            return
+        
+        # Upload mask to SLM
+        mask = mask * 255  # mask is uint8, values 1-255 specify dithering
+        self.mmc.setSLMImage(self.slm_device, mask.astype(np.uint8).flatten())
+        logger.debug(f"Updated polygon mask for {event_type}")
+    
+    def get_polygon_dimensions(self) -> Optional[Tuple[int, int]]:
+        """Get polygon SLM dimensions."""
+        return self.polygon_dims
+    
+    def get_calibration_points(self) -> Optional[Dict[str, Any]]:
+        """Get polygon calibration points."""
+        return self.calibration_points
+    
+    def _load_polygon_calibration(self, calibration_fname: str) -> Optional[Dict[str, Any]]:
+        """
+        Load calibration points for polygon from JSON file.
+        
+        Args:
+            calibration_fname: Path to calibration JSON file
+        
+        Returns:
+            Dictionary containing pcx, pcy, icx, icy arrays
+        """
+        try:
+            with open(calibration_fname) as f:
+                md = json.load(f)
+                calibrations = md["calibrations"]
+                
+                # Get current objective and binning
+                obj = self.mmc.getProperty("ObjectiveTurret", "Label")
+                cam = self.mmc.getCameraDevice()
+                binning = self.mmc.getProperty(cam, "Binning")
+                
+                # Find matching calibrations
+                dt_list = []
+                for cali in calibrations:
+                    if cali["objective"] == obj and cali["binning"] == binning:
+                        dt_list.append(cali["datetime"])
+                
+                if not dt_list:
+                    logger.error(
+                        f"No matching calibration found for objective: {obj}, binning: {binning}"
+                    )
+                    return None
+                
+                # Get latest calibration
+                dt_list.sort()
+                latest_dt = dt_list[-1]
+                
+                # Find and return calibration data
+                for cali in calibrations:
+                    if (cali["objective"] == obj and 
+                        cali["datetime"] == latest_dt):
+                        return {
+                            "pcx": np.array(cali["pcx"]),
+                            "pcy": np.array(cali["pcy"]),
+                            "icx": np.array(cali["icx"]),
+                            "icy": np.array(cali["icy"])
+                        }
+        
+        except Exception as e:
+            logger.error(f"Error loading calibration points: {e}")
+            return None
+        
 
 class MicroManagerBackend(BaseHardwareBackend):
     """
@@ -419,7 +807,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         # Create interfaces
         self._camera = MicroManagerCamera(self.mmc, self.config.backend, roi)
         self._stage = MicroManagerStage(self.mmc, self.config.backend)
-        self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend)
+        self._stimulus = self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend, self.config)
         
         # Apply device properties and system properties from config
         self._apply_device_properties()
