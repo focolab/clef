@@ -268,6 +268,44 @@ class ClosedLoopEngine:
             raise
             
         logger.info("Algorithm initialized successfully")
+
+    def initialize_algorithm_FACTORY_REPLACE_OLD_VERSION(self):
+            """
+            Initialize the closed-loop trigger algorithm using the factory pattern.
+            
+            Uses AlgorithmFactory to instantiate the correct algorithm based on configuration.
+            The factory handles all imports and provides helpful error messages if the
+            algorithm type is not found.
+            """
+            logger.info(f"Initializing algorithm: {self.trigger_alg}")
+            
+            try:
+                # Import factory
+                from algorithms import create_algorithm
+                
+                # Create algorithm using factory
+                self.alg = create_algorithm(
+                    algorithm_config=self.algorithm_config,
+                    experiment_config=self.experiment_config,
+                    hardware_config=self.hardware_config,
+                    local_handles={"mmc": self.mmc}
+                )
+                
+                # Initialize the algorithm's internal model
+                self.alg.initialize_model()
+                
+            except ValueError as err:
+                # Algorithm not found in registry
+                logger.error(f"Algorithm not found: {err}")
+                raise
+                
+                
+            except Exception as err:
+                logger.exception(f"Error initializing algorithm: {err}")
+                raise
+                
+            logger.info("Algorithm initialized successfully")
+
         
     def initialize_stimulus(self):
         """

@@ -1,0 +1,195 @@
+"""
+Dummy Algorithm for CLEF
+
+A minimal no-op algorithm for testing and as a template for new algorithms.
+This algorithm does nothing - it processes frames without triggering any stimuli.
+"""
+
+import logging
+import random
+
+logger = logging.getLogger(__name__)
+
+
+class DummyAlg:
+    """
+    Dummy algorithm that does nothing.
+    
+    This is useful for:
+    - Testing the acquisition system without closed-loop logic
+    - Template for implementing new algorithms
+    - Fallback when a specified algorithm fails to load
+    """
+    
+    def __init__(self, args=None, local_handles=None):
+        """
+        Initialize dummy algorithm.
+        
+        Args:
+            args: Legacy args dictionary (optional, for compatibility)
+            local_handles: Dictionary of local handles like {'mmc': mmc_instance}
+        """
+        if args is None:
+            args = {}
+        if local_handles is None:
+            local_handles = {}
+            
+        self.args = args
+        self.local_handles = local_handles
+        
+        # Extract commonly used parameters with safe defaults
+        gooey_args = self.args.get("gooey_args", {})
+        self.frames_to_grab = gooey_args.get("total_frames", 100)
+        self.zsize = gooey_args.get("zsize", 1)
+        
+        # Get ROI info if available
+        self.roi = self.args.get("roi", [0, 0, 512, 512])
+        self.xsize = self.roi[2]
+        self.ysize = self.roi[3]
+        
+        # State
+        self.frame_count = 0
+        self.volume_count = 0
+        
+        logger.info("DummyAlg initialized (no-op algorithm)")
+    
+    def initialize_model(self):
+        """
+        Initialize the algorithm model.
+        
+        For dummy algorithm, this just seeds the RNG for reproducibility.
+        """
+        # Seed RNG for reproducibility if we have a session ID
+        session_id = self.args.get("id", "default")
+        random.seed(session_id)
+        logger.debug(f"DummyAlg model initialized with seed: {session_id}")
+    
+    def process_frame(self, img, zndx):
+        """
+        Process a single frame.
+        
+        Args:
+            img: Image array (numpy array)
+            zndx: Z-plane index
+        """
+        self.frame_count += 1
+        
+        # Check if we completed a volume
+        if zndx == self.zsize - 1:
+            self.volume_count += 1
+            
+        # Log periodically
+        if self.frame_count % 500 == 0:
+            logger.debug(
+                f"DummyAlg processed {self.frame_count} frames "
+                f"({self.volume_count} volumes)"
+            )
+    
+    def process_volume(self):
+        """
+        Process a completed volume (called after full z-stack).
+        
+        For dummy algorithm, this does nothing.
+        """
+        pass
+    
+    def check_stim(self, image_ndx, cooldown_counter=0):
+        """
+        Check if stimulus should be triggered.
+        
+        Args:
+            image_ndx: Current image index
+            cooldown_counter: Current cooldown counter value
+            
+        Returns:
+            tuple: (stim_params dict, new_cooldown_counter)
+                - stim_params: Empty dict (no stimulation)
+                - new_cooldown_counter: 0 (no cooldown needed)
+        """
+        # Dummy algorithm never triggers stimulation
+        return {}, 0
+    
+    def get_metadata(self, args=None):
+        """
+        Return metadata captured during runtime.
+        
+        Args:
+            args: Optional args dict (for compatibility)
+            
+        Returns:
+            dict: Metadata dictionary
+        """
+        return {
+            "algorithm_type": "DummyAlg",
+            "frames_processed": self.frame_count,
+            "volumes_processed": self.volume_count,
+            "description": "No-op algorithm for testing",
+        }
+    
+    def plot_model(self, show_plot=False, savefilename=None):
+        """
+        Plot the current state of the model.
+        
+        Args:
+            show_plot: Whether to display the plot
+            savefilename: If provided, save plot to this file
+        """
+        logger.info("DummyAlg has no model to plot")
+    
+    def close(self):
+        """
+        Clean up resources and close the algorithm.
+        """
+        logger.info(
+            f"DummyAlg closing. Processed {self.frame_count} frames, "
+            f"{self.volume_count} volumes"
+        )
+
+
+# Standalone testing
+if __name__ == "__main__":
+    import numpy as np
+    
+    # Set up logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    print("Testing DummyAlg...")
+    
+    # Create test args
+    test_args = {
+        "id": "test_session",
+        "roi": [0, 0, 512, 512],
+        "gooey_args": {
+            "total_frames": 100,
+            "zsize": 10,
+        }
+    }
+    
+    # Initialize algorithm
+    alg = DummyAlg(test_args)
+    alg.initialize_model()
+    
+    # Simulate processing some frames
+    for i in range(50):
+        img = np.random.randint(0, 255, (512, 512), dtype=np.uint16)
+        zndx = i % 10
+        
+        alg.process_frame(img, zndx)
+        
+        # Check stim every frame
+        stim_params, cooldown = alg.check_stim(i, 0)
+        
+        if stim_params:
+            print(f"Frame {i}: Triggered stim (shouldn't happen!)")
+    
+    # Get metadata
+    metadata = alg.get_metadata()
+    print(f"\nMetadata: {metadata}")
+    
+    # Close
+    alg.close()
+    
+    print("\nDummyAlg test complete!")
