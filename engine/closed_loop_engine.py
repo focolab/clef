@@ -27,6 +27,9 @@ from config.config_manager import (
     AlgorithmConfig,
 )
 
+# Import factory
+from algorithms import create_algorithm
+
 # Import hardware manager and stimulus controllers
 from hardware.hardware_manager import HardwareManager
 from hardware.stimulus_controllers import create_stimulus_controller
@@ -247,9 +250,7 @@ class ClosedLoopEngine:
         logger.info(f"Initializing algorithm: {self.trigger_alg}")
         
         try:
-            # Import factory
-            from algorithms import create_algorithm
-            
+
             # Create algorithm using factory
             self.alg = create_algorithm(
                 algorithm_config=self.algorithm_config,
