@@ -289,7 +289,7 @@ class ClosedLoopEngine:
             
             # Create stimulus controller using factory
             self.stim_controller = create_stimulus_controller(
-                stim_interface_type=stim_interface,
+                stim_interface=stim_interface,
                 hardware_manager=self.hardware,
                 config=self.args  # Still passing args for backward compatibility
             )
@@ -458,6 +458,7 @@ class ClosedLoopEngine:
                     # Submit stimulus params to controller instead of direct stim
                     # Controller will manage hardware.stimulus activation/deactivation
                     if stim_params:
+                        logging.debug(f'Submitting stim params: {stim_params} on image_ndx {image_ndx}')
                         self.stim_controller.submit_stim_params(stim_params, image_ndx)
                     
                     # Volume completion handling
