@@ -11,14 +11,14 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import numpy as np
 
 # Custom libraries and utils
-from lib import MMSubroutines
 from lib import StimBaseClass
 from lib import wbliveUtils as utils
+from lib import MMSubroutines # couple more refs then can remove
 
 # Import config models
 from config.config_manager import (
@@ -26,6 +26,9 @@ from config.config_manager import (
     ExperimentConfig,
     AlgorithmConfig,
 )
+
+# Import hardware manager
+from hardware.hardware_manager import HardwareManager
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +67,6 @@ class ClosedLoopEngine:
         # This will be gradually eliminated as we refactor components
         self.args = self._build_legacy_args()
         self.gooey_args = self.args['gooey_args']
-        # Build args structure that matches original format expected by MMSubroutines
         
         # Execution state
         self.is_running = False
@@ -72,16 +74,17 @@ class ClosedLoopEngine:
         self.img_count = 0
         self.cooldown_counter = 0
         
-        # Components (initialized later), defaults for unit tests
-        self.mmc = None
-        self.xsize = 200 # default for unit tests
-        self.ysize = 200 # default for unit tests
+        # Components (initialized later)
+        self.hardware: HardwareManager = None
+        self.mmc = None  # Legacy - will be removed
+        self.xsize = 200  # default for unit tests
+        self.ysize = 200  # default for unit tests
         self.roi = (0, 0, 200, 200)
         self.alg = None
         self.stim = None
-        self.t0 = 1. 
+        self.t0 = 1.  # default for unit tests
         self.args["t0"] = self.t0
-        self.args["id"] = 11111111-11-11-11
+        self.args["id"] = "11111111-11-11-11"  # default for unit tests
         self.args["saveroot"] = 'C:/Users/rldun/Downloads/'
         
         # Data storage
@@ -188,43 +191,49 @@ class ClosedLoopEngine:
         self.no_save_metadata = self.gooey_args.get("no_save_metadata", False)
         self.save_mip_movie = self.gooey_args.get("save_mip", False)
         self.save_alg_model_plot = self.gooey_args.get("save_alg_model_plot", False)
-        self.strobe_acquisition = self.gooey_args.get("strobe_acquisition", False)
-        self.strobe_inter_frame_interval = self.gooey_args.get("strobe_inter_frame_interval", 30)
-        self.config_file = self.gooey_args.get("mm_configuration_file", "")
+        self.strobe_acquisition = self.hardware_config.strobe_acquisition
+        self.strobe_inter_frame_interval = self.hardware_config.strobe_inter_frame_interval_ms
+        self.config_file = self.hardware_config.mm_config_path or ""
         self.is_demo_acquisition = self.config_file.endswith("MMConfig_demo.cfg")
         self.save_structural_scan = self.gooey_args.get("save_structural_scan", "")
         self.prefill_wb_ops = self.gooey_args.get("prefill_wb_ops", False)
         self.notify_sms_on_done = self.gooey_args.get("send_sms", True)
         self.trigger_alg = self.gooey_args.get("trigger_algorithm", "DummyAlg")
-        self.acquisition_backend = self.gooey_args.get("acquisition_backend", "micromanager")
+        self.acquisition_backend = self.hardware_config.backend
         self.gui_mode = self.gooey_args.get("GUI_mode", "neural_imaging")
-        
+          
     def initialize_hardware(self):
         """
-        Initialize microscope and camera hardware.
+        Initialize microscope and camera hardware through HardwareManager.
         
-        Sets up MicroManager core and configures ROI settings.
+        Sets up hardware abstraction layer and configures ROI settings.
         """
         logger.info("Initializing hardware...")
         
-        # Initialize MicroManager core
-        self.mmc = MMSubroutines.initialize_mmc(self.args, self.config_file)
+        # Create HardwareManager
+        self.hardware = HardwareManager(self.hardware_config)
         
-        # Configure ROI based on backend
-        res = self.mmc.getROI()
-        
-        # pycromanager returns java objects
-        if self.acquisition_backend == "pycromanager":
-            self.roi = [res.getX(), res.getY(), res.getWidth(), res.getHeight()]
+        # Initialize with input recording if provided
+        input_recording = self.experiment_config.input_recording_path
+        if input_recording:
+            logger.info(f"Using input recording: {input_recording}")
+            self.hardware.initialize(input_file=input_recording)
         else:
-            self.roi = res
+            self.hardware.initialize()
+        
+        # Get ROI from camera interface
+        self.roi = self.hardware.camera.get_roi()
         self.args["roi"] = self.roi
         
-        # grab xsize and ysize form hardware
+        # Extract image dimensions
         self.xsize = self.roi[2]
         self.ysize = self.roi[3]
         
-        logger.info(f"Hardware initialized with ROI: {self.roi}")
+        # For legacy components that still need mmc directly
+        # This will be removed as components are refactored
+        self.mmc = self.hardware.get_mmc()
+        
+        logger.info(f"Hardware initialized with camera ROI: {self.roi}")
         
     def initialize_algorithm(self):
         """
@@ -257,8 +266,9 @@ class ClosedLoopEngine:
                 self.alg = Brainalyzer.Brainalyzer(self.args, local_handles={"mmc": self.mmc})
             else:
                 logger.debug("Running closed-loop with DUMMY algorithm")
-                from lib import DummyAlg
-                self.alg = DummyAlg.DummyAlg()
+                # from lib import DummyAlg
+                from algorithms.dummy import DummyAlg
+                self.alg = DummyAlg()
                 
             # Initialize the algorithm's internal model
             self.alg.initialize_model()
@@ -339,43 +349,67 @@ class ClosedLoopEngine:
         
         # Create output directory with timestamp
         dt = datetime.today().strftime("%Y%m%d-%H-%M-%S")
-        base_savedir = self.gooey_args.get("output_folder", "./output")
+        base_savedir = self.experiment_config.output_dir
         self.savedir = os.path.join(base_savedir, dt)
         os.makedirs(self.savedir, exist_ok=True)
         
         self.saveroot = os.path.join(self.savedir, dt)
         self.session_id = dt
         
-        # Update args dict with session info (needed by MMSubroutines and other components)
+        # Update args dict with session info (needed by legacy components)
         self.args["id"] = self.session_id
         self.args["saveroot"] = self.saveroot
         
-        # Initialize frame storage, requires hardware initialization (ysize, xsize)
+        # Initialize frame storage (requires hardware initialization for dimensions)
         self.frames = np.zeros(
             (self.frames_to_grab, self.ysize, self.xsize), 
             dtype=np.uint16
         )
         self.frame_time_list = []
         
-        # Configure microscope for acquisition
-        MMSubroutines.prepare_live_acquisition(self.mmc, self.args)
+        # Configure camera for acquisition through hardware manager
+        self._prepare_camera_acquisition()
         
         # Run pre-acquisition structural scan if requested
-        MMSubroutines.run_structural_scan(
-            self.save_structural_scan,
-            self.mmc,
-            self.args,
-            self.saveroot,
-            self.session_id,
-            self.zsize
-        )
+        self._run_structural_scan_pre() # TODO break out into separate config instead of bootstrap
         
         logger.info(f"Acquisition prepared. Saving to: {self.savedir}")
+
+    def _prepare_camera_acquisition(self):
+        """Configure camera for live acquisition through HardwareManager."""
+        camera = self.hardware.camera
+        
+        # Clear buffer
+        camera.clear_buffer()
+        
+        # Set buffer size based on config
+        buffer_size = 10000  # Default, can be made configurable
+        
+        # Start acquisition will be called in run_acquisition_loop
+        logger.debug("Camera prepared for acquisition")
+
+    def _run_structural_scan_pre(self):
+        """Run pre-acquisition structural scan if requested."""
+        if self.save_structural_scan and "pre" in self.save_structural_scan.lower():
+            logger.info("Running pre-acquisition structural scan...")
+            try:
+                # TODO This still uses MMSubroutines temporarily
+                # Will be refactored when structural scans are moved to hardware layer
+                MMSubroutines.run_structural_scan(
+                    self.save_structural_scan,
+                    self.mmc,
+                    self.args,
+                    self.saveroot,
+                    self.session_id,
+                    self.zsize
+                )
+            except Exception as err:
+                logger.error(f"Error in pre-acquisition structural scan: {err}")
 
 
     def run_acquisition_loop(self):
         """
-        Execute the main acquisition loop.
+        Execute the main acquisition loop using HardwareManager.
         
         Continuously:
         1. Snap images from camera
@@ -395,37 +429,34 @@ class ClosedLoopEngine:
         self.t0 = time.time()
         
         false_grab_count = 0
+        camera = self.hardware.camera
         
         # Start acquisition based on mode
         if self.strobe_acquisition:
             self.next_call = time.time()
-            self.mmc.snapImage()
+            camera.snap_image()
         else:
             frame_grab_t0 = time.time()
-            self.mmc.stopSequenceAcquisition()
-            self.mmc.clearCircularBuffer()
-            self.mmc.startContinuousSequenceAcquisition(0)
+            camera.stop_acquisition()
+            camera.clear_buffer()
+            camera.start_acquisition(buffer_size=10000)
             
         try:
             while self.is_running and self.img_count < self.frames_to_grab:
-                rem = self.mmc.getRemainingImageCount()
+                rem = camera.get_remaining_image_count()
                 
                 while (rem > 0 or self.strobe_acquisition) and self.img_count < self.frames_to_grab:
                     # Grab image from buffer
                     try:
                         if self.strobe_acquisition:
-                            img = self.mmc.getImage().astype(np.uint16)
+                            img = camera.get_image()
                         else:
-                            img = self.mmc.popNextImage().astype(np.uint16)
+                            img = camera.pop_next_image()
                             self.next_call = frame_grab_t0
                     except Exception as err:
                         false_grab_count += 1
                         logger.debug(f"False grab #{false_grab_count}: {err}")
                         continue
-                        
-                    # Reshape if using pycromanager
-                    if self.acquisition_backend == "pycromanager":
-                        img = img.reshape((self.ysize, self.xsize))
                         
                     # Record timestamp and store frame
                     frame_grab_t0 = time.time()
@@ -439,17 +470,17 @@ class ClosedLoopEngine:
                     # Periodic logging
                     if self.img_count % 200 == 0:
                         logger.info(f"Frame: {self.img_count}/{self.frames_to_grab}")
-                        
+                    
+                    # TODO remove this concept, logic now lives in hardware/algorithm
                     # Handle cooldown
                     if self.cooldown_counter > 0:
                         self.cooldown_counter -= 1
                         
-                    # Process frame through algorithm - propagate errors
+                    # Process frame through algorithm
                     zndx = image_ndx % self.zsize
                     try:
                         self.alg.process_frame(img, zndx)
                     except Exception as err:
-                        # Re-raise algorithm errors to be caught by caller
                         raise Exception(f"Algorithm error at frame {image_ndx}, z={zndx}: {err}") from err
                     
                     # Check for stimulus trigger
@@ -476,9 +507,9 @@ class ClosedLoopEngine:
                         else:
                             time.sleep(self.next_call - nowtime)
                             
-                        self.mmc.snapImage()
+                        camera.snap_image()
                     else:
-                        rem = self.mmc.getRemainingImageCount()
+                        rem = camera.get_remaining_image_count()
                         
         finally:
             self.is_running = False
@@ -490,9 +521,9 @@ class ClosedLoopEngine:
         Collect and save metadata from all components.
         
         Aggregates metadata from:
+        - Hardware (via HardwareManager)
         - Algorithm
         - Stimulus interface
-        - MicroManager
         - Acquisition settings
         """
         if self.no_save_metadata:
@@ -501,17 +532,21 @@ class ClosedLoopEngine:
             
         logger.info("Saving metadata...")
         
-        # Build metadata dict - using self.args as base which has the expected structure
+        # Build metadata dict
         metadata = dict(self.args)
         metadata["frame_time_list"] = self.frame_time_list
         metadata["t0"] = self.t0
         metadata["xsize"] = self.xsize
         metadata["ysize"] = self.ysize
 
-        # store configs
+        # Store configs
         metadata['hardware_config'] = self.hardware_config.model_dump(mode='json')
         metadata['experiment_config'] = self.experiment_config.model_dump(mode='json')
         metadata["algorithm_config"] = self.algorithm_config.model_dump(mode='json')
+        
+        # Collect hardware metadata through HardwareManager
+        if self.hardware and self.hardware.is_initialized:
+            metadata["hardware_metadata"] = self.hardware.get_metadata()
         
         # Collect component metadata
         if self.alg:
@@ -519,11 +554,6 @@ class ClosedLoopEngine:
             
         if self.stim:
             metadata["stim_metadata"] = self.stim.get_metadata(args=metadata)
-            
-        if self.mmc:
-            metadata["mmc_metadata"] = MMSubroutines.get_metadata(
-                args=metadata, mmc=self.mmc
-            )
             
         # Save to file
         utils.save_metadata(
@@ -537,7 +567,6 @@ class ClosedLoopEngine:
             
         logger.info("Metadata saved")
 
-        # also return object
         return metadata
         
     def _save_images(self):
@@ -547,13 +576,15 @@ class ClosedLoopEngine:
             return
             
         logger.info("Saving images...")
+
+        # TODO migrate this it shouldn't be here maybe utils?
         MMSubroutines.saveScanTiffs(
             fname=self.saveroot + ".tiff",
             img_array=self.frames
         )
         logger.info("Images saved")
         
-    def _save_visualizations(self):
+    def _save_visualizations(self, mip_fps: float | None = None):
         """Save algorithm plots and MIP movies."""
         if self.save_alg_model_plot and self.alg:
             logger.info("Saving algorithm model plot...")
@@ -561,7 +592,7 @@ class ClosedLoopEngine:
             
         if self.save_mip_movie:
             logger.info("Generating MIP movie...")
-            exposure = self.gooey_args.get("exposure", 30)
+            exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps # hardcoded default
             utils.generate_mip_movie(
                 savefilename=self.saveroot + "_mip_movie",
                 frames=self.frames,
@@ -608,12 +639,12 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.warning(f"Error closing stimulus interface: {err}")
                 
-        # Close hardware (MicroManager)
-        if self.mmc:
+        # Close hardware through HardwareManager
+        if self.hardware:
             try:
-                MMSubroutines.close(self.mmc, self.args)
+                self.hardware.close()
             except Exception as err:
-                logger.warning(f"Error closing MicroManager: {err}")
+                logger.warning(f"Error closing hardware: {err}")
                 
         # Send notification
         if self.notify_sms_on_done:
@@ -630,8 +661,8 @@ class ClosedLoopEngine:
         Orchestrate the full acquisition workflow.
         
         Executes all phases in order:
-        1. Prepare acquisition (create dirs, etc.)
-        2. Initialize hardware
+        1. Initialize hardware (via HardwareManager)
+        2. Prepare acquisition
         3. Initialize algorithm
         4. Initialize stimulus
         5. Run acquisition loop
@@ -647,10 +678,9 @@ class ClosedLoopEngine:
             
             # Initialization phase
             self.initialize_hardware()
-            self.prepare_acquisition() # reads from hardware, initializes values for alg/stim
+            self.prepare_acquisition()
             self.initialize_algorithm()
             self.initialize_stimulus()
-            
             
             # Acquisition phase
             self.run_acquisition_loop()
@@ -690,12 +720,9 @@ def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
     if ops.get("input_recording") is not None:
         fname = ops["input_recording"]
         logger.debug(f"Simulating recording from file: {fname}")
-        # Continue with normal flow - DummyMMC will handle the file
     
     try:
         # Convert gooey_args to Config objects
-        from config.config_manager import ConfigManager
-        
         configs = convert_gooey_args_to_configs(ops)
         
         # Run acquisition with new signature
@@ -712,7 +739,6 @@ def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
     finally:
         logger.info("Session complete")
         sys.exit()
-
 
 
 def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
@@ -745,7 +771,7 @@ def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
         backend=gooey_args.get("acquisition_backend", "dummy"),
         mm_config_path=gooey_args.get("mm_configuration_file"),
         stim_interface=gooey_args.get("stim_interface", "dummy"),
-        microscope_name=gooey_args.get("microscope_name"),  # Temporary
+        microscope_name=gooey_args.get("microscope_name"),
         strobe_acquisition=gooey_args.get("strobe_acquisition", False),
         strobe_inter_frame_interval_ms=gooey_args.get("strobe_inter_frame_interval", 80),
         use_static_stim_roi=gooey_args.get("use_static_stim_roi", False),
@@ -840,137 +866,6 @@ def run_acquisition(args: dict[str, Any]):
     engine.run()
 
 
-
-# def create_test_config(input_recording: str | None = None) -> dict[str, Any]:
-#     """
-#     Create a test configuration for running the engine with dummy objects.
-    
-#     Args:
-#         input_recording: Optional path to a TIFF file for simulated acquisition.
-#                         If None, will use DummyMMC without data.
-    
-#     Returns:
-#         Dictionary with test configuration matching gooey_args format
-#     """
-#     test_config = {
-#         # Acquisition controls
-#         "output_folder": "./test_output",
-#         "total_frames": 100,  # Small number for quick testing
-#         "mm_configuration_file": "MMConfig_demo.cfg", # Not used
-#         "zsize": 10,
-#         "save_mip": False,
-#         "strobe_acquisition": False,
-#         "strobe_inter_frame_interval": 80,
-#         "save_structural_scan": "none",
-        
-#         # Experimental metadata (minimal for testing)
-#         "subject_strain": "test_strain",
-#         "subject_condition": "",
-#         "atr_concentration": 0.0,
-#         "z_step_size": 3.0,
-#         "nose_orientation": "left",
-#         "vnc_orientation": "up",
-#         "num_eggs": 0,
-#         "microscope_name": "test",
-#         "experimental_notes": "Test run with dummy objects",
-        
-#         # Closed-loop controls
-#         "trigger_algorithm": "Dummy algorithm (does nothing)",
-#         "GUI_mode": "neural_imaging",
-#         "rec_baseline": 0,
-#         "save_alg_model_plot": False,
-        
-#         # Stimulus settings
-#         "stim_interface": "no stim",
-#         "use_static_stim_roi": False,
-#         "frames_to_stimulate_for_options": [48],
-#         "stim_intensity_options": [10],
-#         "stimulus_diameter": 10,
-        
-#         # Dev ops
-#         "input_recording": input_recording,
-#         "acquisition_backend": "test",
-#         "no_save_images": True,  # Don't save images during testing
-#         "no_save_metadata": True,  # Don't save metadata during testing
-#         "save_gooey_defaults": False,
-#         "prefill_wb_ops": False,
-#         "send_sms": False,
-        
-#         # Additional params that might be needed
-#         "roi": [0, 0, 200, 200],
-#         "exposure": 30,
-#         "binning": "1x1",
-#         "configs": {},
-#     }
-    
-#     return test_config
-
-# def run_test():
-#     """
-#     Run a test acquisition using dummy objects.
-    
-#     This function demonstrates how to run the ClosedLoopEngine with
-#     stub objects for testing without real hardware.
-#     """
-#     print("="*60)
-#     print("Running ClosedLoopEngine Test")
-#     print("="*60)
-    
-#     # Option 1: Test with a real TIFF file for realistic simulation
-#     # Uncomment and provide path to test with actual data:
-#     # test_config = create_test_config(input_recording="path/to/your/test.tiff")
-    
-#     # Option 2: Test with dummy objects (no real data)
-#     test_config = create_test_config()
-    
-#     # Create and run engine
-#     try:
-#         engine = ClosedLoopEngine(gooey_args=test_config)
-#         engine.run()
-#         print("\n" + "="*60)
-#         print("Test completed successfully!")
-#         print("="*60)
-#         return True
-#     except Exception as err:
-#         print("\n" + "="*60)
-#         print(f"Test failed with error: {err}")
-#         print("="*60)
-#         logger.exception("Full test error traceback:")
-#         return False
-
-
-# if __name__ == "__main__":
-
-#     # in parent directory, run:
-#     # python -m engine.closed_loop_engine
-
-#     # Run the test when this module is executed directly
-#     import sys
-    
-#     # Set up logging for test
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-    
-#     # Check if a TIFF file was provided as command line argument
-#     if len(sys.argv) > 1:
-#         test_file = sys.argv[1]
-#         print(f"Running test with input file: {test_file}")
-#         test_config = create_test_config(input_recording=test_file)
-#     else:
-#         print("Running test with dummy objects (no input file)")
-#         test_config = create_test_config()
-    
-#     # Run test
-#     success = run_test()
-#     sys.exit(0 if success else 1)
-
-
-
-# ============================================================================
-# Testing and Development Functions
-# ============================================================================
 
 def create_test_config() -> dict[str, Any]:
     """

@@ -208,5 +208,9 @@ class HardwareManager:
         
         if isinstance(self._backend, MicroManagerBackend):
             return self._backend.get_mmc()
+
+        if isinstance(self._backend, DummyHardwareBackend):
+            return self._backend.get_mmc()
+            
         return None
 
