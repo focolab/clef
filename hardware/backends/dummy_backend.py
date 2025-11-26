@@ -14,6 +14,7 @@ from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
 from config.config_manager import HardwareConfig
+from hardware.backends.lib import DummyMMC
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +257,7 @@ class DummyHardwareBackend(BaseHardwareBackend):
         # Note: input_recording_path is in ExperimentConfig, not HardwareConfig
         # This will be passed separately when needed
         self.input_file = None
+        self.mmc = None # for legacy testing
     
     def initialize(self, input_file: Optional[str] = None) -> None:
         """
@@ -274,6 +276,9 @@ class DummyHardwareBackend(BaseHardwareBackend):
         
         # Create dummy stimulus
         self._stimulus = DummyStimulus()
+
+        # Dummy micromanager object
+        self.mmc = DummyMMC.DummyMMC()
         
         self._initialized = True
         logger.info("Dummy hardware backend initialized")
@@ -300,3 +305,17 @@ class DummyHardwareBackend(BaseHardwareBackend):
         }
         return metadata
 
+    def get_mmc(self):
+        """
+        Get (fake) underlying Micro-Manager Core object.
+        
+        This method provides access to the raw MMC object for components
+        that haven't been refactored yet. This is temporary and will be
+        removed as components are migrated to use the hardware abstraction.
+
+        For use with testing
+        
+        Returns:
+            Micro-Manager Core object
+        """
+        return self.mmc
