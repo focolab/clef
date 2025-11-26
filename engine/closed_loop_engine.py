@@ -236,50 +236,6 @@ class ClosedLoopEngine:
         logger.info(f"Hardware initialized with camera ROI: {self.roi}")
         
     def initialize_algorithm(self):
-        """
-        Initialize the closed-loop trigger algorithm.
-        
-        Uses AlgorithmFactory pattern to instantiate the correct algorithm
-        based on configuration.
-        """
-        logger.info(f"Initializing algorithm: {self.trigger_alg}")
-        
-        # Algorithm selection
-        try:
-            if self.trigger_alg == "Dynamic range deriv":
-                from lib import DynamicRangeDeriv
-                self.alg = DynamicRangeDeriv.DynamicRangeDeriv(self.args)
-            elif self.trigger_alg == "RoiDeriv":
-                from lib import RoiDeriv
-                self.alg = RoiDeriv.RoiDeriv(self.args)
-            elif self.trigger_alg == "StimOnsetFromList":
-                from lib import StimOnsetFromList
-                self.alg = StimOnsetFromList.StimOnsetFromList(self.args)
-            elif self.trigger_alg == "PointAndClick":
-                from lib import PointAndClick
-                self.alg = PointAndClick.PointAndClick(self.args)
-            elif self.trigger_alg == "HammerOfDawn":
-                from lib import HammerOfDawn
-                self.alg = HammerOfDawn.HammerOfDawn(self.args)
-            elif self.trigger_alg == "Brainalyzer":
-                from lib import Brainalyzer
-                self.alg = Brainalyzer.Brainalyzer(self.args, local_handles={"mmc": self.mmc})
-            else:
-                logger.debug("Running closed-loop with DUMMY algorithm")
-                # from lib import DummyAlg
-                from algorithms.dummy import DummyAlg
-                self.alg = DummyAlg()
-                
-            # Initialize the algorithm's internal model
-            self.alg.initialize_model()
-            
-        except Exception as err:
-            logger.exception(f"Error initializing algorithm: {err}")
-            raise
-            
-        logger.info("Algorithm initialized successfully")
-
-    def initialize_algorithm_FACTORY_REPLACE_OLD_VERSION(self):
             """
             Initialize the closed-loop trigger algorithm using the factory pattern.
             
@@ -308,7 +264,6 @@ class ClosedLoopEngine:
                 # Algorithm not found in registry
                 logger.error(f"Algorithm not found: {err}")
                 raise
-                
                 
             except Exception as err:
                 logger.exception(f"Error initializing algorithm: {err}")
