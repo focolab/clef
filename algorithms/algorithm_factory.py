@@ -130,7 +130,7 @@ _registry = AlgorithmRegistry()
 def create_algorithm(
     algorithm_config: 'AlgorithmConfig',
     experiment_config: 'ExperimentConfig',
-    hardware_config: 'HardwareConfig',
+    hardware_manager: 'HardwareManager',
     local_handles: Dict[str, Any] = None
 ) -> Any:
     """
@@ -177,14 +177,15 @@ def create_algorithm(
         raise
     
     # Build legacy args for algorithms that still expect it
-    args = _build_legacy_args(algorithm_config, experiment_config, hardware_config)
+    args = _build_legacy_args(algorithm_config, experiment_config, hardware_manager.config)
     
     try:
         # Instantiate algorithm
         # Different algorithms have different signatures:
         # - Most take: (args, local_handles={})
         # - Some take: (args) only
-        alg_instance = alg_class(args, local_handles=local_handles)
+        # alg_instance = alg_class(args, local_handles=local_handles)
+        alg_instance = alg_class(algorithm_config=algorithm_config, experiment_config=experiment_config, hardware_manager=hardware_manager, args=args, local_handles=local_handles)
         
         logger.info(f"Successfully created algorithm: {alg_type}")
         return alg_instance

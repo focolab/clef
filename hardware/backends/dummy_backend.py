@@ -7,6 +7,8 @@ for testing without real hardware.
 
 import logging
 import numpy as np
+import tifffile as tf
+import time
 from typing import Dict, Any, Optional, Tuple, Union
 
 from hardware.backends.base_backend import BaseHardwareBackend
@@ -33,21 +35,28 @@ class DummyCamera(CameraInterface):
         """
         self.width = width
         self.height = height
-        self.exposure_ms = 10.0
-        self.roi = (0, 0, width, height)
+        self.exposure_ms = 5
         self._acquisition_running = False
         self._buffer_count = 0
         self._frame_count = 0
+        self.input_file = input_file
         
         # Load input file if provided
         self.input_data = None
         if input_file:
             try:
-                import tifffile as tf
                 self.input_data = tf.imread(input_file)
+                if len(self.input_data.shape) == 4: # TZYX
+                    self.height = self.input_data.shape[2]
+                    self.width = self.input_data.shape[3]
+                else: # TYX
+                    self.height = self.input_data.shape[1]
+                    self.width = self.input_data.shape[2]
+                # self.tsize = self.input_data.shape[0] * self.input_data.shape[1]
                 logger.info(f"Loaded dummy camera data from {input_file}, shape: {self.input_data.shape}")
             except Exception as e:
                 logger.warning(f"Could not load input file {input_file}: {e}")
+        self.roi = (0, 0, self.width, self.height)
     
     def acquire_frame(self) -> np.ndarray:
         """Acquire a single frame."""
@@ -81,10 +90,29 @@ class DummyCamera(CameraInterface):
     
     def get_image(self) -> np.ndarray:
         """Get most recent image."""
-        if self.input_data is not None and self._frame_count < len(self.input_data):
-            return self.input_data[self._frame_count].astype(np.uint16)
+
+        if self.input_data is not None:
+            
+            # load from tiff
+            if len(self.input_data.shape) == 4:
+                # d1 is t, d2 is z
+                dt = (self._frame_count // self.input_data.shape[1]) % self.input_data.shape[1] # loop
+                dz = self._frame_count % self.input_data.shape[1]
+                frame = self.input_data[dt, dz, :, :].copy()
+
+            elif len(self.input_data.shape) == 3:
+                frame = self.input_data[self._frame_count % self.input_data.shape[1],:,:].copy()
+
         # Generate random noise image
-        return np.random.randint(0, 65536, size=(self.height, self.width), dtype=np.uint16)
+        else:
+            frame = np.random.randint(0, 65536, size=(self.height, self.width), dtype=np.uint16)
+        
+        # Sleep for fake exposure
+        time.sleep(self.exposure_ms/1000)
+         
+        return frame
+
+
     
     def clear_buffer(self) -> None:
         """Clear buffer."""

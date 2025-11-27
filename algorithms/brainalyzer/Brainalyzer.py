@@ -18,8 +18,10 @@ from typing import Optional, Dict, Any
 from config.config_manager import (
     AlgorithmConfig,
     ExperimentConfig,
-    HardwareConfig,
 )
+
+# Hardware interaction layer
+from hardware.hardware_manager import HardwareManager
 
 # Import worker process
 try:
@@ -55,8 +57,9 @@ class Brainalyzer:
         self,
         algorithm_config: AlgorithmConfig,
         experiment_config: ExperimentConfig,
-        hardware_config: Optional[HardwareConfig] = None,
-        local_handles: Optional[Dict[str, Any]] = None
+        hardware_manager: Optional[HardwareManager] = None,
+        local_handles: Optional[Dict[str, Any]] = None,
+        args:  Optional[Dict[str, Any]] = None
     ):
         """
         Initialize Brainalyzer algorithm with Config objects.
@@ -66,14 +69,17 @@ class Brainalyzer:
             experiment_config: Experiment configuration (acquisition, subject, output)
             hardware_config: Hardware configuration (optional, for behavior mode)
             local_handles: Dictionary with optional handles (e.g., {'mmc': mmc_instance})
+            args: slated for deprecation
         """
         if local_handles is None:
             local_handles = {}
+        if args is None:
+            args = {}
         
         # Store configs
         self.algorithm_config = algorithm_config
         self.experiment_config = experiment_config
-        self.hardware_config = hardware_config
+        self.hardware = hardware_manager
         self.local_handles = local_handles
         
         # Extract core experiment params
@@ -89,13 +95,17 @@ class Brainalyzer:
         
         # Hardware params (with safe defaults)
         self.microscope_name = (
-            hardware_config.microscope_name if hardware_config else "unknown"
+            self.hardware.config.microscope_name if self.hardware else "unknown"
         )
         
         # Data params - will be set by closed_loop_engine after hardware init
         self.roi = (0, 0, 200, 200)  # Default, will be updated
-        self.xsize = 200
-        self.ysize = 200
+        try:
+            self.roi = self.hardware.camera.roi
+        except Exception as err:
+            logger.warning(f'No hardware detected by brainalyzer, defaulting to image roi: {self.roi}')
+        self.xsize = self.roi[2]
+        self.ysize = self.roi[3]
         self.camera_binning = None
         self.dtype = np.uint16
         
@@ -155,6 +165,8 @@ class Brainalyzer:
             "camera_binning": self.camera_binning,
             "dtype": self.dtype,
         }
+
+        logger.info(f'Instantiating worker with vis_args: {self.vis_args}')
 
         # Initialize the visualizer
         try:
@@ -274,11 +286,13 @@ class Brainalyzer:
                 # Move stage
                 self.mmc.setRelativeXYPosition(xy_offset[0], xy_offset[1])
 
-
     def initialize_model(self):
         """Initialize the algorithm model."""
         # Seed RNG for reproducibility
         random.seed(self.rec_id)
+
+        # initialize subprocess
+        self.initialize_worker()
 
     def get_metadata(self, args=None):
         """
@@ -296,8 +310,8 @@ class Brainalyzer:
             "experiment_config": self.experiment_config.model_dump(mode='json'),
         }
         
-        if self.hardware_config:
-            metadata["hardware_config"] = self.hardware_config.model_dump(mode='json')
+        if self.hardware:
+            metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
 
         # Optional metadata
         if (self.GUI_mode == "behavior" and
@@ -459,17 +473,19 @@ def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Opt
         >>> # New way (preferred)
         >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
     """
-    from closed_loop_engine import convert_gooey_args_to_configs
+    from engine.closed_loop_engine import convert_gooey_args_to_configs
+    from hardware.hardware_manager import HardwareManager
     
     # Convert legacy args to configs
     gooey_args = args.get("gooey_args", args)
     configs = convert_gooey_args_to_configs(gooey_args)
+    hm = HardwareManager(configs['hardware'])
     
     # Create Brainalyzer with configs
     alg = Brainalyzer(
         algorithm_config=configs["algorithm"],
         experiment_config=configs["experiment"],
-        hardware_config=configs["hardware"],
+        hardware_manager=hm,
         local_handles=local_handles
     )
     

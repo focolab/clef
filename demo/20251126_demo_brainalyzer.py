@@ -73,7 +73,7 @@ def create_demo_configs(input_tiff_path: str) -> dict:
     
     # Acquisition Config
     acquisition_config = AcquisitionConfig(
-        num_frames=100,  # Will read from TIFF
+        num_frames=800,  # Will read from TIFF
         z_planes=8,
         z_step=3,
         baseline_frames=0,
@@ -301,7 +301,7 @@ def run_brainalyzer_demo(input_tiff_path: str):
         
         # Validate outputs
         success = validate_demo_outputs(
-            engine.savedir,
+            engine.experiment_config.output_dir,
             engine.session_id
         )
         

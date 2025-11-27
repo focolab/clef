@@ -83,7 +83,7 @@ class ClosedLoopEngine:
         self.mmc = None  # Legacy - will be removed
         self.xsize = 200  # default for unit tests
         self.ysize = 200  # default for unit tests
-        self.roi = (0, 0, 200, 200)
+        self.roi = (0, 0, 200, 200) # default for unit tests
         self.alg = None
         self.stim_controller = None  # stimulus controller
         self.t0 = 1.  # default for unit tests
@@ -255,7 +255,7 @@ class ClosedLoopEngine:
             self.alg = create_algorithm(
                 algorithm_config=self.algorithm_config,
                 experiment_config=self.experiment_config,
-                hardware_config=self.hardware_config,
+                hardware_manager=self.hardware,
                 local_handles={"mmc": self.mmc}
             )
             
@@ -330,6 +330,7 @@ class ClosedLoopEngine:
             (self.frames_to_grab, self.ysize, self.xsize), 
             dtype=np.uint16
         )
+        logger.debug(f'Initialized output array of shape {self.frames.shape}')
         self.frame_time_list = []
         
         # Configure camera for acquisition through hardware manager
