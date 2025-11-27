@@ -3,11 +3,12 @@ import numpy as np
 # import seaborn as sns
 import logging, logging, warnings, time, os
 from datetime import datetime
+from pathlib import Path
 
 # for qtvisualizer
-# from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-# import pyqtgraph as pg
-# import pyqtgraph.opengl as gl
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+import pyqtgraph as pg
+import pyqtgraph.opengl as gl
 from multiprocessing import Process, shared_memory
 
 # custom imports
@@ -25,6 +26,11 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # pyqtgraph speedup
 # pg.setConfigOption('useNumba', True)
 
+# Pathing to other resources
+ROOTDIR = Path(__file__).resolve().parents[2]
+CSS_PATH = ROOTDIR  / "media" / "css" / "Ubuntu.qss"
+MODELS_DIR = ROOTDIR / "algorithms" / "models"
+
 class BrainalyzerWorker(Process):
 
     def __init__(self, child_conn, vis_args):
@@ -36,12 +42,9 @@ class BrainalyzerWorker(Process):
         self.vis_args = vis_args
         self.child_conn = child_conn
 
-        if BRAINALYZER_DEBUG:
-            self.model_dir = self.vis_args.get("model_dir", 'models/') # for local testing
-            self.css_fname = self.vis_args.get("css_fname", "css/Ubuntu.qss") # for local testing
-        else:
-            self.model_dir = self.vis_args.get('model_dir', 'lib/models/')
-            self.css_fname = self.vis_args.get("css_fname", "lib/css/Ubuntu.qss")
+        # pathing to resources
+        self.model_dir = MODELS_DIR
+        self.css_fname = CSS_PATH
 
         # general params
         self.initialization_t0 = time.time()
@@ -66,8 +69,6 @@ class BrainalyzerWorker(Process):
         self.roi_plot_cmap = self.vis_args.get('roi_plot_cmap', "bright")
         self.GUI_mode = self.vis_args.get('GUI_mode', 'neural_imaging')
         self.camera_binning = self.vis_args.get("camera_binning", "1x1")
-        # self.quant_cmap_list = [(255*np.array(x)).round().astype(np.uint8) for x in sns.color_palette(self.roi_plot_cmap)]
-        self.quant_cmap_list = []  # BREAKING HOTFIX, PER IF SEABORN IS VALID DEPENDENCY
         self.num_rois_added = 0
         self.stim_cmap_list = [np.array((255, 0, 0), dtype=np.uint8)]
         self.shared_frame_memory_list = []
@@ -552,6 +553,17 @@ class BrainalyzerWorker(Process):
         for z in range(self.zsize):
             self.ii_list[z].setLevels(lev)
 
+    def get_random_pen_color(self):
+        # quant_cmap_list = [(255*np.array(x)).round().astype(np.uint8) for x in sns.color_palette(self.roi_plot_cmap)]
+        # cmap_ndx = self.num_rois_added % len(quant_cmap_list)
+        # color = quant_cmap_list[cmap_ndx]
+
+        color = (np.random.randint(0, 255),
+               np.random.randint(0, 255),
+               np.random.randint(0, 255))
+        return color
+
+
     def add_quant_roi_to_image(self, event):
 
         # read z index from stateful dropdown
@@ -563,7 +575,7 @@ class BrainalyzerWorker(Process):
         
         # create maleable roi object - note xy is flipped
         roi_id = hash(datetime.now())
-        pen_color = self.quant_cmap_list[self.num_rois_added % len(self.quant_cmap_list)]
+        pen_color = self.get_random_pen_color()
         quant_roi = pg.RectROI(
             [self.ysize // 2, self.xsize // 2],
             [40, 40],
@@ -1015,10 +1027,10 @@ class BrainalyzerWorker(Process):
             # deactivate model toggle, this will turn off stim if it's currently on
             self.activate_model_button.setChecked(False)
 
-# class BrainalyzerImageItem(pg.ImageItem):
-#     def __init__(self, *args, **kwargs):
-#         super(BrainalyzerImageItem, self).__init__(*args, **kwargs)
-#         self.imageitem_id = kwargs.get('imageitem_id', None)
+class BrainalyzerImageItem(pg.ImageItem):
+    def __init__(self, *args, **kwargs):
+        super(BrainalyzerImageItem, self).__init__(*args, **kwargs)
+        self.imageitem_id = kwargs.get('imageitem_id', None)
 
 if __name__ == "__main__":
 

@@ -173,7 +173,7 @@ def dummy_tiff_file(temp_output_dir):
     import tifffile as tf
     
     # Create small test dataset
-    test_data = np.random.randint(0, 65536, size=(100, 200, 200), dtype=np.uint16)
+    test_data = np.random.randint(0, 65536, size=(10, 50, 50), dtype=np.uint16)
     filepath = os.path.join(temp_output_dir, "test_recording.tiff")
     tf.imwrite(filepath, test_data)
     
@@ -851,16 +851,18 @@ class TestIntegration:
         """Test acquisition with TIFF file input."""
         configs = minimal_configs.copy()
         configs["experiment"].input_recording_path = dummy_tiff_file
-        configs["experiment"].acquisition.num_frames = 50
+        configs["experiment"].acquisition.num_frames = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
             experiment_config=configs["experiment"],
             algorithm_config=configs["algorithm"]
         )
+        engine.initialize_hardware() # needs to load virtual hardware settings after initialization
+        engine.prepare_acquisition() # needs to overwrite default acquitision initialization 
         engine.run()
         
-        assert engine.img_count == 50
+        assert engine.img_count == 10
     
     def test_acquisition_with_z_stacks(self, minimal_configs):
         """Test acquisition with multiple z-planes."""

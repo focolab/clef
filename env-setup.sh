@@ -6,3 +6,6 @@
 
 # 20251108
 pip install numpy
+
+# 20251126 demo
+pip install pyqtgraph, pyside6, pyopengl 

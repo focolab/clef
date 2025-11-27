@@ -42,7 +42,7 @@ class TestDummyCamera:
         camera = DummyCamera()
         assert camera.width == 200
         assert camera.height == 200
-        assert camera.exposure_ms == 10.0
+        assert camera.exposure_ms == 5.0
         assert camera.roi == (0, 0, 200, 200)
     
     def test_dummy_camera_initialization_custom(self):

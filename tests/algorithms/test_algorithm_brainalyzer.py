@@ -23,6 +23,7 @@ from config.config_manager import (
     AlgorithmParameters,
     StimulusParameters,
 )
+from hardware.hardware_manager import HardwareManager
 
 
 class TestBrainalyzerInitialization:
@@ -67,7 +68,15 @@ class TestBrainalyzerInitialization:
             microscope_name="test_microscope",
         )
     
-    def test_init_with_configs(self, algorithm_config, experiment_config, hardware_config):
+    @pytest.fixture
+    def hardware_manager(self, hardware_config):
+        """Create and initialize test hardware manager."""
+        hw_manager = HardwareManager(hardware_config)
+        hw_manager.initialize()
+        yield hw_manager
+        hw_manager.close()
+    
+    def test_init_with_configs(self, algorithm_config, experiment_config, hardware_manager):
         """Test initialization with Config objects."""
         from algorithms.brainalyzer.Brainalyzer import Brainalyzer
         
@@ -75,7 +84,7 @@ class TestBrainalyzerInitialization:
         alg = Brainalyzer(
             algorithm_config=algorithm_config,
             experiment_config=experiment_config,
-            hardware_config=hardware_config,
+            hardware_manager=hardware_manager,
         )
         
         # Verify core attributes set correctly
@@ -87,8 +96,8 @@ class TestBrainalyzerInitialization:
         assert alg.stim_intensity_ops == [10, 20, 30]
         assert alg.stim_intensity == 10  # First option
     
-    def test_init_without_hardware_config(self, algorithm_config, experiment_config):
-        """Test initialization without hardware config (optional)."""
+    def test_init_without_hardware_manager(self, algorithm_config, experiment_config):
+        """Test initialization without hardware manager (optional)."""
         from algorithms.brainalyzer.Brainalyzer import Brainalyzer
         
         alg = Brainalyzer(
@@ -98,7 +107,7 @@ class TestBrainalyzerInitialization:
         
         # Should use safe defaults
         assert alg.microscope_name == "unknown"
-        assert alg.hardware_config is None
+        assert alg.hardware is None
     
     def test_set_roi(self, algorithm_config, experiment_config):
         """Test ROI setting after initialization."""
@@ -155,7 +164,20 @@ class TestBrainalyzerProcessing:
     """Test Brainalyzer frame processing."""
     
     @pytest.fixture
-    def brainalyzer(self):
+    def hardware_manager(self):
+        """Create and initialize test hardware manager."""
+        hardware_config = HardwareConfig(
+            backend="dummy",
+            stim_interface="dummy",
+            microscope_name="test_microscope",
+        )
+        hw_manager = HardwareManager(hardware_config)
+        hw_manager.initialize()
+        yield hw_manager
+        hw_manager.close()
+    
+    @pytest.fixture
+    def brainalyzer(self, hardware_manager):
         """Create Brainalyzer instance for testing."""
         from algorithms.brainalyzer.Brainalyzer import Brainalyzer
         
@@ -180,6 +202,7 @@ class TestBrainalyzerProcessing:
         alg = Brainalyzer(
             algorithm_config=algorithm_config,
             experiment_config=experiment_config,
+            hardware_manager=hardware_manager,
         )
         
         # Set ROI
@@ -283,7 +306,20 @@ class TestBrainalyzerProcessing:
 class TestBrainalyzerMetadata:
     """Test Brainalyzer metadata collection."""
     
-    def test_get_metadata(self):
+    @pytest.fixture
+    def hardware_manager(self):
+        """Create and initialize test hardware manager."""
+        hardware_config = HardwareConfig(
+            backend="dummy",
+            stim_interface="dummy",
+            microscope_name="test_scope",
+        )
+        hw_manager = HardwareManager(hardware_config)
+        hw_manager.initialize()
+        yield hw_manager
+        hw_manager.close()
+    
+    def test_get_metadata(self, hardware_manager):
         """Test metadata collection."""
         from algorithms.brainalyzer.Brainalyzer import Brainalyzer
         
@@ -301,15 +337,10 @@ class TestBrainalyzerMetadata:
             acquisition=AcquisitionConfig(num_frames=100, z_planes=10),
         )
         
-        hardware_config = HardwareConfig(
-            backend="dummy",
-            microscope_name="test_scope",
-        )
-        
         alg = Brainalyzer(
             algorithm_config=algorithm_config,
             experiment_config=experiment_config,
-            hardware_config=hardware_config,
+            hardware_manager=hardware_manager,
         )
         
         # Add some stimulus events
@@ -352,22 +383,29 @@ class TestBrainalyzerBehaviorMode:
             microscope_name="innovation core thunderscope",  # Specific scope
         )
         
+        # Create hardware manager
+        hardware_manager = HardwareManager(hardware_config)
+        hardware_manager.initialize()
+        
         # Mock MMC
         mock_mmc = Mock()
         local_handles = {"mmc": mock_mmc}
         
-        # Create with behavior mode
-        alg = Brainalyzer(
-            algorithm_config=algorithm_config,
-            experiment_config=experiment_config,
-            hardware_config=hardware_config,
-            local_handles=local_handles,
-        )
-        
-        # Verify behavior mode setup
-        assert alg.GUI_mode == "behavior"
-        assert hasattr(alg, 'shared_stage_offset_xy')
-        assert hasattr(alg, 'xy_stage_position_list')
+        try:
+            # Create with behavior mode
+            alg = Brainalyzer(
+                algorithm_config=algorithm_config,
+                experiment_config=experiment_config,
+                hardware_manager=hardware_manager,
+                local_handles=local_handles,
+            )
+            
+            # Verify behavior mode setup
+            assert alg.GUI_mode == "behavior"
+            assert hasattr(alg, 'shared_stage_offset_xy')
+            assert hasattr(alg, 'xy_stage_position_list')
+        finally:
+            hardware_manager.close()
 
 
 if __name__ == "__main__":

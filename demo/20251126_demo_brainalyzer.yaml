@@ -27,11 +27,11 @@ experiment:
     num_frames: 100
     frame_rate: null
     z_stack: true
-    z_planes: 10
+    z_planes: 8
     z_start: 0.0
     z_end: 9.0
     z_step: 1.0
-    baseline_frames: 10
+    baseline_frames: 0
     save_structural_scan: "none"
   
   # Subject metadata
