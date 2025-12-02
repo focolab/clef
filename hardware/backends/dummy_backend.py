@@ -65,7 +65,7 @@ class DummyCamera(CameraInterface):
     def start_acquisition(self, buffer_size: int = 0) -> None:
         """Start continuous acquisition."""
         self._acquisition_running = True
-        self._buffer_count = 1000  # Simulate buffer with images
+        # self._buffer_count = 1000  # Simulate buffer with images
         logger.debug("Dummy camera: Started continuous acquisition")
     
     def stop_acquisition(self) -> None:
@@ -75,9 +75,10 @@ class DummyCamera(CameraInterface):
     
     def get_remaining_image_count(self) -> int:
         """Get remaining images in buffer."""
-        if not self._acquisition_running:
-            return 0
-        return max(0, self._buffer_count - self._frame_count)
+        # if not self._acquisition_running:
+        #     return 1
+        # return max(0, self._buffer_count - self._frame_count)
+        return 1 # Dummy should always return available images
     
     def pop_next_image(self) -> np.ndarray:
         """Pop next image from buffer."""
