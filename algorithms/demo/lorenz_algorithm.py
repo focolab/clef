@@ -339,6 +339,14 @@ class LorenzDemoAlgorithm:
             
             return stim_params, self.cooldown_counter
         
+        # after delivering perturbation, to avoid system sitting in same position, 
+        # let's rotate perturbation vector
+        # pick axis based on (hopefully) uncorrelated property for reproducible randomness
+        perturb_index = self.frame_count % 3
+        new_perturb = self.perturbation
+        new_perturb[perturb_index] = new_perturb[perturb_index] * -1
+        self.perturbation = new_perturb
+        
         return {}, 0
     
     def get_metadata(self, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -544,12 +552,12 @@ class LorenzVisualizer:
         self.image_widget = pg.ImageView()
         self.image_widget.ui.roiBtn.hide()
         self.image_widget.ui.menuBtn.hide()
-        self.layout.addWidget(self.image_widget, 0, 0, 2, 1)
+        self.layout.addWidget(self.image_widget, 0, 0, 1, 1)
         
         # 3D view (right top)
         self.view_3d = gl.GLViewWidget()
         self.view_3d.setCameraPosition(distance=80)
-        self.layout.addWidget(self.view_3d, 0, 1, 1, 1)
+        self.layout.addWidget(self.view_3d, 0, 1, 2, 1)
         
         # Add grid
         grid = gl.GLGridItem()
@@ -574,7 +582,7 @@ class LorenzVisualizer:
         self.info_text = QtWidgets.QLabel()
         self.info_text.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.info_text.setStyleSheet("QLabel { background-color: white; padding: 10px; }")
-        self.layout.addWidget(self.info_text, 1, 1, 1, 1)
+        self.layout.addWidget(self.info_text, 1, 0, 1, 1)
         
         self.window.show()
         
@@ -647,6 +655,7 @@ class LorenzVisualizer:
         
         info = f"""
         <b>Lorenz Attractor Closed-Loop Demo</b><br><br>
+        <b>Controls</b>: Mouse wheel: Zoom, Click+Hold: Rotate, CTRL+Click+Hold: Pan.<br>
         <b>Frame:</b> {self.algorithm.frame_count} / {self.algorithm.frames_to_grab}<br>
         <b>Current State:</b><br>
         &nbsp;&nbsp;x = {current_state[0]:.2f}<br>
