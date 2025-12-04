@@ -266,7 +266,7 @@ class LorenzStimulus(DummyStimulus):
         # Apply to Lorenz system
         self.lorenz.perturb_state(perturbation)
         
-        logger.info(f"Applied Lorenz stimulus: params={params}, perturbation{perturbation}")
+        logger.info(f"Applied Lorenz stimulus: params={params}")
 
 
 
