@@ -15,16 +15,20 @@ lorenz_params:
   dt: 0.01         # Integration time step
   
   # Initial conditions
-  # initial_state: [1.0, 1.0, 1.0]  # [x, y, z]
   initial_state: [0.1, 0.1, 0.1]  # [x, y, z]
+  # initial_state: [28,10,8/3]
   
   # Image generation parameters
   image_width: 100
   image_height: 100
   noise_level: 100.0
-  # noise_level: 0
   pixel_brightness: 50000.0
   pixel_radius: 2
+  
+  # Camera exposure simulation (milliseconds)
+  exposure_ms: 5.0
+  # exposure_ms: 20
+  # exposure_ms: 1.0
 
 # Stimulus device (not used for polygon/LED, just for metadata)
 stimulus_devices:

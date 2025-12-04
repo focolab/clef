@@ -10,6 +10,10 @@ save_algorithm_plot: true
 
 # Core algorithm parameters
 algorithm_params:
+
+  # Real-time visualization flag
+  visualize_real_time: true
+  
   # Cooldown after stimulation (frames)
   stim_cooldown_frames: 10
   
