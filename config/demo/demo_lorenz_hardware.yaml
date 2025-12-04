@@ -15,8 +15,9 @@ lorenz_params:
   dt: 0.01         # Integration time step
   
   # Initial conditions
-  initial_state: [0.1, 0.1, 0.1]  # [x, y, z]
+  # initial_state: [0.1, 0.1, 0.1]  # [x, y, z]
   # initial_state: [28,10,8/3]
+  initial_state: [-3.58, -4.11, 19.47]
   
   # Image generation parameters
   image_width: 100
