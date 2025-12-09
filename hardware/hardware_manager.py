@@ -10,6 +10,7 @@ from hardware.backends.base_backend import BaseHardwareBackend
 from hardware.backends.dummy_backend import DummyHardwareBackend
 from hardware.backends.micromanager_backend import MicroManagerBackend
 from hardware.backends.demo_lorenz_backend import LorenzDemoBackend
+from hardware.backends.screenshot_backend import ScreenshotBackend
 from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
@@ -57,21 +58,17 @@ class HardwareManager:
         elif backend_type == "lorenz_demo":
             self._backend = LorenzDemoBackend(self.config)
             logger.info("Selected LorenzDemoBackend")
+        elif backend_type == "screenshot":
+            self._backend = ScreenshotBackend(self.config)
+            logger.info("Selected ScreenshotBackend")
         else:
             raise ValueError(
                 f"Unknown backend type: {backend_type}. "
-                f"Supported: 'dummy', 'test', 'pycromanager', 'pymmcore', 'lorenz_demo'"
+                f"Supported: 'dummy', 'test', 'pycromanager', 'pymmcore', 'lorenz_demo', 'screenshot'"
             )
     
     def initialize(self, **kwargs) -> None:
-        """
-        Initialize hardware connections and devices.
-        
-        Creates appropriate data interface based on backend type.
-        
-        Args:
-            **kwargs: Backend-specific initialization parameters
-        """
+        """Initialize hardware connections and devices."""
         if self._initialized:
             logger.warning("Hardware already initialized")
             return
@@ -79,11 +76,17 @@ class HardwareManager:
         logger.info("Initializing hardware manager...")
         self._backend.initialize(**kwargs)
         
-        # Create data interface wrapping the camera
-        # For now, all backends provide camera-based image data
-        # Future: Could select different data interface types based on config
-        self._data_interface = ImageDataInterface(self._backend.camera)
-        logger.debug("Created ImageDataInterface wrapping camera")
+        # Create appropriate data interface based on backend type
+        if isinstance(self._backend, ScreenshotBackend):
+            # NEW: Use RGBDataInterface for screenshot backend
+            from hardware.rgb_data_interface import RGBDataInterface
+            self._data_interface = RGBDataInterface(self._backend.screenshot_source)
+            logger.debug("Created RGBDataInterface for screenshot backend")
+        else:
+            # Use ImageDataInterface for camera-based backends
+            from hardware.image_data_interface import ImageDataInterface
+            self._data_interface = ImageDataInterface(self._backend.camera)
+            logger.debug("Created ImageDataInterface wrapping camera")
         
         self._initialized = True
         logger.info("Hardware manager initialized successfully")

@@ -34,6 +34,7 @@ def create_stimulus_controller(
     from hardware.stimulus_controllers.widefield_controller import WidefieldStimulusController
     from hardware.stimulus_controllers.polygon_controller import PolygonStimulusController
     from hardware.stimulus_controllers.demo_lorenz_controller import LorenzStimulusController
+    from hardware.stimulus_controllers.input_stimulus_controller import InputStimulusController  # NEW
     
     # Normalize interface string
     interface_lower = stim_interface.lower()
@@ -63,11 +64,16 @@ def create_stimulus_controller(
         logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
         return LorenzStimulusController(hardware_manager, config)
     
+    elif "computer_input" in interface_lower or "keyboard" in interface_lower or "input" in interface_lower:
+        logger.info(f"Creating InputStimulusController for '{stim_interface}'")
+        return InputStimulusController(hardware_manager, config)
+    
     else:
         raise ValueError(
             f"Unknown stimulus interface: {stim_interface}. "
             f"Supported: 'no stim', 'dummy', 'InvCore-SpinningDisk-639', "
-            f"'InvCore-LDI-Polygon-640', 'InvCore-ThunderscopeLED3', 'lorenz'"
+            f"'InvCore-LDI-Polygon-640', 'InvCore-ThunderscopeLED3', 'lorenz', "
+            f"'keyboard', 'input'"
         )
 
 
