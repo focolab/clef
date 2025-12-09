@@ -52,10 +52,10 @@ def mock_configs():
     experiment_config.z_step_size_um = 1.0
     
     experiment_config.acquisition = Mock()
-    experiment_config.acquisition.num_frames = 100
+    experiment_config.acquisition.num_samples = 100
     experiment_config.acquisition.z_planes = 10
     experiment_config.acquisition.save_structural_scan = "none"
-    experiment_config.acquisition.baseline_frames = 0
+    experiment_config.acquisition.baseline_samples = 0
     
     experiment_config.subject = Mock()
     experiment_config.subject.genotype = "test_strain"
@@ -137,7 +137,7 @@ class TestAlgorithmFactory:
         alg.initialize_model()
         import numpy as np
         img = np.zeros((512, 512), dtype=np.uint16)
-        alg.process_frame(img, zndx=0)
+        alg.process_sample(img, sample_ndx=0)
         stim_params, cooldown = alg.check_stim(0, 0)
         assert stim_params == {}
     

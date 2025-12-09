@@ -40,7 +40,7 @@ class TestDummyAlgBasics:
         """Test DummyAlg can initialize with no args."""
         alg = DummyAlg()
         assert alg is not None
-        assert alg.frame_count == 0
+        assert alg.sample_count == 0
         assert alg.volume_count == 0
     
     def test_initialization_with_full_args(self):
@@ -55,7 +55,7 @@ class TestDummyAlgBasics:
         }
         
         alg = DummyAlg(args=args)
-        assert alg.frames_to_grab == 100
+        assert alg.samples_to_grab == 100
         assert alg.zsize == 10
         assert alg.xsize == 512
         assert alg.ysize == 512
@@ -78,18 +78,18 @@ class TestDummyAlgBasics:
 class TestDummyAlgProcessing:
     """Test DummyAlg frame and volume processing."""
     
-    def test_process_frame(self):
+    def test_process_sample(self):
         """Test frame processing increments counter."""
         alg = DummyAlg()
         alg.initialize_model()
         
         img = np.zeros((512, 512), dtype=np.uint16)
         
-        assert alg.frame_count == 0
-        alg.process_frame(img, zndx=0)
-        assert alg.frame_count == 1
-        alg.process_frame(img, zndx=0)
-        assert alg.frame_count == 2
+        assert alg.sample_count == 0
+        alg.process_sample(img, sample_ndx=0)
+        assert alg.sample_count == 1
+        alg.process_sample(img, sample_ndx=0)
+        assert alg.sample_count == 2
     
     def test_process_volume_counting(self):
         """Test volume counting when z-stack completes."""
@@ -100,18 +100,22 @@ class TestDummyAlgProcessing:
         }
         alg = DummyAlg(args)
         img = np.zeros((512, 512), dtype=np.uint16)
+        sample_ndx = 0
         
+        assert alg.zsize == 5
         assert alg.volume_count == 0
         
         # Process first volume (z=0 through z=4)
         for z in range(5):
-            alg.process_frame(img, zndx=z)
+            alg.process_sample(img, sample_ndx=sample_ndx)
+            sample_ndx = sample_ndx + 1
         
         assert alg.volume_count == 1
         
         # Process second volume
         for z in range(5):
-            alg.process_frame(img, zndx=z)
+            alg.process_sample(img, sample_ndx=sample_ndx)
+            sample_ndx = sample_ndx + 1
         
         assert alg.volume_count == 2
     
@@ -157,7 +161,7 @@ class TestDummyAlgMetadata:
         metadata = alg.get_metadata()
         
         assert "algorithm_type" in metadata
-        assert "frames_processed" in metadata
+        assert "samples_processed" in metadata
         assert "volumes_processed" in metadata
         assert "description" in metadata
     
@@ -169,12 +173,12 @@ class TestDummyAlgMetadata:
         
         # Process some frames
         for i in range(20):
-            alg.process_frame(img, zndx=i % 10)
+            alg.process_sample(img, sample_ndx=i)
         
         metadata = alg.get_metadata()
         
         assert metadata["algorithm_type"] == "DummyAlg"
-        assert metadata["frames_processed"] == 20
+        assert metadata["samples_processed"] == 20
         assert metadata["volumes_processed"] == 2  # 2 complete volumes
 
 
@@ -189,7 +193,7 @@ class TestDummyAlgClosing:
         
         # Process some frames
         for i in range(10):
-            alg.process_frame(img, zndx=i % 5)
+            alg.process_sample(img, sample_ndx=i)
         
         with caplog.at_level(logging.INFO):
             alg.close()
@@ -254,7 +258,7 @@ class TestDummyAlgIntegration:
         experiment_config.input_recording_path = None
         experiment_config.z_step_size_um = 1.0
         experiment_config.acquisition = Mock()
-        experiment_config.acquisition.num_frames = 100
+        experiment_config.acquisition.num_samples = 100
         experiment_config.acquisition.z_planes = 10
         experiment_config.acquisition.save_structural_scan = "none"
         experiment_config.acquisition.baseline_frames = 0
@@ -285,7 +289,7 @@ class TestDummyAlgIntegration:
         # Should be usable
         alg.initialize_model()
         img = np.zeros((512, 512), dtype=np.uint16)
-        alg.process_frame(img, zndx=0)
+        alg.process_sample(img, sample_ndx=0)
         stim_params, cooldown = alg.check_stim(0, 0)
         assert stim_params == {}
 
@@ -299,7 +303,7 @@ class TestDummyAlgEdgeCases:
         alg = DummyAlg(args)
         
         # Should use defaults
-        assert alg.frames_to_grab == 100
+        assert alg.samples_to_grab == 100
         assert alg.zsize == 1
     
     def test_missing_roi(self):
@@ -316,9 +320,9 @@ class TestDummyAlgEdgeCases:
         
         # Process 1000 frames
         for i in range(1000):
-            alg.process_frame(img, zndx=i % 10)
+            alg.process_sample(img, sample_ndx=i)
         
-        assert alg.frame_count == 1000
+        assert alg.sample_count == 1000
         assert alg.volume_count == 100
 
 

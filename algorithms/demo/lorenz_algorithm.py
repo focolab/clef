@@ -214,7 +214,7 @@ class LorenzDemoAlgorithm:
         
         return np.array([x, y, z])
     
-    def process_frame(self, img: np.ndarray, zndx: int):
+    def process_frame(self, img: np.ndarray, sample_ndx: int):
         """
         Process a single frame.
         
@@ -224,38 +224,35 @@ class LorenzDemoAlgorithm:
         """
         self.frame_count += 1
         
-        # Only process if single plane (z-stack not expected for this demo)
-        if zndx == 0:
-            # Find 3 brightest local maxima
-            maxima_coords = self._find_local_maxima(img, num_peaks=3)
-            
-            # Convert to Lorenz state
-            state = self._pixel_coords_to_lorenz_state(maxima_coords, img.shape)
-            
-            # Store state
-            self.x_history.append(state[0])
-            self.y_history.append(state[1])
-            self.z_history.append(state[2])
-            self.frame_indices.append(self.frame_count)
-
-            # Update visualizer
-            if self.visualizer:
-                self.visualizer.update_image(img, maxima_coords)
-                self.visualizer.update_trajectory()
-                self.visualizer.update_stim_markers()
-                self.visualizer.update_info_text()
-                self.visualizer.process_events()
-                    
-            # Log periodically
-            if self.frame_count % 50 == 0:
-                logger.info(
-                    f"Frame {self.frame_count}: "
-                    f"Lorenz state = [{state[0]:.2f}, {state[1]:.2f}, {state[2]:.2f}]"
-                )
+        # Find 3 brightest local maxima
+        maxima_coords = self._find_local_maxima(img, num_peaks=3)
         
+        # Convert to Lorenz state
+        state = self._pixel_coords_to_lorenz_state(maxima_coords, img.shape)
+        
+        # Store state
+        self.x_history.append(state[0])
+        self.y_history.append(state[1])
+        self.z_history.append(state[2])
+        self.frame_indices.append(self.frame_count)
+
+        # Update visualizer
+        if self.visualizer:
+            self.visualizer.update_image(img, maxima_coords)
+            self.visualizer.update_trajectory()
+            self.visualizer.update_stim_markers()
+            self.visualizer.update_info_text()
+            self.visualizer.process_events()
+                
+        # Log periodically
+        if self.frame_count % 50 == 0:
+            logger.info(
+                f"Frame {self.frame_count}: "
+                f"Lorenz state = [{state[0]:.2f}, {state[1]:.2f}, {state[2]:.2f}]"
+            )
+    
         # Update volume count
-        if zndx == self.zsize - 1:
-            self.volume_count += 1
+        self.volume_count += 1
     
     def process_volume(self):
         """Process completed volume (not used in this demo)."""

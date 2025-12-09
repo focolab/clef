@@ -120,7 +120,7 @@ def minimal_configs(temp_output_dir):
     )
     
     acquisition_config = AcquisitionConfig(
-        num_frames=100,
+        num_samples=100,
         z_planes=10,
         z_step=1.0,
     )
@@ -210,13 +210,13 @@ class TestConfigObjectCreation:
         
         # Validate loaded configs
         assert manager.hardware_config.backend == "dummy"
-        assert manager.experiment_config.acquisition.num_frames == 100
+        assert manager.experiment_config.acquisition.num_samples == 100
         assert manager.algorithm_config.algorithm_type == "dummy"
     
     def test_create_programmatically(self, minimal_configs):
         """Test creating Config objects programmatically."""
         assert minimal_configs["hardware"].backend == "dummy"
-        assert minimal_configs["experiment"].acquisition.num_frames == 100
+        assert minimal_configs["experiment"].acquisition.num_samples == 100
         assert minimal_configs["algorithm"].algorithm_type == "dummy"
     
     def test_convert_from_legacy_gooey_args(self, legacy_gooey_args):
@@ -229,7 +229,7 @@ class TestConfigObjectCreation:
         
         # Verify conversion accuracy
         assert configs["hardware"].backend == "dummy"
-        assert configs["experiment"].acquisition.num_frames == 100
+        assert configs["experiment"].acquisition.num_samples == 100
         assert configs["algorithm"].algorithm_type == "dummy"
     
     def test_create_test_config_generates_valid_configs(self):
@@ -242,7 +242,7 @@ class TestConfigObjectCreation:
         assert "algorithm" in configs
         
         # Should have sensible defaults
-        assert configs["experiment"].acquisition.num_frames == 100
+        assert configs["experiment"].acquisition.num_samples == 100
         assert configs["algorithm"].algorithm_type == "dummy"
         assert configs["hardware"].stim_interface == "dummy"
 
@@ -288,8 +288,8 @@ class TestInitialization:
         engine = engine_with_configs
         
         assert engine.is_running is False
-        assert engine.frame_count == 0
-        assert engine.img_count == 0
+        assert engine.sample_count == 0
+        assert engine.sample_count == 0
         assert engine.cooldown_counter == 0
         assert engine.mmc is None
         assert engine.alg is None
@@ -324,7 +324,7 @@ class TestInitialization:
         
         # Direct config access (new way)
         assert engine.hardware_config.backend == "dummy"
-        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.acquisition.num_samples == 100
         assert engine.algorithm_config.algorithm_type == "dummy"
         
         # Legacy args access still works
@@ -354,8 +354,8 @@ class TestInitialization:
         
         # ROI should be retrieved through camera interface
         assert engine.roi is not None
-        assert engine.xsize == engine.roi[2]
-        assert engine.ysize == engine.roi[3]
+        assert engine.data_interface.xsize == engine.roi[2]
+        assert engine.data_interface.ysize == engine.roi[3]
         
         # ROI should match what camera interface returns
         camera_roi = engine.hardware.camera.get_roi()
@@ -386,16 +386,16 @@ class TestAcquisitionLoop:
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
-        assert engine.frames is not None
-        expected_frames = engine.experiment_config.acquisition.num_frames
-        assert engine.frames.shape == (expected_frames, engine.ysize, engine.xsize)
-        assert engine.frames.dtype == np.uint16
+        assert engine.samples is not None
+        expected_frames = engine.experiment_config.acquisition.num_samples
+        assert engine.samples.shape == (expected_frames, engine.data_interface.ysize, engine.data_interface.xsize)
+        assert engine.samples.dtype == np.uint16
     
     def test_acquisition_loop_captures_frames(self, minimal_configs):
         """Test that acquisition loop captures the expected number of frames."""
         # Create config with small frame count
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 20
+        configs["experiment"].acquisition.num_samples = 20
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -410,12 +410,12 @@ class TestAcquisitionLoop:
         # Run acquisition
         engine.run_acquisition_loop()
         
-        assert engine.img_count == 20
+        assert engine.sample_count == 20
     
     def test_acquisition_loop_tracks_frame_times(self, minimal_configs):
         """Test that frame timestamps are recorded."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 20
+        configs["experiment"].acquisition.num_samples = 20
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -429,13 +429,13 @@ class TestAcquisitionLoop:
         
         engine.run_acquisition_loop()
         
-        assert len(engine.frame_time_list) == 20
-        assert all(isinstance(t, (float, np.float64)) for t in engine.frame_time_list)
+        assert len(engine.data_interface.sample_time_list) == 20
+        assert all(isinstance(t, (float, np.float64)) for t in engine.data_interface.sample_time_list)
     
     def test_z_stack_indexing(self, minimal_configs):
         """Test that z-stack indexing cycles correctly."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 25
+        configs["experiment"].acquisition.num_samples = 25
         configs["experiment"].acquisition.z_planes = 5
         
         engine = ClosedLoopEngine(
@@ -452,7 +452,8 @@ class TestAcquisitionLoop:
         z_indices_seen = []
         original_process_frame = engine.alg.process_frame
         
-        def track_z_index(frame, zndx):
+        def track_z_index(frame, sample_ndx):
+            zndx = sample_ndx % configs['experiment'].acquisition.z_planes
             z_indices_seen.append(zndx)
             return original_process_frame(frame, zndx)
         
@@ -467,7 +468,7 @@ class TestAcquisitionLoop:
     def test_stimulus_triggering_flow(self, minimal_configs):
         """Test that stimulus checking and submission occurs each frame."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -503,7 +504,7 @@ class TestAcquisitionLoop:
     def test_cooldown_counter_decrements(self, minimal_configs):
         """Test that cooldown counter properly decrements."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -520,11 +521,11 @@ class TestAcquisitionLoop:
         initial_cooldown = engine.cooldown_counter
         
         # Mock to trigger after a few frames
-        frame_count = [0]
+        sample_count = [0]
         def mock_check_stim(image_ndx, cooldown):
-            nonlocal frame_count
-            frame_count[0] += 1
-            if frame_count[0] >= initial_cooldown:
+            nonlocal sample_count
+            sample_count[0] += 1
+            if sample_count[0] >= initial_cooldown:
                 return {}, 0  # Reset cooldown after it expires
             return {}, cooldown - 1 if cooldown > 0 else 0
         
@@ -538,7 +539,7 @@ class TestAcquisitionLoop:
     def test_acquisition_uses_camera_interface(self, minimal_configs):
         """Test that acquisition loop uses camera interface from HardwareManager."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 20
+        configs["experiment"].acquisition.num_samples = 20
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -579,7 +580,7 @@ class TestMetadata:
         """Test that metadata includes Config objects."""
         configs = minimal_configs.copy()
         configs["experiment"].save_metadata = True
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -609,7 +610,7 @@ class TestMetadata:
         """Test that metadata includes timing information."""
         configs = minimal_configs.copy()
         configs["experiment"].save_metadata = True
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -626,7 +627,7 @@ class TestMetadata:
             metadata = engine.save_metadata()
             
             assert metadata["t0"] is not None
-            assert len(metadata["frame_time_list"]) == 10
+            assert len(metadata["sample_time_list"]) == 10
     
     def test_algorithm_metadata_included(self, minimal_configs):
         """Test that algorithm metadata is collected."""
@@ -673,7 +674,7 @@ class TestMetadata:
         """Test that metadata includes data from HardwareManager."""
         configs = minimal_configs.copy()
         configs["experiment"].save_metadata = True
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -829,7 +830,7 @@ class TestIntegration:
     def test_full_workflow_with_hardware_manager(self, minimal_configs):
         """Test complete workflow using HardwareManager."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 20
+        configs["experiment"].acquisition.num_samples = 20
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -841,7 +842,7 @@ class TestIntegration:
         engine.run()
         
         # Verify final state
-        assert engine.img_count == 20
+        assert engine.sample_count == 20
         assert os.path.exists(engine.savedir)
         
         # Verify hardware was properly closed
@@ -851,7 +852,7 @@ class TestIntegration:
         """Test acquisition with TIFF file input."""
         configs = minimal_configs.copy()
         configs["experiment"].input_recording_path = dummy_tiff_file
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -862,12 +863,12 @@ class TestIntegration:
         engine.prepare_acquisition() # needs to overwrite default acquitision initialization 
         engine.run()
         
-        assert engine.img_count == 10
+        assert engine.sample_count == 10
     
     def test_acquisition_with_z_stacks(self, minimal_configs):
         """Test acquisition with multiple z-planes."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 30
+        configs["experiment"].acquisition.num_samples = 30
         configs["experiment"].acquisition.z_planes = 10
         
         engine = ClosedLoopEngine(
@@ -878,13 +879,13 @@ class TestIntegration:
         engine.run()
         
         # Should complete 3 full volumes
-        assert engine.img_count == 30
+        assert engine.sample_count == 30
     
     def test_acquisition_saves_images_when_enabled(self, minimal_configs):
         """Test that images are saved when flag is enabled."""
         configs = minimal_configs.copy()
         configs["experiment"].save_images = True
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -911,7 +912,7 @@ class TestIntegration:
     def test_multiple_acquisitions_with_same_instance(self, minimal_configs):
         """Test that engine can be reused for multiple acquisitions."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         # First acquisition
         engine = ClosedLoopEngine(
@@ -932,8 +933,7 @@ class TestIntegration:
         
         # Reset for second acquisition
         engine.is_running = False
-        engine.img_count = 0
-        engine.frame_count = 0
+        engine.sample_count = 0
         engine.initialize_hardware() # reset hardware
         engine.prepare_acquisition()
 
@@ -996,7 +996,7 @@ class TestErrorHandling:
     def test_acquisition_interrupted_mid_loop(self, minimal_configs):
         """Test that interrupting acquisition is handled gracefully."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 100
+        configs["experiment"].acquisition.num_samples = 100
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -1028,7 +1028,7 @@ class TestErrorHandling:
     def test_algorithm_process_frame_error(self, minimal_configs):
         """Test handling of algorithm errors during frame processing."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -1050,7 +1050,7 @@ class TestErrorHandling:
     def test_cleanup_called_on_exception(self, minimal_configs):
         """Test that cleanup is called even when exception occurs."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 10
+        configs["experiment"].acquisition.num_samples = 10
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -1073,9 +1073,9 @@ class TestErrorHandling:
         with pytest.raises(Exception):  # ValidationError
             HardwareConfig(backend="invalid_backend")
         
-        # Test negative num_frames
+        # Test negative num_samples
         with pytest.raises(Exception):  # ValidationError
-            AcquisitionConfig(num_frames=-10)
+            AcquisitionConfig(num_samples=-10)
         
         # Test invalid z_end (less than z_start when z_stack enabled)
         with pytest.raises(Exception):  # ValidationError
@@ -1106,7 +1106,7 @@ class TestBackwardCompatibility:
         
         # Verify engine is properly initialized
         assert engine.hardware_config.backend == "dummy"
-        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.acquisition.num_samples == 100
     
     def test_launch_from_gooey_wrapper(self, legacy_gooey_args, monkeypatch):
         """Test the legacy launch_wblive_from_gooey wrapper."""
@@ -1153,7 +1153,7 @@ class TestBackwardCompatibility:
         
         # Experiment mappings
         assert configs["experiment"].output_dir == legacy_gooey_args["output_folder"]
-        assert configs["experiment"].acquisition.num_frames == legacy_gooey_args["total_frames"]
+        assert configs["experiment"].acquisition.num_samples == legacy_gooey_args["total_frames"]
         assert configs["experiment"].acquisition.z_planes == legacy_gooey_args["zsize"]
         
         # Algorithm mappings
@@ -1224,7 +1224,7 @@ class TestConfigAccessPatterns:
         )
         
         # New way
-        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.acquisition.num_samples == 100
         assert engine.experiment_config.acquisition.z_planes == 10
         assert engine.experiment_config.save_images is False
         assert engine.experiment_config.subject.genotype == "test_strain"
@@ -1258,7 +1258,7 @@ class TestConfigAccessPatterns:
         )
         
         # Nested experiment config
-        assert engine.experiment_config.acquisition.num_frames == 100
+        assert engine.experiment_config.acquisition.num_samples == 100
         assert engine.experiment_config.subject.genotype == "test_strain"
         assert engine.experiment_config.dev_options.prefill_wb_ops is False
         
@@ -1329,7 +1329,7 @@ class TestHardwareAbstraction:
     def test_no_direct_mmc_calls_in_acquisition_loop(self, minimal_configs):
         """Verify acquisition loop doesn't call MMC directly."""
         configs = minimal_configs.copy()
-        configs["experiment"].acquisition.num_frames = 5
+        configs["experiment"].acquisition.num_samples = 5
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],

@@ -29,10 +29,9 @@ from config.config_manager import (
 
 # Import factory
 from algorithms import create_algorithm
-
-# Import hardware manager and stimulus controllers
 from hardware.hardware_manager import HardwareManager
 from hardware.stimulus_controllers import create_stimulus_controller
+from hardware.data_interface import DataInterface
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +71,16 @@ class ClosedLoopEngine:
         self.args = self._build_legacy_args()
         self.gooey_args = self.args['gooey_args']
         
-        # Execution state
+        # Execution state - RENAMED FOR GENERIC DATA
         self.is_running = False
-        self.frame_count = 0
-        self.img_count = 0
+        self.sample_count = 0  # RENAMED: was img_count
         self.cooldown_counter = 0
         
         # Components (initialized later)
         self.hardware: HardwareManager = None
         self.mmc = None  # Legacy - will be removed
-        self.xsize = 200  # default for unit tests
-        self.ysize = 200  # default for unit tests
+        # self.xsize = 200  # default for unit tests
+        # self.ysize = 200  # default for unit tests
         self.roi = (0, 0, 200, 200) # default for unit tests
         self.alg = None
         self.stim_controller = None  # stimulus controller
@@ -91,9 +89,14 @@ class ClosedLoopEngine:
         self.args["id"] = "11111111-11-11-11"  # default for unit tests
         self.args["saveroot"] = 'C:/Users/rldun/Downloads/'
         
-        # Data storage
-        self.frames: np.ndarray | None = None
-        self.frame_time_list: list[float] = []
+        # Data storage - RENAMED FOR GENERIC DATA
+        # self.samples: np.ndarray | None = None  # RENAMED: was frames
+        # self.sample_time_list: list[float] = []  # RENAMED: was frame_time_list
+        self.samples_to_grab = experiment_config.acquisition.num_samples
+        self.data_interface: DataInterface = None
+        self.sample_shape: tuple = None  # NEW: track sample dimensions
+        self.sample_dtype: np.dtype = None  # NEW: track sample data type
+        self.samples = None
         
         # Timing
         self.next_call: float | None = None
@@ -124,13 +127,13 @@ class ClosedLoopEngine:
         gooey_args = {
             # From ExperimentConfig
             "output_folder": exp.output_dir,
-            "total_frames": exp.acquisition.num_frames,
+            "total_frames": exp.acquisition.num_samples,
             "zsize": exp.acquisition.z_planes,
             "save_mip": exp.save_mip_video,
             "strobe_acquisition": hw.strobe_acquisition,
             "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
             "save_structural_scan": exp.acquisition.save_structural_scan,
-            "rec_baseline": exp.acquisition.baseline_frames,
+            "rec_baseline": exp.acquisition.baseline_samples,
             "z_step_size": exp.z_step_size_um,
             
             # Subject metadata
@@ -189,10 +192,10 @@ class ClosedLoopEngine:
     def _extract_parameters(self):
         """Extract frequently used parameters from configs."""
         self.zsize = self.gooey_args.get("zsize", 1)
-        self.frames_to_grab = self.gooey_args.get("total_frames", 100)
-        self.frames_baseline_window = self.gooey_args.get("rec_baseline", 0)
-        self.no_save_images = self.gooey_args.get("no_save_images", False)
-        self.no_save_metadata = self.gooey_args.get("no_save_metadata", False)
+        self.samples_to_grab = self.gooey_args.get("total_frames", 100)
+        self.samples_baseline_window = self.gooey_args.get("rec_baseline", 0)
+        self.NO_SAVE_DATA = self.gooey_args.get("no_save_images", False)
+        self.NO_SAVE_METADATA = self.gooey_args.get("no_save_metadata", False)
         self.save_mip_movie = self.gooey_args.get("save_mip", False)
         self.save_alg_model_plot = self.gooey_args.get("save_alg_model_plot", False)
         self.strobe_acquisition = self.hardware_config.strobe_acquisition
@@ -210,7 +213,7 @@ class ClosedLoopEngine:
         """
         Initialize microscope and camera hardware through HardwareManager.
         
-        Sets up hardware abstraction layer and configures ROI settings.
+        Sets up hardware abstraction layer and configures various settings.
         """
         logger.info("Initializing hardware...")
         
@@ -224,20 +227,27 @@ class ClosedLoopEngine:
             self.hardware.initialize(input_file=input_recording)
         else:
             self.hardware.initialize()
+
+        # Get sample shape and dtype from data interface
+        self.data_interface = self.hardware.data
+        self.sample_shape = self.data_interface.get_sample_shape()
+        self.sample_dtype = self.data_interface.get_sample_dtype()
+        # self.samples = self.data_interface.samples # use mutable structure for pointer ref
         
         # Get ROI from camera interface
-        self.roi = self.hardware.camera.get_roi()
-        self.args["roi"] = self.roi
+        # self.roi = self.hardware.camera.get_roi()
+        # self.args["roi"] = self.roi
+        # INSTEAD we should use hardware.data.get_sample_shape()
         
         # Extract image dimensions
-        self.xsize = self.roi[2]
-        self.ysize = self.roi[3]
+        # self.xsize = self.roi[2]
+        # self.ysize = self.roi[3]
         
         # For legacy components that still need mmc directly
         # This will be removed as components are refactored
         self.mmc = self.hardware.get_mmc()
         
-        logger.info(f"Hardware initialized with camera ROI: {self.roi}")
+        logger.info(f"Hardware initialized with shape/dtype: {self.sample_shape}/{self.sample_dtype}")
         
     def initialize_algorithm(self):
         """
@@ -325,34 +335,15 @@ class ClosedLoopEngine:
         self.args["id"] = self.session_id
         self.args["saveroot"] = self.saveroot
         
-        # Initialize frame storage (requires hardware initialization for dimensions)
-        self.frames = np.zeros(
-            (self.frames_to_grab, self.ysize, self.xsize), 
-            dtype=np.uint16
-        )
-        logger.debug(f'Initialized output array of shape {self.frames.shape}')
-        self.frame_time_list = []
-        
         # Configure camera for acquisition through hardware manager
-        self._prepare_camera_acquisition()
+        self.data_interface.configure_sampling(self.experiment_config) # send expeirment config to data interface
+        self.samples = self.data_interface.samples # use mutable structure for pointer ref
+        logger.debug("Data interface prepared for acquisition")
         
         # Run pre-acquisition structural scan if requested
         self._run_structural_scan_pre()
         
         logger.info(f"Acquisition prepared. Saving to: {self.savedir}")
-
-    def _prepare_camera_acquisition(self):
-        """Configure camera for live acquisition through HardwareManager."""
-        camera = self.hardware.camera
-        
-        # Clear buffer
-        camera.clear_buffer()
-        
-        # Set buffer size based on config
-        buffer_size = 10000  # Default, can be made configurable
-        
-        # Start acquisition will be called in run_acquisition_loop
-        logger.debug("Camera prepared for acquisition")
 
     def _run_structural_scan_pre(self):
         """Run pre-acquisition structural scan if requested."""
@@ -374,11 +365,10 @@ class ClosedLoopEngine:
 
     def run_acquisition_loop(self):
         """
-        Execute the main acquisition loop using HardwareManager.
+        Execute main acquisition loop using data interface.
         
-        UPDATED: Now uses stimulus controller to handle stimulus events instead
-        of direct stimulus interface calls. The algorithm returns stim_params,
-        which are submitted to the controller, which then manages hardware.stimulus.
+        REFACTORED: Now uses hardware.data.sample_data() instead of
+        camera-specific methods. Supports generic data types.
         
         Continuously:
         1. Snap images from camera
@@ -391,97 +381,62 @@ class ClosedLoopEngine:
         Raises:
             Exception: When algorithm processing encounters an error
         """
-        logger.info(f"Starting acquisition loop for {self.frames_to_grab} frames...")
+        logger.info(f"Starting acquisition loop for {self.samples_to_grab} samples...")
         
         self.is_running = True
-        self.img_count = 0
+        self.sample_count = 0  # RENAMED: was img_count
         self.cooldown_counter = 0
         self.t0 = time.time()
         
         false_grab_count = 0
-        camera = self.hardware.camera
         
         # Start acquisition based on mode
+        # TODO this should reall just be "continuous" vs "discrete"... 
         if self.strobe_acquisition:
             self.next_call = time.time()
-            camera.snap_image()
+            self.data_interface.sample_data()
         else:
-            frame_grab_t0 = time.time()
-            camera.stop_acquisition()
-            camera.clear_buffer()
-            camera.start_acquisition(buffer_size=10000)
+            sample_grab_t0 = time.time()
+            self.data_interface.stop_sampling()
+            self.data_interface.clear_buffer()
+            self.data_interface.start_sampling(buffer_size=0)
             
         try:
-            while self.is_running and self.img_count < self.frames_to_grab:
-                rem = camera.get_remaining_image_count()
+            while self.is_running and self.sample_count < self.samples_to_grab:
                 
-                while (rem > 0 or self.strobe_acquisition) and self.img_count < self.frames_to_grab:
-                    # Grab image from buffer
-                    try:
-                        if self.strobe_acquisition:
-                            img = camera.get_image()
-                        else:
-                            img = camera.pop_next_image()
-                            self.next_call = frame_grab_t0
-                    except Exception as err:
-                        false_grab_count += 1
-                        logger.debug(f"False grab #{false_grab_count}: {err}")
-                        continue
+                # get data sample
+                sample = self.data_interface.sample_data()
                         
-                    # Record timestamp and store frame
-                    frame_grab_t0 = time.time()
-                    self.frame_time_list.append(
-                        np.round(frame_grab_t0 - self.t0, decimals=4)
-                    )
-                    self.frames[self.img_count, :, :] = img
-                    image_ndx = self.img_count
-                    self.img_count += 1
+                # Record timestamp and store frame
+                sample_ndx = self.sample_count
+                self.sample_count += 1
                     
-                    # Periodic logging
-                    if self.img_count % 200 == 0:
-                        logger.info(f"Frame: {self.img_count}/{self.frames_to_grab}")
+                # Periodic logging
+                if self.sample_count % 200 == 0:
+                    logger.info(f"Sample: {self.sample_count}/{self.samples_to_grab}")
                     
-                    # Handle cooldown (TODO: move to algorithm/controller)
-                    if self.cooldown_counter > 0:
-                        self.cooldown_counter -= 1
-                        
-                    # Process frame through algorithm
-                    zndx = image_ndx % self.zsize
-                    try:
-                        self.alg.process_frame(img, zndx)
-                    except Exception as err:
-                        raise Exception(f"Algorithm error at frame {image_ndx}, z={zndx}: {err}") from err
+                # Handle cooldown (TODO: move to algorithm/controller)
+                if self.cooldown_counter > 0:
+                    self.cooldown_counter -= 1
+
+                # Process sample through algorithm
+                try:
+                    self.alg.process_frame(sample, sample_ndx)
+                except Exception as err:
+                    raise Exception(f"Algorithm error at frame {sample_ndx}: {err}") from err
                     
-                    # Check for stimulus trigger from algorithm
-                    stim_params, self.cooldown_counter = self.alg.check_stim(
-                        image_ndx, self.cooldown_counter
-                    )
+                # Check for stimulus trigger from algorithm
+                stim_params, self.cooldown_counter = self.alg.check_stim(
+                    sample_ndx, self.cooldown_counter
+                )
                     
-                    # Submit stimulus params to controller instead of direct stim
-                    # Controller will manage hardware.stimulus activation/deactivation
-                    logging.debug(f'Submitting stim params: {stim_params} on image_ndx {image_ndx}')
-                    self.stim_controller.submit_stim_params(stim_params, image_ndx)
+                # Submit stimulus params to controller instead of direct stim
+                # Controller will manage hardware.stimulus activation/deactivation
+                logging.debug(f'Submitting stim params: {stim_params} on image_ndx {sample_ndx}')
+                self.stim_controller.submit_stim_params(stim_params, sample_ndx)
                     
-                    # Volume completion handling
-                    # Controller checks if this frame should trigger hardware changes
-                    if zndx == self.zsize - 1:
-                        self.stim_controller.check_stim(self.img_count)
-                        
-                    # Handle strobe timing
-                    if self.strobe_acquisition:
-                        nowtime = time.time()
-                        self.next_call = self.next_call + self.strobe_inter_frame_interval / 1000
-                        
-                        if self.next_call - nowtime < 0:
-                            logger.warning(
-                                f"Strobe delay exceeded interval! Frame: {image_ndx}"
-                            )
-                        else:
-                            time.sleep(self.next_call - nowtime)
-                            
-                        camera.snap_image()
-                    else:
-                        rem = camera.get_remaining_image_count()
+                # check controller for stim on next sample (sample_count not sample_ndx)
+                self.stim_controller.check_stim(self.sample_count)
                         
         finally:
             self.is_running = False
@@ -500,7 +455,7 @@ class ClosedLoopEngine:
         - Stimulus controller
         - Acquisition settings
         """
-        if self.no_save_metadata:
+        if self.NO_SAVE_METADATA:
             logger.info("Metadata saving disabled")
             return
             
@@ -508,10 +463,12 @@ class ClosedLoopEngine:
         
         # Build metadata dict
         metadata = dict(self.args)
-        metadata["frame_time_list"] = self.frame_time_list
+        metadata["sample_time_list"] = self.data_interface.sample_time_list  # RENAMED
         metadata["t0"] = self.t0
-        metadata["xsize"] = self.xsize
-        metadata["ysize"] = self.ysize
+        # metadata["xsize"] = self.data_interface.xsize
+        # metadata["ysize"] = self.data_interface.ysize
+        metadata["sample_shape"] = self.sample_shape  # NEW
+        metadata["sample_dtype"] = str(self.sample_dtype)  # NEW
 
         # Store configs
         metadata['hardware_config'] = self.hardware_config.model_dump(mode='json')
@@ -544,20 +501,26 @@ class ClosedLoopEngine:
 
         return metadata
         
-    def _save_images(self):
-        """Save acquired image stack."""
-        if self.no_save_images:
-            logger.info("Image saving disabled")
+    def _save_data(self):
+        """
+        Save acquired data using data interface.
+        
+        UPDATED: Delegates to data interface's save_data() method,
+        which handles format-specific saving (TIFF, HDF5, NPY, etc.)
+        """
+        if self.NO_SAVE_DATA:
+            logger.info("Data saving disabled")
             return
             
-        logger.info("Saving images...")
-
-        # TODO migrate this it shouldn't be here maybe utils?
-        MMSubroutines.saveScanTiffs(
-            fname=self.saveroot + ".tiff",
-            img_array=self.frames
+        logger.info("Saving data...")
+        
+        # Delegate to data interface for format-appropriate saving
+        self.data_interface.save_data(
+            data=self.samples,
+            filepath=self.saveroot + ".tiff",
         )
-        logger.info("Images saved")
+        
+        logger.info("Data saved")
         
     def _save_visualizations(self, mip_fps: float | None = None):
         """Save algorithm plots and MIP movies."""
@@ -570,7 +533,7 @@ class ClosedLoopEngine:
             exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps
             utils.generate_mip_movie(
                 savefilename=self.saveroot + "_mip_movie",
-                frames=self.frames,
+                samples=self.samples,
                 zsize=self.zsize,
                 exposure=exposure,
                 GUI_mode=self.gui_mode,
@@ -664,7 +627,7 @@ class ClosedLoopEngine:
             
             # Post-processing phase
             self._post_acquisition_structural_scan()
-            self._save_images()
+            self._save_data()  # UPDATED: uses data interface
             self._save_visualizations()
             self.save_metadata()
             
@@ -757,10 +720,10 @@ def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
     
     # Build ExperimentConfig
     acquisition_config = AcquisitionConfig(
-        num_frames=gooey_args.get("total_frames", 100),
+        num_samples=gooey_args.get("total_frames", 100),
         z_planes=gooey_args.get("zsize", 1),
         z_step=gooey_args.get("z_step_size", 1.0),
-        baseline_frames=gooey_args.get("rec_baseline", 0),
+        baseline_samples=gooey_args.get("rec_baseline", 0),
         save_structural_scan=gooey_args.get("save_structural_scan", "none"),
     )
     
@@ -874,7 +837,7 @@ def create_test_config() -> dict[str, Any]:
     )
     
     acquisition_config = AcquisitionConfig(
-        num_frames=100,
+        num_samples=100,
         z_planes=10,
         z_step=1.0,
     )
