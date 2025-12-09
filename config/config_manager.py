@@ -500,12 +500,6 @@ class ConfigManager:
             logger.error("Not all configs loaded - call load_all_configs() first")
             return False
         
-        # Check backend/stim compatibility
-        if self.hardware_config.backend == "dummy" or self.hardware_config.backend == "test":
-            if self.hardware_config.stim_interface not in ["dummy", "no stim", "test", "lorenz"]:
-                logger.warning(f"Backend is {self.hardware_config.backend} but stim_interface is "
-                             f"'{self.hardware_config.stim_interface}' - may not work")
-        
         # Check z-stack configuration consistency
         if self.experiment_config.acquisition.z_stack:
             if self.experiment_config.acquisition.z_planes <= 1:

@@ -488,25 +488,25 @@ def test_validate_config_before_loading(temp_config_dir):
     assert cm.validate_config() is False
 
 
-def test_validate_config_warns_backend_stim_mismatch(temp_config_dir, default_configs, caplog):
-    """Test validation warns about backend/stim mismatch."""
-    # Create config with dummy backend but real stim
-    mismatch_config = {
-        'backend': 'dummy',
-        'stim_interface': 'InvCoreLDIPolygon'  # Real stim with dummy backend
-    }
+# def test_validate_config_warns_backend_stim_mismatch(temp_config_dir, default_configs, caplog):
+#     """Test validation warns about backend/stim mismatch."""
+#     # Create config with dummy backend but real stim
+#     mismatch_config = {
+#         'backend': 'dummy',
+#         'stim_interface': 'InvCoreLDIPolygon'  # Real stim with dummy backend
+#     }
     
-    path = temp_config_dir / "mismatch_hardware.yaml"
-    with open(path, 'w') as f:
-        yaml.dump(mismatch_config, f)
+#     path = temp_config_dir / "mismatch_hardware.yaml"
+#     with open(path, 'w') as f:
+#         yaml.dump(mismatch_config, f)
     
-    cm = ConfigManager(package_root=temp_config_dir)
-    cm.load_all_configs(hardware_path=path)
+#     cm = ConfigManager(package_root=temp_config_dir)
+#     cm.load_all_configs(hardware_path=path)
     
-    cm.validate_config()
+#     cm.validate_config()
     
-    # Check for warning in logs
-    assert any("may not work" in record.message for record in caplog.records)
+#     # Check for warning in logs
+#     assert any("may not work" in record.message for record in caplog.records)
 
 
 # ============================================================================

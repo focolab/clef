@@ -69,7 +69,7 @@ class TestDummyAlgBasics:
     def test_initialize_model(self):
         """Test model initialization."""
         args = {"id": "test_session"}
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         
         # Should not raise any errors
         alg.initialize_model()
@@ -98,7 +98,7 @@ class TestDummyAlgProcessing:
                 "zsize": 5,
             }
         }
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         img = np.zeros((512, 512), dtype=np.uint16)
         sample_ndx = 0
         
@@ -168,7 +168,7 @@ class TestDummyAlgMetadata:
     def test_get_metadata_values(self):
         """Test metadata reflects actual processing."""
         args = {"gooey_args": {"zsize": 10}}
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         img = np.zeros((512, 512), dtype=np.uint16)
         
         # Process some frames
@@ -188,7 +188,7 @@ class TestDummyAlgClosing:
     def test_close(self, caplog):
         """Test close method logs correctly."""
         args = {"gooey_args": {"zsize": 5}}
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         img = np.zeros((512, 512), dtype=np.uint16)
         
         # Process some frames
@@ -300,7 +300,7 @@ class TestDummyAlgEdgeCases:
     def test_missing_gooey_args(self):
         """Test DummyAlg handles missing gooey_args."""
         args = {"id": "test"}
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         
         # Should use defaults
         assert alg.samples_to_grab == 100
@@ -315,7 +315,15 @@ class TestDummyAlgEdgeCases:
     
     def test_process_large_number_of_frames(self):
         """Test processing many frames doesn't cause issues."""
-        alg = DummyAlg()
+        args = {
+            "id": "test_session",
+            "roi": [0, 0, 512, 512],
+            "gooey_args": {
+                # "total_frames": 1000,
+                "zsize": 10,
+            }
+        }
+        alg = DummyAlg(args=args)
         img = np.zeros((512, 512), dtype=np.uint16)
         
         # Process 1000 frames
