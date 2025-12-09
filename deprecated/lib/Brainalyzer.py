@@ -208,7 +208,7 @@ class Brainalyzer:
         """ utility fxn """
         pass
 
-    def process_frame(self, img, zndx):
+    def process_sample(self, img, zndx):
         """ what do you want this alg to do with each frame"""
 
         # store the frame in shared memory
@@ -489,7 +489,7 @@ if __name__ == "__main__":
 
             # mip = zmip.max(axis=2)
             # vis.update_display_images(mip)
-            alg.process_frame(img, zndx=z)
+            alg.process_sample(img, zndx=z)
 
             # pause for fps sim
             if fps is not None:

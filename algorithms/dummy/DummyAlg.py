@@ -7,9 +7,15 @@ This algorithm does nothing - it processes frames without triggering any stimuli
 
 import logging
 import random
-
+from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
+# Import config models
+from config.config_manager import (
+    AlgorithmConfig,
+    ExperimentConfig,
+)
+from hardware.hardware_manager import HardwareManager
 
 class DummyAlg:
     """
@@ -49,7 +55,7 @@ class DummyAlg:
         
         # Extract commonly used parameters with safe defaults
         gooey_args = self.args.get("gooey_args", {})
-        self.frames_to_grab = gooey_args.get("total_frames", 100)
+        self.samples_to_grab = gooey_args.get("total_frames", 100)
         self.zsize = gooey_args.get("zsize", 1)
         
         # Get ROI info if available
@@ -58,7 +64,7 @@ class DummyAlg:
         self.ysize = self.roi[3]
         
         # State
-        self.frame_count = 0
+        self.sample_count = 0
         self.volume_count = 0
         
         logger.info("DummyAlg initialized (no-op algorithm)")
@@ -74,7 +80,7 @@ class DummyAlg:
         random.seed(session_id)
         logger.debug(f"DummyAlg model initialized with seed: {session_id}")
     
-    def process_frame(self, img, zndx):
+    def process_sample(self, img, sample_ndx):
         """
         Process a single frame.
         
@@ -82,16 +88,18 @@ class DummyAlg:
             img: Image array (numpy array)
             zndx: Z-plane index
         """
-        self.frame_count += 1
+        self.sample_count += 1
         
         # Check if we completed a volume
-        if zndx == self.zsize - 1:
-            self.volume_count += 1
+        zndx = sample_ndx % self.zsize
+        if zndx == (self.zsize - 1):
+            logging.debug(f'Finished volume with zndx: {zndx}, self.zsize: {self.zsize}, sample_ndx: {sample_ndx}')
+            self.process_volume()
             
         # Log periodically
-        if self.frame_count % 500 == 0:
+        if self.sample_count % 500 == 0:
             logger.debug(
-                f"DummyAlg processed {self.frame_count} frames "
+                f"DummyAlg processed {self.sample_count} samples "
                 f"({self.volume_count} volumes)"
             )
     
@@ -101,7 +109,7 @@ class DummyAlg:
         
         For dummy algorithm, this does nothing.
         """
-        pass
+        self.volume_count = self.volume_count + 1
     
     def check_stim(self, image_ndx, cooldown_counter=0):
         """
@@ -131,7 +139,7 @@ class DummyAlg:
         """
         return {
             "algorithm_type": "DummyAlg",
-            "frames_processed": self.frame_count,
+            "samples_processed": self.sample_count,
             "volumes_processed": self.volume_count,
             "description": "No-op algorithm for testing",
             "is_dummy_alg": True,
@@ -152,7 +160,7 @@ class DummyAlg:
         Clean up resources and close the algorithm.
         """
         logger.info(
-            f"DummyAlg closing. Processed {self.frame_count} frames, "
+            f"DummyAlg closing. Processed {self.sample_count} frames, "
             f"{self.volume_count} volumes"
         )
 
@@ -174,7 +182,7 @@ if __name__ == "__main__":
         "id": "test_session",
         "roi": [0, 0, 512, 512],
         "gooey_args": {
-            "total_frames": 100,
+            "total_samples": 100,
             "zsize": 10,
         }
     }
@@ -188,7 +196,7 @@ if __name__ == "__main__":
         img = np.random.randint(0, 255, (512, 512), dtype=np.uint16)
         zndx = i % 10
         
-        alg.process_frame(img, zndx)
+        alg.process_sample(img, i)
         
         # Check stim every frame
         stim_params, cooldown = alg.check_stim(i, 0)

@@ -102,7 +102,8 @@ class DummyCamera(CameraInterface):
                 frame = self.input_data[dt, dz, :, :].copy()
 
             elif len(self.input_data.shape) == 3:
-                frame = self.input_data[self._frame_count % self.input_data.shape[1],:,:].copy()
+                # loop through t by modular indexing
+                frame = self.input_data[(self._frame_count % self.input_data.shape[0]),:,:].copy()
 
         # Generate random noise image
         else:

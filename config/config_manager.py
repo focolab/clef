@@ -98,7 +98,7 @@ class HardwareConfig(BaseModel):
 
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
-    num_frames: int = Field(100, gt=0, description="Number of frames to acquire")
+    num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
     frame_rate: Optional[float] = Field(None, gt=0, description="Target frame rate (Hz)")
     
     # Z-stack settings
@@ -109,7 +109,7 @@ class AcquisitionConfig(BaseModel):
     z_step: float = Field(1.0, gt=0, description="Z-stack step size (µm)")
     
     # Baseline and structural scan
-    baseline_frames: int = Field(0, ge=0, description="Frames before stims allowed")
+    baseline_samples: int = Field(0, ge=0, description="Samples before stims allowed")
     save_structural_scan: str = Field("none", description="Structural scan type")
     
     @field_validator('z_end')
