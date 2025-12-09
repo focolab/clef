@@ -93,15 +93,15 @@ def main():
             algorithm_config=algorithm_config
         )
         
-        # Add screenshot-specific initialization parameters
-        engine.hardware_config.screenshot = {
-            'x': 100,
-            'y': 100,
-            'width': 800,
-            'height': 600,
-            'monitor': 1,
-            'backend': 'mss',
-        }
+        # # Add screenshot-specific initialization parameters
+        # engine.hardware_config.screenshot = {
+        #     'x': 100,
+        #     'y': 100,
+        #     'width': 800,
+        #     'height': 600,
+        #     'monitor': 1,
+        #     'backend': 'mss',
+        # }
         
         logger.info("Starting screenshot capture...")
         engine.run()
