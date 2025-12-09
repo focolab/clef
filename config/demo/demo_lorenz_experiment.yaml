@@ -9,7 +9,7 @@ save_mip_video: false
 
 # Acquisition parameters
 acquisition:
-  num_frames: 3000 
+  num_samples: 3000 
   frame_rate: null     # As fast as possible
   z_stack: false       # Single plane
   z_planes: 1

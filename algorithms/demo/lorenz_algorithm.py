@@ -214,7 +214,7 @@ class LorenzDemoAlgorithm:
         
         return np.array([x, y, z])
     
-    def process_frame(self, img: np.ndarray, sample_ndx: int):
+    def process_sample(self, img: np.ndarray, sample_ndx: int):
         """
         Process a single frame.
         
