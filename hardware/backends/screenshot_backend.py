@@ -330,12 +330,13 @@ class ScreenshotBackend(BaseHardwareBackend):
         logger.info("Initializing screenshot hardware backend...")
         
         # Extract capture parameters
-        x = kwargs.get('x', 0)
-        y = kwargs.get('y', 0)
-        width = kwargs.get('width', 800)
-        height = kwargs.get('height', 600)
-        monitor = kwargs.get('monitor', 1)
-        backend = kwargs.get('backend', 'mss')
+        screenshot_args = self.config.screenshot
+        x = screenshot_args.get('x', 0)
+        y = screenshot_args.get('y', 0)
+        width = screenshot_args.get('width', 800)
+        height = screenshot_args.get('height', 600)
+        monitor = screenshot_args.get('monitor', 1)
+        backend = screenshot_args.get('backend', 'mss')
         
         # Create screenshot source
         self.screenshot_source = ScreenshotSource(
@@ -345,6 +346,9 @@ class ScreenshotBackend(BaseHardwareBackend):
         
         # Create camera adapter
         self._camera = ScreenshotCamera(self.screenshot_source)
+
+        # Set ROI
+        # self._camera.set_roi(x, y, width, height)
         
         # Create dummy stage
         self._stage = DummyStage()

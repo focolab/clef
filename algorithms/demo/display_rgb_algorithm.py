@@ -346,7 +346,12 @@ class RGBVisualizer:
         except ImportError:
             logger.error("PyQt or pyqtgraph not available")
             raise
-        
+
+        # Useful vars
+        self.FIRST_IMAGE = True
+        self.downsample_factor = 4
+
+        # Qt setup
         self.QtCore = QtCore
         self.QtWidgets = QtWidgets
         self.pg = pg
@@ -397,7 +402,11 @@ class RGBVisualizer:
         """Update image display."""
         # pyqtgraph ImageView expects (width, height, 3) with origin at bottom-left
         # Our images are (height, width, 3) so we need to transpose and flip
-        self.image_widget.setImage(img.transpose(1, 0, 2), autoLevels=True, autoRange=False)
+        if self.FIRST_IMAGE:
+            self.image_widget.setImage(img.transpose(1, 0, 2), autoLevels=True, autoRange=True)
+            self.FIRST_IMAGE = False
+        else:
+            self.image_widget.setImage(img.transpose(1, 0, 2), autoLevels=False, autoRange=False)
     
     def update_statistics(self):
         """Update statistics plot."""

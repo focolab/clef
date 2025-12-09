@@ -8,8 +8,8 @@ stim_interface: "keyboard"
 screenshot:
   x: 100              # Left edge of capture region
   y: 100              # Top edge of capture region
-  width: 800          # Capture width in pixels
-  height: 600         # Capture height in pixels
+  width: 1920         # Capture width in pixels
+  height: 1080        # Capture height in pixels
   monitor: 1          # Monitor number (1-indexed)
   backend: "mss"      # Capture backend: "mss" or "pil"
 
