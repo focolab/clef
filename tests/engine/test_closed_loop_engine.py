@@ -450,14 +450,14 @@ class TestAcquisitionLoop:
         
         # Mock the algorithm to track z indices
         z_indices_seen = []
-        original_process_frame = engine.alg.process_frame
+        original_process_sample = engine.alg.process_sample
         
         def track_z_index(frame, sample_ndx):
             zndx = sample_ndx % configs['experiment'].acquisition.z_planes
             z_indices_seen.append(zndx)
-            return original_process_frame(frame, zndx)
+            return original_process_sample(frame, zndx)
         
-        engine.alg.process_frame = track_z_index
+        engine.alg.process_sample = track_z_index
         
         engine.run_acquisition_loop()
         
@@ -1009,7 +1009,7 @@ class TestErrorHandling:
         engine.initialize_stimulus()
         
         # Mock to interrupt after 10 frames
-        original_process = engine.alg.process_frame
+        original_process = engine.alg.process_sample
         call_count = [0]
         
         def interrupt_after_10(frame, zndx):
@@ -1018,14 +1018,14 @@ class TestErrorHandling:
                 raise KeyboardInterrupt("User interrupted")
             return original_process(frame, zndx)
         
-        engine.alg.process_frame = interrupt_after_10
+        engine.alg.process_sample = interrupt_after_10
         
         # Should handle interrupt gracefully
         with pytest.raises(KeyboardInterrupt):
             engine.run_acquisition_loop()
     
     
-    def test_algorithm_process_frame_error(self, minimal_configs):
+    def test_algorithm_process_sample_error(self, minimal_configs):
         """Test handling of algorithm errors during frame processing."""
         configs = minimal_configs.copy()
         configs["experiment"].acquisition.num_samples = 10
@@ -1041,7 +1041,7 @@ class TestErrorHandling:
         engine.initialize_stimulus()
         
         # Make algorithm raise error
-        engine.alg.process_frame = Mock(side_effect=Exception("Algorithm error"))
+        engine.alg.process_sample = Mock(side_effect=Exception("Algorithm error"))
         
         # Should propagate error from acquisition loop
         with pytest.raises(Exception):

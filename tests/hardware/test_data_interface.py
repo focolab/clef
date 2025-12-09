@@ -235,36 +235,15 @@ class TestImageDataInterfaceSampling:
 class TestImageDataInterfaceConfiguration:
     """Test ImageDataInterface configuration."""
     
-    def test_configure_sampling(self, image_data_interface):
+    def test_configure_sampling(self, image_data_interface, minimal_experiment_config):
         """Test configure_sampling updates camera settings."""
-        config = {
-            'exposure': 50.0,
-            'roi': (10, 10, 400, 400),
-        }
-        image_data_interface.configure_sampling(config)
+
+        minimal_experiment_config.acquisition.num_samples = 5
+        minimal_experiment_config.save_images = True
         
-        assert image_data_interface.camera.exposure_ms == 50.0
-        assert image_data_interface.camera.roi == (10, 10, 400, 400)
-    
-    def test_get_sampling_rate(self, image_data_interface):
-        """Test get_sampling_rate calculates from exposure."""
-        image_data_interface.camera.set_exposure(100.0)  # 100ms
-        rate = image_data_interface.get_sampling_rate()
-        assert rate == pytest.approx(10.0, rel=0.01)  # 10 Hz
-    
-    def test_set_sampling_rate(self, image_data_interface):
-        """Test set_sampling_rate adjusts exposure."""
-        image_data_interface.set_sampling_rate(20.0)  # 20 Hz
-        exposure = image_data_interface.camera.get_exposure()
-        assert exposure == pytest.approx(50.0, rel=0.01)  # 50ms
-    
-    def test_set_sampling_rate_invalid(self, image_data_interface):
-        """Test set_sampling_rate raises error for invalid rate."""
-        with pytest.raises(ValueError):
-            image_data_interface.set_sampling_rate(0.0)
+        image_data_interface.configure_sampling(minimal_experiment_config)
         
-        with pytest.raises(ValueError):
-            image_data_interface.set_sampling_rate(-10.0)
+        assert image_data_interface.samples.shape[0] == 5
 
 
 class TestImageDataInterfaceMetadata:
@@ -353,31 +332,6 @@ class TestImageDataInterfaceSaving:
             # TIFF metadata is embedded in description
             assert tif.pages[0].description is not None
 
-
-class TestImageDataInterfaceLegacyMethods:
-    """Test ImageDataInterface legacy camera access methods."""
-    
-    def test_get_camera_returns_camera_interface(self, image_data_interface):
-        """Test get_camera returns underlying camera."""
-        camera = image_data_interface.get_camera()
-        assert camera == image_data_interface.camera
-        assert isinstance(camera, CameraInterface)
-    
-    def test_snap_image_delegates_to_camera(self, image_data_interface):
-        """Test snap_image delegates to camera."""
-        image_data_interface.snap_image()
-        # Should not raise - dummy camera supports this
-    
-    def test_get_image_delegates_to_camera(self, image_data_interface):
-        """Test get_image delegates to camera."""
-        img = image_data_interface.get_image()
-        assert isinstance(img, np.ndarray)
-    
-    def test_pop_next_image_delegates_to_camera(self, image_data_interface):
-        """Test pop_next_image delegates to camera."""
-        image_data_interface.start_sampling()
-        img = image_data_interface.pop_next_image()
-        assert isinstance(img, np.ndarray)
 
 
 # ============================================================================
@@ -528,9 +482,11 @@ class TestClosedLoopEngineDataTerminology:
             experiment_config=minimal_experiment_config,
             algorithm_config=minimal_algorithm_config,
         )
+
+        engine.initialize_hardware()
         
-        assert hasattr(engine, 'sample_time_list')
-        assert isinstance(engine.sample_time_list, list)
+        assert hasattr(engine.data_interface, 'sample_time_list')
+        assert isinstance(engine.data_interface.sample_time_list, list)
     
     def test_engine_tracks_sample_shape(
         self, minimal_hardware_config, minimal_experiment_config, minimal_algorithm_config

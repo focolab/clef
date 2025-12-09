@@ -88,7 +88,7 @@ class DummyAlg:
             img: Image array (numpy array)
             zndx: Z-plane index
         """
-        self.sample_count += 1
+        self.sample_count = self.sample_count + 1
         
         # Check if we completed a volume
         zndx = sample_ndx % self.zsize

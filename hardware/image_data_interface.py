@@ -175,6 +175,9 @@ class ImageDataInterface(DataInterface):
                      - compression: TIFF compression type
                      - metadata: Additional metadata dict to embed
         """
+        # add .tiff if necessary
+        if not filepath.endswith('.tiff'):
+            filepath = filepath + '.tiff'
 
         MMSubroutines.saveScanTiffs(fname=filepath, img_array=data)
         logger.info(f"Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
@@ -190,7 +193,10 @@ class ImageDataInterface(DataInterface):
                    - Other camera-specific settings
         """
         # pass settings to camera
-        self.camera.configure_camera(config)
+        # TODO camera takes dict argument... configure_sampling should really be taking dict argument too
+        # This should be done elsewhere -- this call changes hardware options, whereas below
+        # we're just initiating data buffer
+        # self.camera.configure_camera(config)
 
         # initiate internal buffer
         sample_shape = tuple([config.acquisition.num_samples]) + self.get_sample_shape()

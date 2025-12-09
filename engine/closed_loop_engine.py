@@ -234,14 +234,8 @@ class ClosedLoopEngine:
         self.sample_dtype = self.data_interface.get_sample_dtype()
         # self.samples = self.data_interface.samples # use mutable structure for pointer ref
         
-        # Get ROI from camera interface
-        # self.roi = self.hardware.camera.get_roi()
-        # self.args["roi"] = self.roi
-        # INSTEAD we should use hardware.data.get_sample_shape()
-        
-        # Extract image dimensions
-        # self.xsize = self.roi[2]
-        # self.ysize = self.roi[3]
+        # TODO Camera configuration is done elsewhere currently but should be done here?
+        # This depends on when we want to initialize storage buffer. Currently it's done at "prepare_acquisition"
         
         # For legacy components that still need mmc directly
         # This will be removed as components are refactored
@@ -421,7 +415,7 @@ class ClosedLoopEngine:
 
                 # Process sample through algorithm
                 try:
-                    self.alg.process_frame(sample, sample_ndx)
+                    self.alg.process_sample(sample, sample_ndx)
                 except Exception as err:
                     raise Exception(f"Algorithm error at frame {sample_ndx}: {err}") from err
                     
