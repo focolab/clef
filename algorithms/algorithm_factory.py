@@ -12,6 +12,7 @@ from typing import Dict, Type, Any
 logger = logging.getLogger(__name__)
 
 # Import classes at module level, for patching during testing
+# TODO clean this
 try:
     from algorithms.dummy import DummyAlg
 except ImportError:
@@ -26,6 +27,11 @@ try:
     from algorithms.demo import LorenzDemoAlgorithm
 except ImportError:
     LorenzDemoAlgorithm = None
+
+try:
+    from algorithms.demo import DisplayRGBAlgorithm
+except ImportError:
+    DisplayRGBAlgorithm = None
     
 
 class AlgorithmRegistry:
@@ -100,6 +106,13 @@ class AlgorithmRegistry:
             logger.info("Registered LorenzDemoAlgorithm")
         except ImportError as e:
             logger.warning(f"Could not import LorenzDemoAlgorithm: {e}")
+
+        try:
+            self.register("DisplayRGBAlgorithm", DisplayRGBAlgorithm)
+            self.register("display_rgb_algorithm", DisplayRGBAlgorithm)
+            logger.info("Registered DisplayRGBAlgorithm")
+        except ImportError as e:
+            logger.warning(f"Could not import DisplayRGBAlgorithm: {e}")
 
 
         # try:
