@@ -1,0 +1,37 @@
+# Ring Attractor Demo Hardware Configuration
+# Configures the ring attractor backend with dual concentric rings
+
+backend: "ring_attractor_demo"
+stim_interface: "ring_attractor"
+microscope_name: "ring_attractor_sim"
+strobe_acquisition: false
+
+# Ring attractor system parameters
+ring_params:
+  # Ring radii (in pixels)
+  inner_radius: 34.0   # r1 - inner stable limit cycle
+  outer_radius: 40.0   # r2 - outer stable limit cycle
+  
+  # Dynamical system parameters
+  k_radial: 5.0   # Radial stiffness: dr/dt = -k*(r-r1)*(r-r2) + perturbation
+  omega: 1.0      # Angular velocity: dθ/dt = ω (rad/time step)
+  dt: 0.01        # Integration time step
+  
+  # Initial state [theta, ring_index]
+  initial_state: [0.0, 0]  # start at theta=0 on inner ring
+  
+  # Image generation parameters
+  image_width: 100
+  image_height: 100
+  noise_level: 100.0
+  puncta_brightness: 5000.0
+  puncta_radius: 3.0
+  
+  # Camera exposure simulation (milliseconds)
+  exposure_ms: 10.0
+
+# Stimulus device
+stimulus_devices:
+  ring_attractor:
+    type: "ring_perturbation"
+    description: "Toggles ring and perturbs angular position"
