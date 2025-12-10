@@ -472,12 +472,11 @@ class RingAttractorAlgorithm:
             f"{self.transition_count} transitions, {len(self.stim_events)} stimuli"
         )
 
-
 class RingVisualizer:
-    """Real-time visualization for ring attractor demo."""
+    """Real-time visualization with both Cartesian and polar views."""
     
     def __init__(self, algorithm: 'RingAttractorAlgorithm'):
-        """Initialize visualizer."""
+        """Initialize enhanced visualizer with polar plot."""
         self.algorithm = algorithm
         
         self.QtCore = QtCore
@@ -489,23 +488,23 @@ class RingVisualizer:
         
         # Create main window
         self.window = QtWidgets.QWidget()
-        self.window.setWindowTitle("Ring Attractor - Real-time Demo")
-        self.window.resize(1200, 700)
+        self.window.setWindowTitle("Ring Attractor - Real-time Demo (Enhanced)")
+        self.window.resize(1400, 700)
         
-        # Create layout
+        # Create layout - now with 3 columns
         self.layout = QtWidgets.QGridLayout()
         self.window.setLayout(self.layout)
         
-        # Image display (left)
+        # === LEFT: Image display ===
         self.image_widget = pg.ImageView()
         self.image_widget.ui.roiBtn.hide()
         self.image_widget.ui.menuBtn.hide()
         self.layout.addWidget(self.image_widget, 0, 0, 2, 1)
         
-        # State space plot (right top)
+        # === MIDDLE: Cartesian state space ===
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setAspectLocked(True)
-        self.plot_widget.setTitle("Ring Attractor State Space")
+        self.plot_widget.setTitle("Cartesian State Space")
         self.plot_widget.setLabel('left', 'Y')
         self.plot_widget.setLabel('bottom', 'X')
         self.layout.addWidget(self.plot_widget, 0, 1, 1, 1)
@@ -519,11 +518,38 @@ class RingVisualizer:
             pen=None, symbol='o', symbolSize=10, symbolBrush='y'
         )
         
-        # Control panel (right bottom)
+        # === RIGHT: Polar state space ===
+        self.polar_widget = pg.PlotWidget()
+        self.polar_widget.setTitle("Polar State Space (θ vs time)")
+        self.polar_widget.setLabel('left', 'θ (radians)')
+        self.polar_widget.setLabel('bottom', 'Frame')
+        self.polar_widget.addLegend()
+        self.layout.addWidget(self.polar_widget, 0, 2, 1, 1)
+        
+        # Polar plots - separate for each ring
+        self.polar_theta_plot = self.polar_widget.plot(
+            pen=pg.mkPen('c', width=2), name='Trajectory'
+        )
+        self.polar_inner_markers = self.polar_widget.plot(
+            pen=None, symbol='o', symbolSize=6, symbolBrush='b', name='Inner ring'
+        )
+        self.polar_outer_markers = self.polar_widget.plot(
+            pen=None, symbol='o', symbolSize=6, symbolBrush='r', name='Outer ring'
+        )
+        self.polar_current_pos = self.polar_widget.plot(
+            pen=None, symbol='o', symbolSize=12, symbolBrush='y'
+        )
+        
+        # Add horizontal lines for ring reference
+        self.polar_widget.addLine(y=0, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
+        self.polar_widget.addLine(y=np.pi, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
+        self.polar_widget.addLine(y=2*np.pi, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
+        
+        # === BOTTOM LEFT: Control panel ===
         self.control_widget = QtWidgets.QWidget()
         self.control_layout = QtWidgets.QVBoxLayout()
         self.control_widget.setLayout(self.control_layout)
-        self.layout.addWidget(self.control_widget, 1, 1, 1, 1)
+        self.layout.addWidget(self.control_widget, 1, 1, 1, 2)  # Span 2 columns
         
         # Trigger button
         self.trigger_button = QtWidgets.QPushButton("Apply Perturbation")
@@ -567,7 +593,7 @@ class RingVisualizer:
         self.control_layout.addWidget(self.info_text)
         
         self.window.show()
-        logger.info("RingVisualizer initialized")
+        logger.info("RingVisualizer with polar plot initialized")
     
     def _draw_ring_circles(self):
         """Draw dotted circles for ring attractors."""
@@ -608,7 +634,7 @@ class RingVisualizer:
         self.image_widget.setImage(img.T, autoLevels=False, autoRange=False)
     
     def update_trajectory(self):
-        """Update trajectory plot."""
+        """Update both Cartesian and polar trajectory plots."""
         if len(self.algorithm.theta_history) < 2:
             return
         
@@ -616,8 +642,9 @@ class RingVisualizer:
         N = min(self.algorithm.fading_trajectory_samples, len(self.algorithm.theta_history))
         thetas = self.algorithm.theta_history[-N:]
         rings = self.algorithm.ring_history[-N:]
+        frames = self.algorithm.frame_indices[-N:]
         
-        # Convert to Cartesian
+        # === UPDATE CARTESIAN PLOT ===
         x_coords = []
         y_coords = []
         for theta, ring_idx in zip(thetas, rings):
@@ -630,6 +657,50 @@ class RingVisualizer:
         # Current position
         if x_coords:
             self.current_pos_plot.setData([x_coords[-1]], [y_coords[-1]])
+        
+        # === UPDATE POLAR PLOT ===
+        # Plot continuous theta trajectory
+        self.polar_theta_plot.setData(frames, thetas)
+        
+        # Separate markers by ring for clarity
+        inner_mask = np.array(rings) == 0
+        outer_mask = np.array(rings) == 1
+        
+        frames_arr = np.array(frames)
+        thetas_arr = np.array(thetas)
+        
+        if np.any(inner_mask):
+            self.polar_inner_markers.setData(
+                frames_arr[inner_mask], 
+                thetas_arr[inner_mask]
+            )
+        else:
+            self.polar_inner_markers.setData([], [])
+            
+        if np.any(outer_mask):
+            self.polar_outer_markers.setData(
+                frames_arr[outer_mask], 
+                thetas_arr[outer_mask]
+            )
+        else:
+            self.polar_outer_markers.setData([], [])
+        
+        # Current position marker
+        if frames:
+            self.polar_current_pos.setData([frames[-1]], [thetas[-1]])
+        
+        # Mark stimulus events on polar plot
+        if hasattr(self, '_stim_lines'):
+            for line in self._stim_lines:
+                self.polar_widget.removeItem(line)
+        
+        self._stim_lines = []
+        for event in self.algorithm.stim_events[-10:]:  # Show last 10 stim events
+            line = self.polar_widget.addLine(
+                x=event['frame'], 
+                pen=pg.mkPen('gold', width=2, style=QtCore.Qt.DashLine)
+            )
+            self._stim_lines.append(line)
     
     def update_info_text(self):
         """Update info text."""
@@ -656,4 +727,4 @@ class RingVisualizer:
     def close(self):
         """Close visualizer."""
         self.window.close()
-        logger.info("RingVisualizer closed")
+        logger.info("Enhanced RingVisualizer closed")
