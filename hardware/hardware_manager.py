@@ -15,8 +15,9 @@ from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
 from hardware.data_interface import DataInterface
-from hardware.image_data_interface import ImageDataInterface
+# from hardware.image_data_interface import ImageDataInterface
 from config.config_manager import HardwareConfig
+from hardware.backends.demo_ring_attractor_backend import RingAttractorBackend
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,9 @@ class HardwareManager:
         elif backend_type == "lorenz_demo":
             self._backend = LorenzDemoBackend(self.config)
             logger.info("Selected LorenzDemoBackend")
+        elif backend_type == "ring_attractor_demo":
+            self._backend = RingAttractorBackend(self.config)
+            logger.info("Selected RingAttractorBackend")
         elif backend_type == "screenshot":
             self._backend = ScreenshotBackend(self.config)
             logger.info("Selected ScreenshotBackend")
