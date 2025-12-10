@@ -360,12 +360,12 @@ class RingStimulus(DummyStimulus):
         self.ring.apply_perturbation(perturbation_strength)
         
         # Optional: Add small angular perturbation (10% of intensity)
-        delta_theta = np.random.normal(0, abs(perturbation_strength) * 0.01)
-        self.ring.perturb_theta(delta_theta)
+        # delta_theta = np.random.normal(0, abs(perturbation_strength) * 0.01)
+        # self.ring.perturb_theta(delta_theta)
         
         logger.info(
             f"Applied ring stimulus: perturbation={perturbation_strength:.1f}, "
-            f"delta_theta={delta_theta:.3f}"
+            # f"delta_theta={delta_theta:.3f}"
         )
 
 
