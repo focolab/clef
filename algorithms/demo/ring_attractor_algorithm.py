@@ -27,6 +27,10 @@ except ImportError:
     logger.error("PyQt or pyqtgraph not available")
     raise
 
+# Stylization for app
+from pathlib import Path
+ROOTDIR = Path(__file__).resolve().parents[2]
+CSS_PATH = ROOTDIR  / "style" / "css" / "Ubuntu.qss"
 
 class RingAttractorAlgorithm:
     """
@@ -68,8 +72,8 @@ class RingAttractorAlgorithm:
             # Ring parameters (from hardware config)
             hw_config = hardware_manager.config
             ring_params = hw_config.ring_params
-            self.inner_radius = ring_params.get('inner_radius', 30.0)
-            self.outer_radius = ring_params.get('outer_radius', 45.0)
+            self.inner_radius = ring_params.get('inner_radius', 3.0)
+            self.outer_radius = ring_params.get('outer_radius', 6.0)
             self.image_width = ring_params.get('image_width', 100)
             self.image_height = ring_params.get('image_height', 100)
             
@@ -88,8 +92,8 @@ class RingAttractorAlgorithm:
             self.fading_trajectory_samples = params.fading_trajectory_samples
         else:
             # Defaults
-            self.inner_radius = 30.0
-            self.outer_radius = 45.0
+            self.inner_radius = 3.0
+            self.outer_radius = 6.0
             self.image_width = 100
             self.image_height = 100
             self.stim_cooldown_frames = 50
@@ -152,6 +156,7 @@ class RingAttractorAlgorithm:
         
         # Compute centroid
         coords = np.argwhere(mask)
+        # coords = np.argmax(mask)
         centroid_y = np.mean(coords[:, 0])
         centroid_x = np.mean(coords[:, 1])
         
@@ -267,7 +272,7 @@ class RingAttractorAlgorithm:
                 'stim_on': image_ndx + 1,
                 'stim_off': image_ndx + 20,  # arbitrary duration
                 'event': {
-                    'intensity': self.current_stim_intensity,  # Now -30 to +30
+                    'stim_intensity': self.current_stim_intensity,  # Now -30 to +30
                     'frame': image_ndx,
                     'trigger_type': 'manual'
                 }
@@ -277,7 +282,7 @@ class RingAttractorAlgorithm:
                 'frame': image_ndx,
                 'theta': self.theta_history[-1] if self.theta_history else 0,
                 'ring': self.ring_history[-1] if self.ring_history else 0,
-                'intensity': self.current_stim_intensity,
+                'stim_intensity': self.current_stim_intensity,
                 'trigger_type': 'manual'
             })
             
@@ -295,7 +300,7 @@ class RingAttractorAlgorithm:
                     'stim_on': image_ndx + 1,
                     'stim_off': image_ndx + 20,
                     'event': {
-                        'intensity': self.auto_stim_perturbation,
+                        'stim_intensity': self.auto_stim_perturbation,
                         'frame': image_ndx,
                         'trigger_type': 'auto',
                         'theta': theta
@@ -306,7 +311,7 @@ class RingAttractorAlgorithm:
                     'frame': image_ndx,
                     'theta': theta,
                     'ring': self.ring_history[-1],
-                    'intensity': self.auto_stim_perturbation,
+                    'stim_intensity': self.auto_stim_perturbation,
                     'trigger_type': 'auto'
                 })
                 
@@ -485,6 +490,8 @@ class RingVisualizer:
         
         # Create Qt application
         self.app = pg.mkQApp("RingVisualizer")
+        with open(CSS_PATH, 'r') as f:
+            self.app.setStyleSheet(f.read())
         
         # Create main window
         self.window = QtWidgets.QWidget()
@@ -560,8 +567,8 @@ class RingVisualizer:
         slider_layout = QtWidgets.QHBoxLayout()
         slider_layout.addWidget(QtWidgets.QLabel("Perturbation:"))
         self.intensity_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.intensity_slider.setMinimum(-30)
-        self.intensity_slider.setMaximum(30)
+        self.intensity_slider.setMinimum(-60)
+        self.intensity_slider.setMaximum(60)
         self.intensity_slider.setValue(0)
         self.intensity_slider.valueChanged.connect(self._on_intensity_changed)
         slider_layout.addWidget(self.intensity_slider)
@@ -574,7 +581,7 @@ class RingVisualizer:
         helper_text = QtWidgets.QLabel(
             "<small><b>Perturbation:</b><br>"
             "• Positive (+) = push outward<br>"
-            "• Negative (−) = pull inward<br>"
+            "• Negative (-) = pull inward<br>"
             "• ~±15 will switch rings</small>"
         )
         helper_text.setStyleSheet("QLabel { color: #666; padding: 5px; }")

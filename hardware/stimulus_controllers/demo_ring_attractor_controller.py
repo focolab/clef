@@ -27,7 +27,8 @@ class RingAttractorStimulusController(DummyStimulusController):
         super().__init__(hardware_manager, config)
         
         # Default intensity (can be updated by algorithm)
-        self.stim_intensity = 50  # 0-100%
+        # self.stim_intensity = 50  # 0-100%
+        self.stim_intensity = 0
         
         logger.info("RingAttractorStimulusController initialized")
     
@@ -42,12 +43,13 @@ class RingAttractorStimulusController(DummyStimulusController):
         if not stim_params:
             return
         
-        # Extract intensity from event if provided
-        if 'event' in stim_params and 'stim_intensity' in stim_params['event']:
-            self.stim_intensity = stim_params['event']['stim_intensity']
+        logger.debug(f"RingAttractorStimulusController: Received stim params at frame {image_ndx}: {stim_params}")
         
         # Call parent implementation
-        super().submit_stim_params(stim_params, image_ndx)
+        super().submit_stim_params(stim_params, image_ndx)        
+
+        # Here we're adding some additional functionality, storing a new value we expect in stim_params
+        self.perturbation = stim_params.get('event').get('perturbation')
         
         logger.debug(f"Ring stimulus submitted with intensity {self.stim_intensity}%")
     
@@ -59,7 +61,7 @@ class RingAttractorStimulusController(DummyStimulusController):
             intensity: Stimulus intensity (not used, we use self.stim_intensity)
         """
         # Pass intensity to stimulus interface
-        params = {"intensity": self.stim_intensity}
+        params = {"intensity": intensity, "perturbation": self.perturbation}
         self.hardware_manager.stimulus.activate_stimulus(params)
         
-        logger.debug(f"Activated ring stimulus at intensity {self.stim_intensity}%")
+        logger.debug(f"Activated ring stimulus at intensity {intensity}%")

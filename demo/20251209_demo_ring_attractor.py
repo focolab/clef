@@ -47,8 +47,9 @@ from engine.closed_loop_engine import ClosedLoopEngine
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True  # <--- Remove this is the debug output is overwhelming lol
 )
 logger = logging.getLogger(__name__)
 
