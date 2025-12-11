@@ -42,11 +42,11 @@ class RingAttractorDynamics:
     
     def __init__(
         self,
-        inner_radius: float = 30.0,
-        outer_radius: float = 45.0,
+        inner_radius: float = 3.0,
+        outer_radius: float = 6.0,
         k_radial: float = 5.0,
         omega: float = 1.0,
-        dt: float = 0.01,
+        dt: float = 0.1,
         image_center: Tuple[float, float] = (50.0, 50.0)
     ):
         """
@@ -62,6 +62,7 @@ class RingAttractorDynamics:
         """
         self.inner_radius = inner_radius  # r1
         self.outer_radius = outer_radius  # r2
+        self.middle_radius = (outer_radius + inner_radius) / 2
         self.k_radial = k_radial
         self.omega = omega
         self.dt = dt
@@ -102,7 +103,8 @@ class RingAttractorDynamics:
             theta = 0.0
         
         # Radial dynamics: dr/dt = -k(r-r1)(r-r2) + u
-        dr = -self.k_radial * (r - self.inner_radius) * (r - self.outer_radius) + u
+        # dr = -self.k_radial * (r - self.inner_radius) * (r - self.outer_radius) + u # oops need an unstable orbit separating the two
+        dr = -self.k_radial * (r - self.inner_radius) * (r - self.middle_radius) * (r - self.outer_radius) + u
         
         # Angular drift: dtheta/dt = omega
         dtheta = self.omega
@@ -132,8 +134,7 @@ class RingAttractorDynamics:
         
         # Update ring classification based on current radius
         r = np.sqrt(self.x**2 + self.y**2)
-        mid_radius = (self.inner_radius + self.outer_radius) / 2.0
-        self.ring_index = 0 if r < mid_radius else 1
+        self.ring_index = 0 if r < self.middle_radius else 1
         
         # Get current angle
         theta = np.arctan2(self.y, self.x)
@@ -397,11 +398,11 @@ class RingAttractorBackend(DummyHardwareBackend):
         
         # Create ring dynamics
         self.ring_dynamics = RingAttractorDynamics(
-            inner_radius=ring_params.get('inner_radius', 30.0),
-            outer_radius=ring_params.get('outer_radius', 45.0),
+            inner_radius=ring_params.get('inner_radius', 1),
+            outer_radius=ring_params.get('outer_radius', 3),
             k_radial=ring_params.get('k_radial', 5.0),
             omega=ring_params.get('omega', 1.0),
-            dt=ring_params.get('dt', 0.01),
+            dt=ring_params.get('dt', 0.001),
             image_center=(width / 2.0, height / 2.0)
         )
         
@@ -417,7 +418,7 @@ class RingAttractorBackend(DummyHardwareBackend):
             height=height,
             ring_dynamics=self.ring_dynamics,
             noise_level=ring_params.get('noise_level', 100.0),
-            puncta_brightness=ring_params.get('puncta_brightness', 50000.0),
+            puncta_brightness=ring_params.get('puncta_brightness', 5000.0),
             puncta_radius=ring_params.get('puncta_radius', 3.0),
             exposure_ms=ring_params.get('exposure_ms', 10.0)
         )
