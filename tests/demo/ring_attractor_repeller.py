@@ -128,6 +128,7 @@ class RingDynamicsDebug:
         if self.mode == 'single':
             # Single attractor: dr/dt = -k(r - r0) + u
             return -self.k * (r - self.r0) + u
+        
         else:
             # Dual attractor with unstable repeller:
             # dr/dt = k(r - r1)(r - r_mid)(r - r2) + u
@@ -137,7 +138,7 @@ class RingDynamicsDebug:
             # - At r_mid: dr/dt ≈ 0, and d²r/dt² > 0 → unstable
             # - At r2: dr/dt ≈ 0, and d²r/dt² < 0 → stable
             return -self.k * (r - self.r1) * (r - self.r_mid) * (r - self.r2) + u
-
+        
     def _compute_derivatives(self, x: float, y: float, u: float) -> Tuple[float, float]:
         """
         Compute time derivatives dx/dt, dy/dt.
