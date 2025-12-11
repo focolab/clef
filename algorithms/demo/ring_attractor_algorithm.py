@@ -6,9 +6,9 @@ Provides real-time visualization with interactive stimulus control using -30 to 
 
 The algorithm:
 - Finds puncta via centroid of brightest pixels
-- Converts pixel coordinates to (theta, ring_index)
-- Stores timeseries of state
+- Stores raw XY positions from image
 - Provides interactive GUI with manual stimulus triggering
+- Displays raw XY trajectory in Cartesian state space with ring overlays
 - Slider controls radial perturbation from -30 (inward) to +30 (outward)
 """
 
@@ -61,8 +61,6 @@ class RingAttractorAlgorithm:
         self.hardware_manager = hardware_manager
         
         # Extract config parameters
-        # gooey_args = self.args.get("gooey_args", {})
-        # self.frames_to_grab = gooey_args.get("total_frames", 500)
         self.samples_to_grab = experiment_config.acquisition.num_samples
         
         # Get algorithm-specific parameters
@@ -86,7 +84,7 @@ class RingAttractorAlgorithm:
             self.auto_stim_enabled = params.auto_stim_enabled
             self.auto_stim_theta_min = params.auto_stim_theta_min
             self.auto_stim_theta_max = params.auto_stim_theta_max
-            self.auto_stim_perturbation = 15 # TODO remove this
+            self.auto_stim_perturbation = 15
             
             # Trajectory visualization
             self.fading_trajectory_samples = params.fading_trajectory_samples
@@ -105,14 +103,20 @@ class RingAttractorAlgorithm:
             self.auto_stim_perturbation = 15.0
             self.fading_trajectory_samples = 100
         
+        # Image center (for converting to centered coordinates)
+        self.center_x = self.image_width / 2.0
+        self.center_y = self.image_height / 2.0
+        
         # State tracking
         self.frame_count = 0
         self.cooldown_counter = 0
         self.transition_count = 0
         
-        # Extracted state timeseries
-        self.theta_history = []
-        self.ring_history = []
+        # Extracted state timeseries - RAW XY positions
+        self.x_history = []  # Raw X pixel positions (centered)
+        self.y_history = []  # Raw Y pixel positions (centered)
+        self.theta_history = []  # Derived theta for auto-stim
+        self.ring_history = []  # Derived ring classification
         self.frame_indices = []
         self.stim_events = []
         
@@ -156,7 +160,6 @@ class RingAttractorAlgorithm:
         
         # Compute centroid
         coords = np.argwhere(mask)
-        # coords = np.argmax(mask)
         centroid_y = np.mean(coords[:, 0])
         centroid_x = np.mean(coords[:, 1])
         
@@ -177,13 +180,9 @@ class RingAttractorAlgorithm:
         Returns:
             Tuple of (theta, r, ring_index)
         """
-        # Center coordinates
-        cx = self.image_width / 2.0
-        cy = self.image_height / 2.0
-        
         # Relative to center
-        dx = x - cx
-        dy = y - cy
+        dx = x - self.center_x
+        dy = y - self.center_y
         
         # Polar coordinates
         r = np.sqrt(dx**2 + dy**2)
@@ -210,13 +209,19 @@ class RingAttractorAlgorithm:
         """
         self.frame_count += 1
         
-        # Find puncta centroid
-        x, y = self._find_puncta_centroid(img)
+        # Find puncta centroid (raw pixel coordinates)
+        x_pixel, y_pixel = self._find_puncta_centroid(img)
         
-        # Convert to polar and classify ring
-        theta, r, ring_idx = self._pixel_to_polar(x, y)
+        # Convert to centered coordinates for state space
+        x_centered = x_pixel - self.center_x
+        y_centered = y_pixel - self.center_y
         
-        # Store state
+        # Convert to polar for ring classification and auto-stim
+        theta, r, ring_idx = self._pixel_to_polar(x_pixel, y_pixel)
+        
+        # Store RAW centered XY positions
+        self.x_history.append(x_centered)
+        self.y_history.append(y_centered)
         self.theta_history.append(theta)
         self.ring_history.append(ring_idx)
         self.frame_indices.append(self.frame_count)
@@ -229,7 +234,7 @@ class RingAttractorAlgorithm:
         
         # Update visualizer
         if self.visualizer:
-            self.visualizer.update_image(img, x, y)
+            self.visualizer.update_image(img, x_pixel, y_pixel)
             self.visualizer.update_trajectory()
             self.visualizer.update_info_text()
             self.visualizer.process_events()
@@ -237,7 +242,7 @@ class RingAttractorAlgorithm:
         # Log periodically
         if self.frame_count % 100 == 0:
             logger.info(
-                f"Frame {self.frame_count}: theta={theta:.3f}, r={r:.1f}, ring={ring_idx}"
+                f"Frame {self.frame_count}: x={x_centered:.1f}, y={y_centered:.1f}, r={r:.1f}, ring={ring_idx}"
             )
     
     def process_volume(self):
@@ -272,7 +277,7 @@ class RingAttractorAlgorithm:
                 'stim_on': image_ndx + 1,
                 'stim_off': image_ndx + 20,  # arbitrary duration
                 'event': {
-                    'stim_intensity': self.current_stim_intensity,  # Now -30 to +30
+                    'stim_intensity': self.current_stim_intensity,
                     'frame': image_ndx,
                     'trigger_type': 'manual'
                 }
@@ -280,6 +285,8 @@ class RingAttractorAlgorithm:
             
             self.stim_events.append({
                 'frame': image_ndx,
+                'x': self.x_history[-1] if self.x_history else 0,
+                'y': self.y_history[-1] if self.y_history else 0,
                 'theta': self.theta_history[-1] if self.theta_history else 0,
                 'ring': self.ring_history[-1] if self.ring_history else 0,
                 'stim_intensity': self.current_stim_intensity,
@@ -309,6 +316,8 @@ class RingAttractorAlgorithm:
                 
                 self.stim_events.append({
                     'frame': image_ndx,
+                    'x': self.x_history[-1],
+                    'y': self.y_history[-1],
                     'theta': theta,
                     'ring': self.ring_history[-1],
                     'stim_intensity': self.auto_stim_perturbation,
@@ -351,6 +360,8 @@ class RingAttractorAlgorithm:
             "outer_radius": self.outer_radius,
             
             # Extracted state timeseries
+            "x_history": self.x_history,
+            "y_history": self.y_history,
             "theta_history": self.theta_history,
             "ring_history": self.ring_history,
             "frame_indices": self.frame_indices,
@@ -362,6 +373,10 @@ class RingAttractorAlgorithm:
             
             # Statistics
             "state_stats": {
+                "mean_x": float(np.mean(self.x_history)) if self.x_history else 0,
+                "std_x": float(np.std(self.x_history)) if self.x_history else 0,
+                "mean_y": float(np.mean(self.y_history)) if self.y_history else 0,
+                "std_y": float(np.std(self.y_history)) if self.y_history else 0,
                 "mean_theta": float(np.mean(self.theta_history)) if self.theta_history else 0,
                 "std_theta": float(np.std(self.theta_history)) if self.theta_history else 0,
                 "time_inner_ring": sum(1 for r in self.ring_history if r == 0) / len(self.ring_history) if self.ring_history else 0,
@@ -371,7 +386,7 @@ class RingAttractorAlgorithm:
     
     def plot_model(self, show_plot: bool = False, savefilename: Optional[str] = None):
         """Plot the ring attractor trajectory."""
-        if len(self.theta_history) < 2:
+        if len(self.x_history) < 2:
             logger.warning("Not enough data to plot")
             return
         
@@ -383,44 +398,12 @@ class RingAttractorAlgorithm:
         
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         
-        # Polar trajectory plot
+        # XY state space trajectory
         ax = axes[0, 0]
-        ax = plt.subplot(2, 2, 1, projection='polar')
-        
-        # Plot trajectories by ring
-        inner_mask = np.array(self.ring_history) == 0
-        outer_mask = np.array(self.ring_history) == 1
-        
-        theta_arr = np.array(self.theta_history)
-        
-        if np.any(inner_mask):
-            ax.scatter(theta_arr[inner_mask], np.full(np.sum(inner_mask), self.inner_radius),
-                      c='blue', s=1, alpha=0.3, label='Inner ring')
-        if np.any(outer_mask):
-            ax.scatter(theta_arr[outer_mask], np.full(np.sum(outer_mask), self.outer_radius),
-                      c='red', s=1, alpha=0.3, label='Outer ring')
-        
-        # Mark stimuli
-        if self.stim_events:
-            stim_thetas = [e['theta'] for e in self.stim_events]
-            stim_rings = [self.inner_radius if e['ring'] == 0 else self.outer_radius for e in self.stim_events]
-            ax.scatter(stim_thetas, stim_rings, c='gold', s=100, marker='*', zorder=5, label='Stimulus')
-        
-        ax.set_title('Ring Attractor Trajectory (Polar)')
-        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
-        
-        # Cartesian trajectory
-        ax = axes[0, 1]
-        x_coords = []
-        y_coords = []
-        for theta, ring_idx in zip(self.theta_history, self.ring_history):
-            r = self.inner_radius if ring_idx == 0 else self.outer_radius
-            x_coords.append(r * np.cos(theta))
-            y_coords.append(r * np.sin(theta))
         
         # Color by time
-        colors = np.arange(len(x_coords))
-        scatter = ax.scatter(x_coords, y_coords, c=colors, s=1, cmap='viridis', alpha=0.5)
+        colors = np.arange(len(self.x_history))
+        scatter = ax.scatter(self.x_history, self.y_history, c=colors, s=1, cmap='viridis', alpha=0.5)
         
         # Draw ring circles
         circle_inner = plt.Circle((0, 0), self.inner_radius, fill=False, color='blue', linestyle='--', alpha=0.5)
@@ -428,22 +411,41 @@ class RingAttractorAlgorithm:
         ax.add_patch(circle_inner)
         ax.add_patch(circle_outer)
         
-        ax.set_xlabel('X (pixels)')
-        ax.set_ylabel('Y (pixels)')
-        ax.set_title('Ring Trajectory (Cartesian)')
+        # Mark stimuli
+        if self.stim_events:
+            stim_x = [e['x'] for e in self.stim_events]
+            stim_y = [e['y'] for e in self.stim_events]
+            ax.scatter(stim_x, stim_y, c='gold', s=100, marker='*', zorder=5, label='Stimulus')
+        
+        ax.set_xlabel('X (pixels, centered)')
+        ax.set_ylabel('Y (pixels, centered)')
+        ax.set_title('XY State Space Trajectory')
         ax.set_aspect('equal')
         ax.grid(True, alpha=0.3)
+        ax.legend()
         plt.colorbar(scatter, ax=ax, label='Time (frame)')
         
-        # Theta time series
-        ax = axes[1, 0]
-        ax.plot(self.frame_indices, self.theta_history, 'b-', alpha=0.7, linewidth=0.5)
+        # X position time series
+        ax = axes[0, 1]
+        ax.plot(self.frame_indices, self.x_history, 'r-', alpha=0.7, linewidth=0.5, label='X')
         for event in self.stim_events:
             ax.axvline(event['frame'], color='gold', alpha=0.3, linestyle='--')
         ax.set_xlabel('Frame')
-        ax.set_ylabel('Theta (radians)')
-        ax.set_title('Angular Position Over Time')
+        ax.set_ylabel('X Position (pixels)')
+        ax.set_title('X Position Over Time')
         ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+        # Y position time series
+        ax = axes[1, 0]
+        ax.plot(self.frame_indices, self.y_history, 'b-', alpha=0.7, linewidth=0.5, label='Y')
+        for event in self.stim_events:
+            ax.axvline(event['frame'], color='gold', alpha=0.3, linestyle='--')
+        ax.set_xlabel('Frame')
+        ax.set_ylabel('Y Position (pixels)')
+        ax.set_title('Y Position Over Time')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
         
         # Ring index time series
         ax = axes[1, 1]
@@ -477,11 +479,12 @@ class RingAttractorAlgorithm:
             f"{self.transition_count} transitions, {len(self.stim_events)} stimuli"
         )
 
+
 class RingVisualizer:
-    """Real-time visualization with both Cartesian and polar views."""
+    """Real-time visualization with XY state space plot showing raw positions."""
     
     def __init__(self, algorithm: 'RingAttractorAlgorithm'):
-        """Initialize enhanced visualizer with polar plot."""
+        """Initialize visualizer with XY state space plot."""
         self.algorithm = algorithm
         
         self.QtCore = QtCore
@@ -495,10 +498,10 @@ class RingVisualizer:
         
         # Create main window
         self.window = QtWidgets.QWidget()
-        self.window.setWindowTitle("Ring Attractor - Real-time Demo (Enhanced)")
-        self.window.resize(1400, 700)
+        self.window.setWindowTitle("Ring Attractor - XY State Space Demo")
+        self.window.resize(1200, 700)
         
-        # Create layout - now with 3 columns
+        # Create layout - 2 columns
         self.layout = QtWidgets.QGridLayout()
         self.window.setLayout(self.layout)
         
@@ -508,12 +511,12 @@ class RingVisualizer:
         self.image_widget.ui.menuBtn.hide()
         self.layout.addWidget(self.image_widget, 0, 0, 2, 1)
         
-        # === MIDDLE: Cartesian state space ===
+        # === RIGHT: XY state space ===
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setAspectLocked(True)
-        self.plot_widget.setTitle("Cartesian State Space")
-        self.plot_widget.setLabel('left', 'Y')
-        self.plot_widget.setLabel('bottom', 'X')
+        self.plot_widget.setTitle("XY State Space (Raw Positions)")
+        self.plot_widget.setLabel('left', 'Y (pixels, centered)')
+        self.plot_widget.setLabel('bottom', 'X (pixels, centered)')
         self.layout.addWidget(self.plot_widget, 0, 1, 1, 1)
         
         # Draw ring circles
@@ -525,38 +528,11 @@ class RingVisualizer:
             pen=None, symbol='o', symbolSize=10, symbolBrush='y'
         )
         
-        # === RIGHT: Polar state space ===
-        self.polar_widget = pg.PlotWidget()
-        self.polar_widget.setTitle("Polar State Space (θ vs time)")
-        self.polar_widget.setLabel('left', 'θ (radians)')
-        self.polar_widget.setLabel('bottom', 'Frame')
-        self.polar_widget.addLegend()
-        self.layout.addWidget(self.polar_widget, 0, 2, 1, 1)
-        
-        # Polar plots - separate for each ring
-        self.polar_theta_plot = self.polar_widget.plot(
-            pen=pg.mkPen('c', width=2), name='Trajectory'
-        )
-        self.polar_inner_markers = self.polar_widget.plot(
-            pen=None, symbol='o', symbolSize=6, symbolBrush='b', name='Inner ring'
-        )
-        self.polar_outer_markers = self.polar_widget.plot(
-            pen=None, symbol='o', symbolSize=6, symbolBrush='r', name='Outer ring'
-        )
-        self.polar_current_pos = self.polar_widget.plot(
-            pen=None, symbol='o', symbolSize=12, symbolBrush='y'
-        )
-        
-        # Add horizontal lines for ring reference
-        self.polar_widget.addLine(y=0, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
-        self.polar_widget.addLine(y=np.pi, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
-        self.polar_widget.addLine(y=2*np.pi, pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine))
-        
-        # === BOTTOM LEFT: Control panel ===
+        # === BOTTOM RIGHT: Control panel ===
         self.control_widget = QtWidgets.QWidget()
         self.control_layout = QtWidgets.QVBoxLayout()
         self.control_widget.setLayout(self.control_layout)
-        self.layout.addWidget(self.control_widget, 1, 1, 1, 2)  # Span 2 columns
+        self.layout.addWidget(self.control_widget, 1, 1, 1, 1)
         
         # Trigger button
         self.trigger_button = QtWidgets.QPushButton("Apply Perturbation")
@@ -600,7 +576,7 @@ class RingVisualizer:
         self.control_layout.addWidget(self.info_text)
         
         self.window.show()
-        logger.info("RingVisualizer with polar plot initialized")
+        logger.info("RingVisualizer with XY state space initialized")
     
     def _draw_ring_circles(self):
         """Draw dotted circles for ring attractors."""
@@ -641,83 +617,40 @@ class RingVisualizer:
         self.image_widget.setImage(img.T, autoLevels=False, autoRange=False)
     
     def update_trajectory(self):
-        """Update both Cartesian and polar trajectory plots."""
-        if len(self.algorithm.theta_history) < 2:
+        """Update XY state space trajectory plot."""
+        if len(self.algorithm.x_history) < 2:
             return
         
         # Get last N points for fading trail
-        N = min(self.algorithm.fading_trajectory_samples, len(self.algorithm.theta_history))
-        thetas = self.algorithm.theta_history[-N:]
-        rings = self.algorithm.ring_history[-N:]
-        frames = self.algorithm.frame_indices[-N:]
+        N = min(self.algorithm.fading_trajectory_samples, len(self.algorithm.x_history))
+        x_coords = self.algorithm.x_history[-N:]
+        y_coords = self.algorithm.y_history[-N:]
         
-        # === UPDATE CARTESIAN PLOT ===
-        x_coords = []
-        y_coords = []
-        for theta, ring_idx in zip(thetas, rings):
-            r = self.algorithm.inner_radius if ring_idx == 0 else self.algorithm.outer_radius
-            x_coords.append(r * np.cos(theta))
-            y_coords.append(r * np.sin(theta))
-        
+        # Plot trajectory
         self.trajectory_plot.setData(x_coords, y_coords)
         
         # Current position
         if x_coords:
             self.current_pos_plot.setData([x_coords[-1]], [y_coords[-1]])
-        
-        # === UPDATE POLAR PLOT ===
-        # Plot continuous theta trajectory
-        self.polar_theta_plot.setData(frames, thetas)
-        
-        # Separate markers by ring for clarity
-        inner_mask = np.array(rings) == 0
-        outer_mask = np.array(rings) == 1
-        
-        frames_arr = np.array(frames)
-        thetas_arr = np.array(thetas)
-        
-        if np.any(inner_mask):
-            self.polar_inner_markers.setData(
-                frames_arr[inner_mask], 
-                thetas_arr[inner_mask]
-            )
-        else:
-            self.polar_inner_markers.setData([], [])
-            
-        if np.any(outer_mask):
-            self.polar_outer_markers.setData(
-                frames_arr[outer_mask], 
-                thetas_arr[outer_mask]
-            )
-        else:
-            self.polar_outer_markers.setData([], [])
-        
-        # Current position marker
-        if frames:
-            self.polar_current_pos.setData([frames[-1]], [thetas[-1]])
-        
-        # Mark stimulus events on polar plot
-        if hasattr(self, '_stim_lines'):
-            for line in self._stim_lines:
-                self.polar_widget.removeItem(line)
-        
-        self._stim_lines = []
-        for event in self.algorithm.stim_events[-10:]:  # Show last 10 stim events
-            line = self.polar_widget.addLine(
-                x=event['frame'], 
-                pen=pg.mkPen('gold', width=2, style=QtCore.Qt.DashLine)
-            )
-            self._stim_lines.append(line)
     
     def update_info_text(self):
         """Update info text."""
+        if not self.algorithm.x_history:
+            return
+            
+        x = self.algorithm.x_history[-1]
+        y = self.algorithm.y_history[-1]
         theta = self.algorithm.theta_history[-1] if self.algorithm.theta_history else 0
         ring_idx = self.algorithm.ring_history[-1] if self.algorithm.ring_history else 0
+        r = np.sqrt(x**2 + y**2)
         
         info = f"""
         <b>Ring Attractor Closed-Loop Demo</b><br><br>
         <b>Frame:</b> {self.algorithm.frame_count} / {self.algorithm.samples_to_grab}<br>
         <b>Current State:</b><br>
+        &nbsp;&nbsp;X = {x:.1f} px<br>
+        &nbsp;&nbsp;Y = {y:.1f} px<br>
+        &nbsp;&nbsp;R = {r:.1f} px<br>
         &nbsp;&nbsp;Theta = {theta:.3f} rad ({np.degrees(theta):.1f}°)<br>
         &nbsp;&nbsp;Ring = {'Inner' if ring_idx == 0 else 'Outer'}<br>
         <br>
@@ -734,4 +667,4 @@ class RingVisualizer:
     def close(self):
         """Close visualizer."""
         self.window.close()
-        logger.info("Enhanced RingVisualizer closed")
+        logger.info("RingVisualizer closed")
