@@ -18,7 +18,7 @@ algorithm_params:
   fading_trajectory_samples: 100  # Number of points in trail
   
   # Stimulus control
-  default_stim_intensity: 50  # Starting slider value (0-100%)
+  default_stim_intensity: 0  # Starting slider value (0-100%)
   stim_cooldown_frames: 50
   
   # Auto-trigger settings
