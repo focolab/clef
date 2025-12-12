@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class RingAttractorStimulusController(DummyStimulusController):
-    """Ring attractor stimulus controller with intensity control."""
+    """Ring attractor stimulus controller with intensity and omega perturbation control."""
     
     def __init__(self, hardware_manager, config: Dict[str, Any]):
         """
@@ -26,9 +26,9 @@ class RingAttractorStimulusController(DummyStimulusController):
         """
         super().__init__(hardware_manager, config)
         
-        # Default intensity (can be updated by algorithm)
-        # self.stim_intensity = 50  # 0-100%
-        self.stim_intensity = 0
+        # Default parameters (can be updated by algorithm)
+        self.stim_intensity = 0  # Radial perturbation: -30 to +30
+        self.omega_perturbation = 0.0  # Angular velocity perturbation: -5 to +5
         
         logger.info("RingAttractorStimulusController initialized")
     
@@ -37,7 +37,8 @@ class RingAttractorStimulusController(DummyStimulusController):
         Accept and process ring-specific stimulus parameters.
         
         Args:
-            stim_params: Dictionary containing stimulus parameters
+            stim_params: Dictionary containing stimulus parameters including:
+                - event: Dict with 'stim_intensity' and 'omega_perturbation'
             image_ndx: Current image index
         """
         if not stim_params:
@@ -45,23 +46,34 @@ class RingAttractorStimulusController(DummyStimulusController):
         
         logger.debug(f"RingAttractorStimulusController: Received stim params at frame {image_ndx}: {stim_params}")
         
-        # Call parent implementation
+        # Call parent implementation to handle timing
         super().submit_stim_params(stim_params, image_ndx)        
 
-        # Here we're adding some additional functionality, storing a new value we expect in stim_params
-        self.perturbation = stim_params.get('event').get('perturbation')
+        # Extract ring-specific parameters
+        event = stim_params.get('event', {})
+        self.stim_intensity = event.get('stim_intensity', 0) 
+        self.omega_perturbation = event.get('omega_perturbation', 0.0)
         
-        logger.debug(f"Ring stimulus submitted with intensity {self.stim_intensity}%")
+        logger.debug(
+            f"Ring stimulus submitted: intensity={self.stim_intensity}, "
+            f"omega_perturbation={self.omega_perturbation:.2f}"
+        )
     
     def _activate_hardware(self, intensity: float) -> None:
         """
         Activate stimulus hardware with ring-specific parameters.
         
         Args:
-            intensity: Stimulus intensity (not used, we use self.stim_intensity)
+            intensity: Stimulus intensity (from parent class, not used directly)
         """
-        # Pass intensity to stimulus interface
-        params = {"intensity": intensity, "perturbation": self.perturbation}
+        # Pass both radial and angular perturbations to stimulus interface
+        params = {
+            "intensity": self.stim_intensity,
+            "omega_perturbation": self.omega_perturbation
+        }
         self.hardware_manager.stimulus.activate_stimulus(params)
         
-        logger.debug(f"Activated ring stimulus at intensity {intensity}%")
+        logger.debug(
+            f"Activated ring stimulus: intensity={self.stim_intensity}, "
+            f"omega_perturbation={self.omega_perturbation:.2f}"
+        )
