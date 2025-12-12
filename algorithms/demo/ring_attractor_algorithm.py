@@ -2,7 +2,8 @@
 Ring Attractor Demo Algorithm
 
 Extracts puncta position from images and tracks state trajectory on dual ring attractors.
-Provides real-time visualization with interactive stimulus control using -30 to +30 perturbation.
+Provides real-time visualization with interactive stimulus control using -30 to +30 perturbation
+and omega perturbation from -5 to +5.
 
 The algorithm:
 - Finds puncta via centroid of brightest pixels
@@ -10,6 +11,7 @@ The algorithm:
 - Provides interactive GUI with manual stimulus triggering
 - Displays raw XY trajectory in Cartesian state space with ring overlays
 - Slider controls radial perturbation from -30 (inward) to +30 (outward)
+- Slider controls omega perturbation from -5 (slower) to +5 (faster)
 """
 
 import logging
@@ -78,6 +80,7 @@ class RingAttractorAlgorithm:
             # Stimulus parameters
             self.stim_cooldown_frames = params.stim_cooldown_frames
             self.default_stim_intensity = 0  # Default to 0 (no perturbation)
+            self.default_omega_perturbation = 0  # Default to 0 (no omega change)
             self.visualize_real_time = params.visualize_real_time
             
             # Auto-stim parameters
@@ -96,6 +99,7 @@ class RingAttractorAlgorithm:
             self.image_height = 100
             self.stim_cooldown_frames = 50
             self.default_stim_intensity = 0
+            self.default_omega_perturbation = 0
             self.visualize_real_time = False
             self.auto_stim_enabled = False
             self.auto_stim_theta_min = 0.0
@@ -123,6 +127,7 @@ class RingAttractorAlgorithm:
         # Manual stimulus control
         self.manual_stim_pending = False
         self.current_stim_intensity = self.default_stim_intensity
+        self.current_omega_perturbation = self.default_omega_perturbation
         
         # Initialize visualizer
         self.visualizer = None
@@ -278,6 +283,7 @@ class RingAttractorAlgorithm:
                 'stim_off': image_ndx + 20,  # arbitrary duration
                 'event': {
                     'stim_intensity': self.current_stim_intensity,
+                    'omega_perturbation': self.current_omega_perturbation,
                     'frame': image_ndx,
                     'trigger_type': 'manual'
                 }
@@ -290,11 +296,16 @@ class RingAttractorAlgorithm:
                 'theta': self.theta_history[-1] if self.theta_history else 0,
                 'ring': self.ring_history[-1] if self.ring_history else 0,
                 'stim_intensity': self.current_stim_intensity,
+                'omega_perturbation': self.current_omega_perturbation,
                 'trigger_type': 'manual'
             })
             
             self.cooldown_counter = self.stim_cooldown_frames
-            logger.info(f"Manual stimulus triggered at frame {image_ndx}, perturbation={self.current_stim_intensity}")
+            logger.info(
+                f"Manual stimulus triggered at frame {image_ndx}, "
+                f"perturbation={self.current_stim_intensity}, "
+                f"omega_perturbation={self.current_omega_perturbation}"
+            )
             
             return stim_params, self.cooldown_counter
         
@@ -308,6 +319,7 @@ class RingAttractorAlgorithm:
                     'stim_off': image_ndx + 20,
                     'event': {
                         'stim_intensity': self.auto_stim_perturbation,
+                        'omega_perturbation': 0,  # No omega perturbation for auto-stim
                         'frame': image_ndx,
                         'trigger_type': 'auto',
                         'theta': theta
@@ -321,6 +333,7 @@ class RingAttractorAlgorithm:
                     'theta': theta,
                     'ring': self.ring_history[-1],
                     'stim_intensity': self.auto_stim_perturbation,
+                    'omega_perturbation': 0,
                     'trigger_type': 'auto'
                 })
                 
@@ -331,7 +344,7 @@ class RingAttractorAlgorithm:
         
         return {}, 0
     
-    def trigger_manual_stimulus(self, intensity: float):
+    def trigger_manual_stimulus(self, intensity: float, omega_perturbation: float):
         """
         Trigger manual stimulus from GUI.
         
@@ -339,10 +352,17 @@ class RingAttractorAlgorithm:
             intensity: Perturbation strength (-30 to +30)
                 Positive = push outward
                 Negative = pull inward
+            omega_perturbation: Angular velocity perturbation (-5 to +5)
+                Positive = speed up rotation
+                Negative = slow down rotation
         """
         self.current_stim_intensity = intensity
+        self.current_omega_perturbation = omega_perturbation
         self.manual_stim_pending = True
-        logger.info(f"Manual stimulus queued with perturbation {intensity}")
+        logger.info(
+            f"Manual stimulus queued with perturbation {intensity}, "
+            f"omega_perturbation {omega_perturbation}"
+        )
     
     def set_auto_stim_enabled(self, enabled: bool):
         """Set auto-stim enabled state."""
@@ -539,9 +559,9 @@ class RingVisualizer:
         self.trigger_button.clicked.connect(self._on_trigger_clicked)
         self.control_layout.addWidget(self.trigger_button)
         
-        # Perturbation slider (-30 to +30)
+        # Radial perturbation slider (-30 to +30)
         slider_layout = QtWidgets.QHBoxLayout()
-        slider_layout.addWidget(QtWidgets.QLabel("Perturbation:"))
+        slider_layout.addWidget(QtWidgets.QLabel("Radial:"))
         self.intensity_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.intensity_slider.setMinimum(-60)
         self.intensity_slider.setMaximum(60)
@@ -553,12 +573,29 @@ class RingVisualizer:
         slider_layout.addWidget(self.intensity_label)
         self.control_layout.addLayout(slider_layout)
         
+        # Omega perturbation slider (-5 to +5)
+        omega_slider_layout = QtWidgets.QHBoxLayout()
+        omega_slider_layout.addWidget(QtWidgets.QLabel("Omega:"))
+        self.omega_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.omega_slider.setMinimum(-50)  # -5.0 with 0.1 resolution
+        self.omega_slider.setMaximum(50)   # +5.0 with 0.1 resolution
+        self.omega_slider.setValue(0)
+        self.omega_slider.valueChanged.connect(self._on_omega_changed)
+        omega_slider_layout.addWidget(self.omega_slider)
+        self.omega_label = QtWidgets.QLabel("0.0 (none)")
+        self.omega_label.setMinimumWidth(100)
+        omega_slider_layout.addWidget(self.omega_label)
+        self.control_layout.addLayout(omega_slider_layout)
+        
         # Helper text
         helper_text = QtWidgets.QLabel(
-            "<small><b>Perturbation:</b><br>"
+            "<small><b>Radial Perturbation:</b><br>"
             "• Positive (+) = push outward<br>"
             "• Negative (-) = pull inward<br>"
-            "• ~±15 will switch rings</small>"
+            "• ~±15 will switch rings<br><br>"
+            "<b>Omega Perturbation:</b><br>"
+            "• Positive (+) = speed up rotation<br>"
+            "• Negative (-) = slow down rotation</small>"
         )
         helper_text.setStyleSheet("QLabel { color: #666; padding: 5px; }")
         self.control_layout.addWidget(helper_text)
@@ -594,7 +631,8 @@ class RingVisualizer:
     def _on_trigger_clicked(self):
         """Handle manual trigger button click."""
         intensity = self.intensity_slider.value()
-        self.algorithm.trigger_manual_stimulus(intensity)
+        omega_perturbation = self.omega_slider.value() / 10.0  # Convert to -5.0 to +5.0
+        self.algorithm.trigger_manual_stimulus(intensity, omega_perturbation)
     
     def _on_intensity_changed(self, value):
         """Handle intensity slider change."""
@@ -606,6 +644,18 @@ class RingVisualizer:
             label = "0 (none)"
         self.intensity_label.setText(label)
         self.algorithm.current_stim_intensity = value
+    
+    def _on_omega_changed(self, value):
+        """Handle omega slider change."""
+        omega_value = value / 10.0  # Convert to -5.0 to +5.0
+        if omega_value > 0:
+            label = f"+{omega_value:.1f} (faster)"
+        elif omega_value < 0:
+            label = f"{omega_value:.1f} (slower)"
+        else:
+            label = "0.0 (none)"
+        self.omega_label.setText(label)
+        self.algorithm.current_omega_perturbation = omega_value
     
     def _on_auto_stim_changed(self, state):
         """Handle auto-stim checkbox change."""

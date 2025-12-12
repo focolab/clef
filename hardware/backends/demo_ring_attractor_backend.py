@@ -8,8 +8,8 @@ The backend:
 - Generates 100x100 uint16 images with a Gaussian blob puncta
 - Maintains state: [x, y] in Cartesian coordinates
 - Uses radial dynamics: dr/dt = -k(r-r1)(r-r2) + perturbation
-- Uses angular drift: dtheta/dt = omega
-- Responds to stimulation by perturbing radially to switch rings
+- Uses angular drift: dtheta/dt = omega + omega_perturbation
+- Responds to stimulation by perturbing radially and angularly
 """
 
 import logging
@@ -34,8 +34,8 @@ class RingAttractorDynamics:
     Ring attractor with dual stable limit cycles.
     
     Implements continuous dynamics:
-    - dr/dt = -k(r-r1)(r-r2) + u(t)  [radial dynamics with two stable cycles]
-    - dtheta/dt = omega               [constant angular drift]
+    - dr/dt = -k(r-r1)(r-r_mid)(r-r2) + u_r(t)  [radial dynamics with two stable cycles]
+    - dtheta/dt = omega + u_omega(t)             [angular drift with perturbation]
     
     Where r1 and r2 are the radii of the two stable limit cycles.
     """
@@ -72,8 +72,9 @@ class RingAttractorDynamics:
         self.x = inner_radius  # Start on inner ring
         self.y = 0.0
         
-        # Perturbation signal
+        # Perturbation signals
         self.perturbation = 0.0
+        self.omega_perturbation = 0.0
         
         # Track which ring we're on
         self.ring_index = 0  # 0=inner, 1=outer
@@ -83,13 +84,14 @@ class RingAttractorDynamics:
             f"k={k_radial}, omega={omega}, dt={dt}"
         )
     
-    def _dynamics(self, x: float, y: float, u: float) -> Tuple[float, float]:
+    def _dynamics(self, x: float, y: float, u_r: float, u_omega: float) -> Tuple[float, float]:
         """
         Compute derivatives dx/dt, dy/dt.
         
         Args:
             x, y: Current Cartesian coordinates
-            u: External perturbation (scalar)
+            u_r: External radial perturbation (scalar)
+            u_omega: External angular perturbation (scalar)
             
         Returns:
             (dx, dy) derivatives
@@ -102,12 +104,11 @@ class RingAttractorDynamics:
             r = 1e-6
             theta = 0.0
         
-        # Radial dynamics: dr/dt = -k(r-r1)(r-r2) + u
-        # dr = -self.k_radial * (r - self.inner_radius) * (r - self.outer_radius) + u # oops need an unstable orbit separating the two
-        dr = -self.k_radial * (r - self.inner_radius) * (r - self.middle_radius) * (r - self.outer_radius) + u
+        # Radial dynamics: dr/dt = -k(r-r1)(r-r_mid)(r-r2) + u_r
+        dr = -self.k_radial * (r - self.inner_radius) * (r - self.middle_radius) * (r - self.outer_radius) + u_r
         
-        # Angular drift: dtheta/dt = omega
-        dtheta = self.omega
+        # Angular drift: dtheta/dt = omega + u_omega
+        dtheta = self.omega + u_omega
         
         # Convert to Cartesian derivatives
         dx = dr * np.cos(theta) - r * dtheta * np.sin(theta)
@@ -123,14 +124,15 @@ class RingAttractorDynamics:
             Tuple of (theta, ring_index)
         """
         # Compute derivatives
-        dx, dy = self._dynamics(self.x, self.y, self.perturbation)
+        dx, dy = self._dynamics(self.x, self.y, self.perturbation, self.omega_perturbation)
         
         # Euler step
         self.x += dx * self.dt
         self.y += dy * self.dt
         
-        # Decay perturbation
+        # Decay perturbations
         self.perturbation *= 0.95  # exponential decay
+        self.omega_perturbation *= 0.95  # exponential decay
         
         # Update ring classification based on current radius
         r = np.sqrt(self.x**2 + self.y**2)
@@ -143,20 +145,28 @@ class RingAttractorDynamics:
         
         return theta, self.ring_index
     
-    def apply_perturbation(self, perturbation_strength: float) -> None:
+    def apply_perturbation(self, perturbation_strength: float, omega_perturbation: float = 0.0) -> None:
         """
-        Apply radial perturbation with specified strength.
+        Apply radial and angular perturbations with specified strengths.
         
         Args:
-            perturbation_strength: Perturbation magnitude (-30 to +30)
+            perturbation_strength: Radial perturbation magnitude (-30 to +30)
                 Positive = push outward
                 Negative = pull inward
+            omega_perturbation: Angular perturbation magnitude (-5 to +5)
+                Positive = speed up rotation
+                Negative = slow down rotation
         """
         r = np.sqrt(self.x**2 + self.y**2)
         self.perturbation = perturbation_strength
+        self.omega_perturbation = omega_perturbation
         
-        direction = "outward" if perturbation_strength > 0 else "inward"
-        logger.debug(f"Applied {direction} perturbation of {perturbation_strength:.1f} at r={r:.1f}")
+        radial_dir = "outward" if perturbation_strength > 0 else "inward"
+        angular_dir = "faster" if omega_perturbation > 0 else "slower"
+        logger.debug(
+            f"Applied {radial_dir} perturbation of {perturbation_strength:.1f} "
+            f"and {angular_dir} omega perturbation of {omega_perturbation:.2f} at r={r:.1f}"
+        )
     
     def toggle_ring(self) -> None:
         """
@@ -217,6 +227,7 @@ class RingAttractorDynamics:
         self.y = r * np.sin(theta)
         self.ring_index = ring_index
         self.perturbation = 0.0
+        self.omega_perturbation = 0.0
     
     def get_cartesian_position(self) -> Tuple[float, float]:
         """
@@ -331,7 +342,7 @@ class RingCamera(DummyCamera):
 
 
 class RingStimulus(DummyStimulus):
-    """Stimulus that toggles ring and perturbs theta."""
+    """Stimulus that perturbs radial position and angular velocity."""
     
     def __init__(self, ring_dynamics: RingAttractorDynamics, **kwargs):
         """
@@ -346,27 +357,25 @@ class RingStimulus(DummyStimulus):
     
     def activate_stimulus(self, params: Dict[str, Any]) -> None:
         """
-        Apply radial perturbation with specified intensity.
+        Apply radial and angular perturbations with specified intensities.
         
         Args:
-            params: Dictionary with 'intensity' (-30 to +30)
-                Positive = push outward, Negative = pull inward
+            params: Dictionary with 'intensity' (-30 to +30) and 'omega_perturbation' (-5 to +5)
+                intensity: Positive = push outward, Negative = pull inward
+                omega_perturbation: Positive = speed up, Negative = slow down
         """
         super().activate_stimulus(params)
         
-        # Get perturbation strength from intensity parameter
+        # Get perturbation strengths from parameters
         perturbation_strength = params.get('intensity', 0.0)
+        omega_perturbation = params.get('omega_perturbation', 0.0)
         
-        # Apply radial perturbation
-        self.ring.apply_perturbation(perturbation_strength)
-        
-        # Optional: Add small angular perturbation (10% of intensity)
-        # delta_theta = np.random.normal(0, abs(perturbation_strength) * 0.01)
-        # self.ring.perturb_theta(delta_theta)
+        # Apply both radial and angular perturbations
+        self.ring.apply_perturbation(perturbation_strength, omega_perturbation)
         
         logger.info(
             f"Applied ring stimulus: perturbation={perturbation_strength:.1f}, "
-            # f"delta_theta={delta_theta:.3f}"
+            f"omega_perturbation={omega_perturbation:.2f}"
         )
 
 
@@ -375,7 +384,7 @@ class RingAttractorBackend(DummyHardwareBackend):
     Hardware backend for ring attractor demonstration.
     
     Generates images with a puncta orbiting one of two concentric rings.
-    Stimulus toggles between rings and perturbs angular position.
+    Stimulus perturbs radial position and angular velocity.
     """
     
     def __init__(self, config: HardwareConfig):
