@@ -87,7 +87,6 @@ class RingAttractorAlgorithm:
             self.auto_stim_enabled = params.auto_stim_enabled
             self.auto_stim_theta_min = params.auto_stim_theta_min
             self.auto_stim_theta_max = params.auto_stim_theta_max
-            self.auto_stim_perturbation = 15
             
             # Trajectory visualization
             self.fading_trajectory_samples = params.fading_trajectory_samples
@@ -104,7 +103,6 @@ class RingAttractorAlgorithm:
             self.auto_stim_enabled = False
             self.auto_stim_theta_min = 0.0
             self.auto_stim_theta_max = np.pi / 4
-            self.auto_stim_perturbation = 15.0
             self.fading_trajectory_samples = 100
         
         # Image center (for converting to centered coordinates)
@@ -121,7 +119,7 @@ class RingAttractorAlgorithm:
         self.y_history = []  # Raw Y pixel positions (centered)
         self.theta_history = []  # Derived theta for auto-stim
         self.ring_history = []  # Derived ring classification
-        self.frame_indices = []
+        self.frame_indices = [] 
         self.stim_events = []
         
         # Manual stimulus control
@@ -310,16 +308,19 @@ class RingAttractorAlgorithm:
             return stim_params, self.cooldown_counter
         
         # Check auto-trigger
-        if self.auto_stim_enabled and len(self.theta_history) > 0:
+        if self.visualizer.auto_stim_checkbox.isChecked() and len(self.theta_history) > 0:
             theta = self.theta_history[-1]
             
             if self.auto_stim_theta_min <= theta <= self.auto_stim_theta_max:
+
+                intensity = self.visualizer.intensity_slider.value()
+                omega_perturbation = self.visualizer.omega_slider.value() / 10.0  # Convert to -10.0 to +10.0
                 stim_params = {
                     'stim_on': image_ndx + 1,
                     'stim_off': image_ndx + 20,
                     'event': {
-                        'stim_intensity': self.auto_stim_perturbation,
-                        'omega_perturbation': 0,  # No omega perturbation for auto-stim
+                        'stim_intensity': intensity,
+                        'omega_perturbation': omega_perturbation,  # No omega perturbation for auto-stim
                         'frame': image_ndx,
                         'trigger_type': 'auto',
                         'theta': theta
@@ -332,7 +333,7 @@ class RingAttractorAlgorithm:
                     'y': self.y_history[-1],
                     'theta': theta,
                     'ring': self.ring_history[-1],
-                    'stim_intensity': self.auto_stim_perturbation,
+                    'stim_intensity': intensity,
                     'omega_perturbation': 0,
                     'trigger_type': 'auto'
                 })
@@ -563,8 +564,8 @@ class RingVisualizer:
         slider_layout = QtWidgets.QHBoxLayout()
         slider_layout.addWidget(QtWidgets.QLabel("Radial:"))
         self.intensity_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.intensity_slider.setMinimum(-60)
-        self.intensity_slider.setMaximum(60)
+        self.intensity_slider.setMinimum(-100)
+        self.intensity_slider.setMaximum(100)
         self.intensity_slider.setValue(0)
         self.intensity_slider.valueChanged.connect(self._on_intensity_changed)
         slider_layout.addWidget(self.intensity_slider)
@@ -577,8 +578,8 @@ class RingVisualizer:
         omega_slider_layout = QtWidgets.QHBoxLayout()
         omega_slider_layout.addWidget(QtWidgets.QLabel("Omega:"))
         self.omega_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.omega_slider.setMinimum(-50)  # -5.0 with 0.1 resolution
-        self.omega_slider.setMaximum(50)   # +5.0 with 0.1 resolution
+        self.omega_slider.setMinimum(-100)  # -10.0 with 0.1 resolution
+        self.omega_slider.setMaximum(100)   # +10.0 with 0.1 resolution
         self.omega_slider.setValue(0)
         self.omega_slider.valueChanged.connect(self._on_omega_changed)
         omega_slider_layout.addWidget(self.omega_slider)
@@ -631,7 +632,7 @@ class RingVisualizer:
     def _on_trigger_clicked(self):
         """Handle manual trigger button click."""
         intensity = self.intensity_slider.value()
-        omega_perturbation = self.omega_slider.value() / 10.0  # Convert to -5.0 to +5.0
+        omega_perturbation = self.omega_slider.value() / 10.0  # Convert to -10.0 to +10.0
         self.algorithm.trigger_manual_stimulus(intensity, omega_perturbation)
     
     def _on_intensity_changed(self, value):
