@@ -51,7 +51,7 @@ class TestBrainalyzerInitialization:
             experiment_name="test_experiment",
             output_dir="./test_output",
             acquisition=AcquisitionConfig(
-                num_frames=100,
+                num_samples=100,
                 z_planes=10,
             ),
             subject=SubjectMetadata(
@@ -194,7 +194,7 @@ class TestBrainalyzerProcessing:
             experiment_name="test",
             output_dir="./test",
             acquisition=AcquisitionConfig(
-                num_frames=100,
+                num_samples=100,
                 z_planes=10,
             ),
         )
@@ -217,13 +217,13 @@ class TestBrainalyzerProcessing:
         
         return alg
     
-    def test_process_frame(self, brainalyzer):
+    def test_process_sample(self, brainalyzer):
         """Test frame processing."""
         # Create test frame
         img = np.random.randint(0, 1000, (128, 128), dtype=np.uint16)
         
         # Process frame
-        brainalyzer.process_frame(img, zndx=0)
+        brainalyzer.process_sample(img, sample_ndx=0)
         
         # Verify frame stored in shared memory
         assert np.array_equal(brainalyzer.shared_ndarray_list[0], img)
@@ -334,7 +334,7 @@ class TestBrainalyzerMetadata:
         experiment_config = ExperimentConfig(
             experiment_name="metadata_test",
             output_dir="./test",
-            acquisition=AcquisitionConfig(num_frames=100, z_planes=10),
+            acquisition=AcquisitionConfig(num_samples=100, z_planes=10),
         )
         
         alg = Brainalyzer(
@@ -375,7 +375,7 @@ class TestBrainalyzerBehaviorMode:
         experiment_config = ExperimentConfig(
             experiment_name="behavior_test",
             output_dir="./test",
-            acquisition=AcquisitionConfig(num_frames=100, z_planes=1),
+            acquisition=AcquisitionConfig(num_samples=100, z_planes=1),
         )
         
         hardware_config = HardwareConfig(

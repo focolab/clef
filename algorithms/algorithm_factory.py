@@ -237,11 +237,11 @@ def _build_legacy_args(
     gooey_args = {
         # From ExperimentConfig
         "output_folder": exp.output_dir,
-        "total_frames": exp.acquisition.num_frames,
+        "total_frames": exp.acquisition.num_samples,
         "zsize": exp.acquisition.z_planes,
         "save_mip": exp.save_mip_video,
         "save_structural_scan": exp.acquisition.save_structural_scan,
-        "rec_baseline": exp.acquisition.baseline_frames,
+        "rec_baseline": exp.acquisition.baseline_samples,
         "z_step_size": exp.z_step_size_um,
         
         # Subject metadata

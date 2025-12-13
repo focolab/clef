@@ -1,8 +1,6 @@
 """
-Hardware Manager - Unified hardware abstraction layer.
+Hardware Manager - Unified hardware abstraction layer with data interface support.
 
-Provides a single interface for all hardware operations, abstracting away
-the details of different backends (Micro-Manager, dummy, etc.).
 """
 
 import logging
@@ -15,6 +13,8 @@ from hardware.backends.demo_lorenz_backend import LorenzDemoBackend
 from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
+from hardware.data_interface import DataInterface
+from hardware.image_data_interface import ImageDataInterface
 from config.config_manager import HardwareConfig
 
 logger = logging.getLogger(__name__)
@@ -22,28 +22,11 @@ logger = logging.getLogger(__name__)
 
 class HardwareManager:
     """
-    Unified hardware manager for CLEF.
+    Unified hardware manager for CLEF with data interface abstraction.
     
-    Provides a single interface for all hardware operations, abstracting away
-    backend-specific details. Automatically selects and initializes the
-    appropriate backend based on HardwareConfig.
-    
-    Example:
-        >>> from config.config_manager import ConfigManager
-        >>> from hardware import HardwareManager
-        >>> 
-        >>> config_manager = ConfigManager()
-        >>> hardware_config = config_manager.load_hardware_config()
-        >>> 
-        >>> hardware = HardwareManager(hardware_config)
-        >>> hardware.initialize()
-        >>> 
-        >>> # Use hardware interfaces
-        >>> img = hardware.camera.acquire_frame()
-        >>> hardware.stage.move_to_position(10.0, axis='Z')
-        >>> hardware.stimulus.activate_stimulus({'intensity': 50})
-        >>> 
-        >>> hardware.close()
+    UPDATED: Now exposes a generic DataInterface that can handle diverse
+    data types (images, timeseries, screenshots, etc.) while maintaining
+    backward compatibility with camera-based microscopy.
     """
     
     def __init__(self, config: HardwareConfig):
@@ -55,6 +38,7 @@ class HardwareManager:
         """
         self.config = config
         self._backend: Optional[BaseHardwareBackend] = None
+        self._data_interface: Optional[DataInterface] = None
         self._initialized = False
         
         # Select backend based on config
@@ -83,12 +67,10 @@ class HardwareManager:
         """
         Initialize hardware connections and devices.
         
-        Must be called before using any hardware operations.
-        Raises exception if initialization fails.
+        Creates appropriate data interface based on backend type.
         
         Args:
             **kwargs: Backend-specific initialization parameters
-                     (e.g., input_recording for dummy backend)
         """
         if self._initialized:
             logger.warning("Hardware already initialized")
@@ -96,28 +78,53 @@ class HardwareManager:
         
         logger.info("Initializing hardware manager...")
         self._backend.initialize(**kwargs)
+        
+        # Create data interface wrapping the camera
+        # For now, all backends provide camera-based image data
+        # Future: Could select different data interface types based on config
+        self._data_interface = ImageDataInterface(self._backend.camera)
+        logger.debug("Created ImageDataInterface wrapping camera")
+        
         self._initialized = True
         logger.info("Hardware manager initialized successfully")
     
     def close(self) -> None:
-        """
-        Close hardware connections and cleanup resources.
-        
-        Should be called when done with hardware to ensure proper cleanup.
-        """
+        """Close hardware connections and cleanup resources."""
         if not self._initialized:
             return
         
         logger.info("Closing hardware manager...")
         if self._backend:
             self._backend.close()
+        self._data_interface = None
         self._initialized = False
         logger.info("Hardware manager closed")
     
     @property
+    def data(self) -> DataInterface:
+        """
+        Get data interface for generic data sampling.
+        
+        NEW: Primary interface for data acquisition. Replaces direct
+        camera access for most use cases.
+        
+        Returns:
+            DataInterface for data sampling operations
+            
+        Raises:
+            RuntimeError: If hardware not initialized
+        """
+        if not self._initialized:
+            raise RuntimeError("Hardware not initialized. Call initialize() first.")
+        return self._data_interface
+    
+    @property
     def camera(self) -> CameraInterface:
         """
-        Get camera interface.
+        Get camera interface (backward compatibility).
+        
+        DEPRECATED: Use hardware.data for new code. This property is
+        maintained for backward compatibility with existing code.
         
         Returns:
             CameraInterface for image acquisition operations
@@ -127,34 +134,19 @@ class HardwareManager:
         """
         if not self._initialized:
             raise RuntimeError("Hardware not initialized. Call initialize() first.")
+        logger.debug("Accessing camera directly (consider using hardware.data instead)")
         return self._backend.camera
     
     @property
     def stage(self) -> StageInterface:
-        """
-        Get stage interface.
-        
-        Returns:
-            StageInterface for stage control operations
-            
-        Raises:
-            RuntimeError: If hardware not initialized
-        """
+        """Get stage interface."""
         if not self._initialized:
             raise RuntimeError("Hardware not initialized. Call initialize() first.")
         return self._backend.stage
     
     @property
     def stimulus(self) -> StimulusInterface:
-        """
-        Get stimulus interface.
-        
-        Returns:
-            StimulusInterface for stimulus control operations
-            
-        Raises:
-            RuntimeError: If hardware not initialized
-        """
+        """Get stimulus interface."""
         if not self._initialized:
             raise RuntimeError("Hardware not initialized. Call initialize() first.")
         return self._backend.stimulus
@@ -166,28 +158,27 @@ class HardwareManager:
     
     def get_metadata(self) -> Dict[str, Any]:
         """
-        Get hardware metadata (exposure, ROI, device properties, etc.).
+        Get hardware metadata including data format information.
         
         Returns:
-            Dictionary containing hardware metadata
+            Dictionary containing hardware and data metadata
         """
         if not self._initialized:
             return {}
-        return self._backend.get_metadata()
+        
+        metadata = self._backend.get_metadata()
+        
+        # Add data interface metadata
+        if self._data_interface:
+            metadata['data'] = self._data_interface.get_metadata()
+        
+        return metadata
     
     def get_backend(self) -> BaseHardwareBackend:
         """
         Get underlying backend object.
         
-        This method provides access to the backend for components that
-        haven't been fully refactored yet. This is temporary and will be
-        removed as components are migrated to use the hardware abstraction.
-        
-        Returns:
-            BaseHardwareBackend instance
-            
-        Raises:
-            RuntimeError: If hardware not initialized
+        TEMPORARY: For components not yet refactored.
         """
         if not self._initialized:
             raise RuntimeError("Hardware not initialized. Call initialize() first.")
@@ -195,26 +186,15 @@ class HardwareManager:
     
     def get_mmc(self):
         """
-        Get underlying Micro-Manager Core object (if using Micro-Manager backend).
+        Get underlying Micro-Manager Core object.
         
-        This method provides access to the raw MMC object for components
-        that haven't been refactored yet. This is temporary and will be
-        removed as components are migrated to use the hardware abstraction.
-        
-        Returns:
-            Micro-Manager Core object, or None if not using Micro-Manager backend
-            
-        Raises:
-            RuntimeError: If hardware not initialized
+        TEMPORARY: For components not yet refactored.
         """
         if not self._initialized:
             raise RuntimeError("Hardware not initialized. Call initialize() first.")
         
         if isinstance(self._backend, MicroManagerBackend):
             return self._backend.get_mmc()
-
         if isinstance(self._backend, DummyHardwareBackend):
             return self._backend.get_mmc()
-            
         return None
-

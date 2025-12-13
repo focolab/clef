@@ -140,6 +140,9 @@ class MicroManagerCamera(CameraInterface):
             config: Dictionary containing camera configuration parameters
                    (e.g., exposure, binning, properties)
         """
+
+        # TODO config will be an ExperimentConfig...
+        
         # Set exposure if provided
         if "exposure" in config:
             self.set_exposure(config["exposure"])

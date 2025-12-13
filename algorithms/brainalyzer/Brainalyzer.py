@@ -85,7 +85,7 @@ class Brainalyzer:
         # Extract core experiment params
         self.rec_id = experiment_config.experiment_name
         self.saveroot = experiment_config.output_dir
-        self.frames_to_grab = experiment_config.acquisition.num_frames
+        self.frames_to_grab = experiment_config.acquisition.num_samples
         self.zsize = experiment_config.acquisition.z_planes
         
         # Extract algorithm params
@@ -322,8 +322,11 @@ class Brainalyzer:
 
         return metadata
 
-    def process_frame(self, img, zndx):
+    def process_sample(self, img, sample_ndx):
         """Process each acquired frame."""
+
+        zndx = sample_ndx % self.zsize
+
         # Store the frame in shared memory
         self.store_frame_in_shm(img, zndx)
 
