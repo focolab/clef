@@ -98,7 +98,7 @@ class HardwareConfig(BaseModel):
 
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
-    num_frames: int = Field(100, gt=0, description="Number of frames to acquire")
+    num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
     frame_rate: Optional[float] = Field(None, gt=0, description="Target frame rate (Hz)")
     
     # Z-stack settings
@@ -109,7 +109,7 @@ class AcquisitionConfig(BaseModel):
     z_step: float = Field(1.0, gt=0, description="Z-stack step size (µm)")
     
     # Baseline and structural scan
-    baseline_frames: int = Field(0, ge=0, description="Frames before stims allowed")
+    baseline_samples: int = Field(0, ge=0, description="Samples before stims allowed")
     save_structural_scan: str = Field("none", description="Structural scan type")
     
     @field_validator('z_end')
@@ -499,12 +499,6 @@ class ConfigManager:
         if not all([self.hardware_config, self.experiment_config, self.algorithm_config]):
             logger.error("Not all configs loaded - call load_all_configs() first")
             return False
-        
-        # Check backend/stim compatibility
-        if self.hardware_config.backend == "dummy" or self.hardware_config.backend == "test":
-            if self.hardware_config.stim_interface not in ["dummy", "no stim", "test", "lorenz"]:
-                logger.warning(f"Backend is {self.hardware_config.backend} but stim_interface is "
-                             f"'{self.hardware_config.stim_interface}' - may not work")
         
         # Check z-stack configuration consistency
         if self.experiment_config.acquisition.z_stack:
