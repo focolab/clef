@@ -13,6 +13,7 @@ from hardware.backends.base_backend import BaseHardwareBackend
 from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
+from hardware.projector_interface import ProjectorInterface
 from config.config_manager import HardwareConfig
 
 logger = logging.getLogger(__name__)
@@ -443,7 +444,7 @@ class MicroManagerStimulus(StimulusInterface):
             return
         
         # Set config group for simultaneous imaging (if using pymmcore)
-        if self.backend == "micromanager pymmcore":
+        if self.backend == "pymmcore":
             try:
                 self.mmc.setConfig("Mightex-Setup", "640-SP")
             except Exception as e:
@@ -761,6 +762,70 @@ class MicroManagerStimulus(StimulusInterface):
             return None
         
 
+class MicroManagerProjector(ProjectorInterface):
+    """Projector/SLM interface wrapping Micro-Manager Core."""
+    
+    def __init__(self, mmc, backend: str, device_name: Optional[str] = None):
+        """
+        Initialize Micro-Manager projector interface.
+        
+        Args:
+            mmc: Micro-Manager Core object
+            backend: Backend type ('pycromanager' or 'pymmcore')
+            device_name: Optional SLM device name (None = query from MMC)
+        """
+        self.mmc = mmc
+        self.backend = backend
+        
+        # Get SLM device
+        if device_name:
+            self._device_name = device_name
+        else:
+            self._device_name = self.mmc.getSLMDevice()
+        
+        self.mmc.setSLMDevice(self._device_name)
+        
+        # Get dimensions
+        self._width = self.mmc.getSLMWidth(self._device_name)
+        self._height = self.mmc.getSLMHeight(self._device_name)
+        
+        logger.debug(f"Initialized projector: {self._device_name}, "
+                    f"dimensions: ({self._width}, {self._height})")
+    
+    def get_dimensions(self) -> Tuple[int, int]:
+        """Get projector dimensions."""
+        return (self._width, self._height)
+    
+    def set_image(self, image: np.ndarray) -> None:
+        """
+        Set projector image/mask.
+        
+        Args:
+            image: 2D numpy array (uint8), shape (height, width)
+        """
+        if image.shape != (self._height, self._width):
+            raise ValueError(
+                f"Image shape {image.shape} doesn't match projector "
+                f"dimensions ({self._height}, {self._width})"
+            )
+        
+        # Flatten and upload to SLM
+        self.mmc.setSLMImage(self._device_name, image.astype(np.uint8).flatten())
+        logger.debug(f"Updated projector image: {self._device_name}")
+    
+    def set_pixels_to(self, value: int) -> None:
+        """Set all pixels to uniform value."""
+        if not 0 <= value <= 255:
+            raise ValueError(f"Pixel value must be 0-255, got {value}")
+        
+        self.mmc.setSLMPixelsTo(self._device_name, value)
+        logger.debug(f"Set projector pixels to {value}: {self._device_name}")
+    
+    def get_device_name(self) -> str:
+        """Get projector device name."""
+        return self._device_name    
+        
+
 class MicroManagerBackend(BaseHardwareBackend):
     """
     Micro-Manager hardware backend.
@@ -773,6 +838,8 @@ class MicroManagerBackend(BaseHardwareBackend):
         """Initialize Micro-Manager backend."""
         super().__init__(config)
         self.mmc = None
+        self._projector: Optional[ProjectorInterface] = None
+
     
     def initialize(self, input_recording: Optional[str] = None) -> None:
         """
@@ -810,8 +877,16 @@ class MicroManagerBackend(BaseHardwareBackend):
         # Create interfaces
         self._camera = MicroManagerCamera(self.mmc, self.config.backend, roi)
         self._stage = MicroManagerStage(self.mmc, self.config.backend)
-        self._stimulus = self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend, self.config)
-        
+        self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend, self.config)
+
+        # Create projector interface if needed (for polygon stimulus)
+        if self.config.stim_interface and "polygon" in self.config.stim_interface.lower():
+            # Get SLM device name from stimulus config
+            stim_config = self.config.get_stimulus_device_config()
+            slm_device = stim_config.slm_device if stim_config else None
+            self._projector = MicroManagerProjector(self.mmc, self.config.backend, slm_device)
+            logger.debug("Created projector interface for polygon stimulus")
+
         # Apply device properties and system properties from config
         self._apply_device_properties()
         self._apply_device_configs()
