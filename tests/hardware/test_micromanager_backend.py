@@ -20,7 +20,7 @@ from hardware.backends.micromanager_backend import (
     MicroManagerStage,
     MicroManagerStimulus,
 )
-from config.config_manager import HardwareConfig, DeviceConfig, DeviceProperties, SystemProperties, ShutterConfig
+from config.config_manager import HardwareConfig, DeviceConfig, DeviceProperties, SystemProperties, ShutterConfig, StimulusDeviceConfig
 
 
 @pytest.fixture
@@ -54,7 +54,10 @@ def pycromanager_config():
         backend="pycromanager",
         stim_interface="dummy",
         mm_config_path="test_config.cfg",
-        microscope_name="test_scope"
+        microscope_name="test_scope",
+        stimulus_devices={
+            "dummy": StimulusDeviceConfig(type="dummy")
+        }
     )
 
 
@@ -65,9 +68,11 @@ def pymmcore_config():
         backend="pymmcore",
         stim_interface="dummy",
         mm_config_path="test_config.cfg",
-        microscope_name="test_scope"
+        microscope_name="test_scope",
+        stimulus_devices={
+            "dummy": StimulusDeviceConfig(type="dummy")
+        }
     )
-
 
 class TestMicroManagerCamera:
     """Test MicroManagerCamera implementation."""
@@ -332,47 +337,58 @@ class TestMicroManagerStage:
         # getFocusDevice should only be called once
         assert mock_mmc.getFocusDevice.call_count == 1
 
-
 class TestMicroManagerStimulus:
     """Test MicroManagerStimulus implementation."""
     
-    def test_stimulus_initialization(self, mock_mmc):
+    def test_stimulus_initialization(self, mock_mmc, pycromanager_config):
         """Test MicroManagerStimulus initializes."""
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager")
+        # Pass HardwareConfig object, not fixture function
+        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", pycromanager_config)
         
         assert stimulus.mmc == mock_mmc
         assert stimulus.backend == "pycromanager"
         assert stimulus._active is False
     
-    def test_stimulus_activate(self, mock_mmc):
+    def test_stimulus_activate(self, mock_mmc, pycromanager_config):
         """Test activate_stimulus."""
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager")
-        params = {"intensity": 50, "position": (100, 100)}
+        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", pycromanager_config)
         
+        # Configure first with a dummy stimulus type
+        stimulus.configure_stimulus({
+            "interface_type": "dummy"
+        })
+        
+        params = {"intensity": 50, "position": (100, 100)}
         stimulus.activate_stimulus(params)
         assert stimulus._active is True
     
-    def test_stimulus_deactivate(self, mock_mmc):
+    def test_stimulus_deactivate(self, mock_mmc, pycromanager_config):
         """Test deactivate_stimulus."""
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager")
+        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", pycromanager_config)
+        
+        # Configure first
+        stimulus.configure_stimulus({"interface_type": "dummy"})
         stimulus._active = True
         
         stimulus.deactivate_stimulus()
         assert stimulus._active is False
     
-    def test_stimulus_configure(self, mock_mmc):
+    def test_stimulus_configure(self, mock_mmc, pycromanager_config):
         """Test configure_stimulus."""
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager")
-        config = {"roi": (0, 0, 100, 100)}
+        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", pycromanager_config)
+        config = {"interface_type": "dummy"}
         
-        # Should not raise (implementation is placeholder)
+        # Should not raise
         stimulus.configure_stimulus(config)
+        assert stimulus._configured is True
     
-    def test_stimulus_is_active(self, mock_mmc):
+    def test_stimulus_is_active(self, mock_mmc, pycromanager_config):
         """Test is_stimulus_active."""
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager")
+        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", pycromanager_config)
         assert stimulus.is_stimulus_active() is False
         
+        # Configure first
+        stimulus.configure_stimulus({"interface_type": "dummy"})
         stimulus.activate_stimulus({"intensity": 50})
         assert stimulus.is_stimulus_active() is True
 

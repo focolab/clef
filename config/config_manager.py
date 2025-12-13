@@ -237,6 +237,86 @@ class AlgorithmConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class StimulusDeviceConfig(BaseModel):
+    """
+    Configuration for a specific stimulus device type.
+    
+    Defines how to control different stimulus hardware through Micro-Manager.
+    """
+    type: str = Field(..., description="Stimulus type: widefield_laser, polygon, led, dummy")
+    
+    # Widefield laser fields
+    voltage_device: Optional[str] = Field(None, description="Voltage control device (e.g., DAC639)")
+    voltage_property: Optional[str] = Field(None, description="Voltage property name (e.g., Volts)")
+    ttl_device: Optional[str] = Field(None, description="TTL control device (e.g., TTL1-8)")
+    ttl_line: Optional[str] = Field(None, description="TTL line name (e.g., TTL-4)")
+    max_volts: Optional[float] = Field(None, description="Maximum voltage (for intensity scaling)")
+    
+    # Polygon/LED fields
+    intensity_device: Optional[str] = Field(None, description="Intensity control device")
+    intensity_property: Optional[str] = Field(None, description="Intensity property name")
+    shutter_device: Optional[str] = Field(None, description="Shutter device name")
+    slm_device: Optional[str] = Field(None, description="SLM device (polygon only, None = query MMC)")
+    
+    model_config = ConfigDict(extra="allow")  # Allow additional device-specific fields
+
+
+class HardwareConfig(BaseModel):
+    """Hardware configuration (hardware.yaml)."""
+    backend: str = Field("pycromanager", description="Backend: pycromanager, pymmcore, or dummy")
+    mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
+    stim_interface: str = Field("dummy", description="Stimulus interface class name")
+    
+    # Temporary field for backward compatibility (Phase 1-2)
+    # Will be removed when hardware abstraction complete
+    microscope_name: Optional[str] = Field(None, description="Microscope name (temporary)")
+    
+    # NEW: Stimulus device configurations
+    stimulus_devices: Dict[str, StimulusDeviceConfig] = Field(
+        default_factory=dict,
+        description="Stimulus device configurations keyed by interface name"
+    )
+    
+    devices: Dict[str, DeviceConfig] = Field(default_factory=dict)
+    illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
+    
+    # System-level Micro-Manager properties
+    system_properties: Optional[SystemProperties] = Field(None, description="System-level MM settings")
+    
+    # Calibration data
+    polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
+    
+    # Strobe acquisition settings
+    strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
+    strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
+    
+    # Static ROI for stimulus
+    use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
+    
+    model_config = ConfigDict(extra="allow")  # Allow additional hardware-specific fields
+    
+    @field_validator('backend')
+    @classmethod
+    def validate_backend(cls, v):
+        allowed = ['pycromanager', 'pymmcore', 'dummy', 'test']
+        if v not in allowed:
+            raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
+        return v
+    
+    def get_stimulus_device_config(self, interface_name: Optional[str] = None) -> Optional[StimulusDeviceConfig]:
+        """
+        Get stimulus device configuration for a given interface.
+        
+        Args:
+            interface_name: Stimulus interface name (uses self.stim_interface if None)
+        
+        Returns:
+            StimulusDeviceConfig if found, None otherwise
+        """
+        interface_name = interface_name or self.stim_interface
+        return self.stimulus_devices.get(interface_name)
+
+
 # ============================================================================
 # Configuration Manager
 # ============================================================================
