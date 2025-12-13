@@ -20,7 +20,7 @@ from hardware.backends.micromanager_backend import (
     MicroManagerStage,
     MicroManagerStimulus,
 )
-from config.config_manager import HardwareConfig
+from config.config_manager import HardwareConfig, DeviceConfig, DeviceProperties, SystemProperties, ShutterConfig
 
 
 @pytest.fixture
@@ -272,12 +272,36 @@ class TestMicroManagerStage:
         
         mock_mmc.setPosition.assert_called()
     
-    def test_stage_run_z_stack(self, mock_mmc):
+    @patch('hardware.backends.micromanager_backend.JavaObject')
+    def test_stage_run_z_stack(self, mock_java_object, mock_mmc):
         """Test run_z_stack (simplified implementation)."""
+        # Create mock vector objects that JavaObject will return
+        mock_double_vector = MagicMock()
+        mock_string_vector = MagicMock()
+        
+        # Configure JavaObject to return appropriate mocks
+        def java_object_factory(class_name):
+            if "DoubleVector" in class_name:
+                return mock_double_vector
+            elif "StrVector" in class_name:
+                return mock_string_vector
+            return MagicMock()
+        
+        mock_java_object.side_effect = java_object_factory
+        
         stage = MicroManagerStage(mock_mmc, "pycromanager")
         # Should not raise (implementation is simplified)
         stage.run_z_stack(z_start=0.0, z_end=30.0, z_step=3.0, num_planes=11)
-    
+        
+        # Verify JavaObject was called for stage configuration
+        assert mock_java_object.call_count >= 2  # Called for DoubleVector and StrVector
+
+    def test_stage_run_z_stack_pymmcore(self, mock_mmc):
+        """Test run_z_stack with pymmcore backend (doesn't need JavaObject)."""
+        stage = MicroManagerStage(mock_mmc, "pymmcore")
+        # Should not raise
+        stage.run_z_stack(z_start=0.0, z_end=30.0, z_step=3.0, num_planes=11)
+        
     def test_stage_stop_sequence(self, mock_mmc):
         """Test stop_sequence."""
         stage = MicroManagerStage(mock_mmc, "pycromanager")
@@ -468,4 +492,319 @@ class TestMicroManagerBackend:
         
         mmc = backend.get_mmc()
         assert mmc == mock_mmc
+
+
+class TestMicroManagerBackendDeviceConfiguration:
+    """Test device properties, configs, and system properties initialization."""
+    
+    @pytest.fixture
+    def config_with_devices(self):
+        """Create config with device properties and configs."""
+        return HardwareConfig(
+            backend="pycromanager",
+            stim_interface="dummy",
+            mm_config_path="test_config.cfg",
+            microscope_name="test_scope",
+            devices={
+                "camera": DeviceConfig(
+                    device_name="PrimeBSI",
+                    device_type="camera",
+                    properties=DeviceProperties(ExposeOutMode="Rolling Shutter", Binning="1")
+                ),
+                "ttl": DeviceConfig(
+                    device_name="TTL1-8",
+                    device_type="ttl",
+                    properties=DeviceProperties(Blanking="On", Sequence="On"),
+                    configs={}
+                ),
+                "laser": DeviceConfig(
+                    device_name="LMM5",
+                    device_type="laser",
+                    properties=DeviceProperties(),
+                    configs={"LMM5": "488+561", "LMM5-561-intensity": "0"}
+                )
+            }
+        )
+    
+    @pytest.fixture
+    def config_with_system_properties(self):
+        """Create config with system properties."""
+        return HardwareConfig(
+            backend="pycromanager",
+            stim_interface="dummy",
+            mm_config_path="test_config.cfg",
+            microscope_name="test_scope",
+            system_properties=SystemProperties(
+                auto_shutter=False,
+                circular_buffer_mb=10000,
+                shutters=[
+                    ShutterConfig(device_name="LaserShutter", state=True),
+                    ShutterConfig(device_name="LMM5-Shutter", state=False)
+                ]
+            )
+        )
+    
+    @pytest.fixture
+    def config_with_all_settings(self):
+        """Create config with devices, configs, and system properties."""
+        return HardwareConfig(
+            backend="pycromanager",
+            stim_interface="dummy",
+            mm_config_path="test_config.cfg",
+            microscope_name="test_scope",
+            devices={
+                "camera": DeviceConfig(
+                    device_name="PrimeBSI",
+                    device_type="camera",
+                    properties=DeviceProperties(ExposeOutMode="Rolling Shutter")
+                ),
+                "ttl": DeviceConfig(
+                    device_name="TTL1-8",
+                    device_type="ttl",
+                    properties=DeviceProperties(Blanking="On", Sequence="On")
+                ),
+                "triggerscope": DeviceConfig(
+                    device_name="TriggerScopeMM-Hub",
+                    device_type="triggerscope",
+                    properties=DeviceProperties(UseActionLEDs="Off")
+                )
+            },
+            system_properties=SystemProperties(
+                auto_shutter=False,
+                circular_buffer_mb=10000,
+                shutters=[ShutterConfig(device_name="LaserShutter", state=True)]
+            )
+        )
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_device_properties(self, mock_mm, config_with_devices, mock_mmc):
+        """Test that device properties are applied via setProperty during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_devices)
+        backend.initialize()
+        
+        # Verify setProperty was called for each device property
+        set_property_calls = [call for call in mock_mmc.setProperty.call_args_list]
+        
+        # Check camera properties
+        assert any(call[0] == ("PrimeBSI", "ExposeOutMode", "Rolling Shutter") for call in set_property_calls)
+        assert any(call[0] == ("PrimeBSI", "Binning", "1") for call in set_property_calls)
+        
+        # Check TTL properties
+        assert any(call[0] == ("TTL1-8", "Blanking", "On") for call in set_property_calls)
+        assert any(call[0] == ("TTL1-8", "Sequence", "On") for call in set_property_calls)
+        
+        # Verify correct number of setProperty calls
+        assert mock_mmc.setProperty.call_count == 4
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_device_configs(self, mock_mm, config_with_devices, mock_mmc):
+        """Test that device configs are applied via setConfig during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_devices)
+        backend.initialize()
+        
+        # Verify setConfig was called for each config preset
+        set_config_calls = [call for call in mock_mmc.setConfig.call_args_list]
+        
+        # Check laser configs
+        assert any(call[0] == ("LMM5", "488+561") for call in set_config_calls)
+        assert any(call[0] == ("LMM5-561-intensity", "0") for call in set_config_calls)
+        
+        # Verify correct number of setConfig calls
+        assert mock_mmc.setConfig.call_count == 2
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_system_properties_auto_shutter(self, mock_mm, config_with_system_properties, mock_mmc):
+        """Test that auto_shutter system property is applied during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_system_properties)
+        backend.initialize()
+        
+        # Verify setAutoShutter was called
+        mock_mmc.setAutoShutter.assert_called_once_with(False)
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_system_properties_circular_buffer(self, mock_mm, config_with_system_properties, mock_mmc):
+        """Test that circular_buffer_mb system property is applied during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_system_properties)
+        backend.initialize()
+        
+        # Verify setCircularBufferMemoryFootprint was called
+        mock_mmc.setCircularBufferMemoryFootprint.assert_called_once_with(10000)
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_system_properties_shutters(self, mock_mm, config_with_system_properties, mock_mmc):
+        """Test that shutter states are applied during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_system_properties)
+        backend.initialize()
+        
+        # Verify setShutterOpen was called for each shutter
+        shutter_calls = [call for call in mock_mmc.setShutterOpen.call_args_list]
+        
+        assert any(call[0] == ("LaserShutter", True) for call in shutter_calls)
+        assert any(call[0] == ("LMM5-Shutter", False) for call in shutter_calls)
+        
+        # Verify correct number of calls
+        assert mock_mmc.setShutterOpen.call_count == 2
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_apply_all_settings_together(self, mock_mm, config_with_all_settings, mock_mmc):
+        """Test that all settings (properties, configs, system) are applied during initialization."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config_with_all_settings)
+        backend.initialize()
+        
+        # Verify device properties were set
+        assert mock_mmc.setProperty.call_count >= 3  # At least 3 properties
+        
+        # Verify system properties were set
+        mock_mmc.setAutoShutter.assert_called_once_with(False)
+        mock_mmc.setCircularBufferMemoryFootprint.assert_called_once_with(10000)
+        mock_mmc.setShutterOpen.assert_called_once_with("LaserShutter", True)
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_device_properties_error_handling(self, mock_mm, config_with_devices, mock_mmc):
+        """Test that errors setting device properties are handled gracefully."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        # Make setProperty raise an exception for one property
+        mock_mmc.setProperty.side_effect = [
+            None,  # First call succeeds
+            Exception("Property not found"),  # Second call fails
+            None,  # Third call succeeds
+            None,  # Fourth call succeeds
+        ]
+        
+        backend = MicroManagerBackend(config_with_devices)
+        # Should not raise - errors should be caught and logged
+        backend.initialize()
+        
+        # Verify initialization still completed
+        assert backend.is_initialized is True
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_device_configs_error_handling(self, mock_mm, config_with_devices, mock_mmc):
+        """Test that errors setting device configs are handled gracefully."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        # Make setConfig raise an exception for one config
+        mock_mmc.setConfig.side_effect = [
+            Exception("Config not found"),  # First call fails
+            None,  # Second call succeeds
+        ]
+        
+        backend = MicroManagerBackend(config_with_devices)
+        # Should not raise - errors should be caught and logged
+        backend.initialize()
+        
+        # Verify initialization still completed
+        assert backend.is_initialized is True
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_system_properties_error_handling(self, mock_mm, config_with_system_properties, mock_mmc):
+        """Test that errors setting system properties are handled gracefully."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        # Make setAutoShutter raise an exception
+        mock_mmc.setAutoShutter.side_effect = Exception("Auto shutter not available")
+        
+        backend = MicroManagerBackend(config_with_system_properties)
+        # Should not raise - errors should be caught and logged
+        backend.initialize()
+        
+        # Verify initialization still completed
+        assert backend.is_initialized is True
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_no_devices_config(self, mock_mm, pycromanager_config, mock_mmc):
+        """Test initialization with no device configuration (should not raise)."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(pycromanager_config)
+        backend.initialize()
+        
+        # Should initialize successfully even with no devices
+        assert backend.is_initialized is True
+        # setProperty should not be called if no devices configured
+        mock_mmc.setProperty.assert_not_called()
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_no_system_properties_config(self, mock_mm, pycromanager_config, mock_mmc):
+        """Test initialization with no system properties (should not raise)."""
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(pycromanager_config)
+        backend.initialize()
+        
+        # Should initialize successfully even with no system properties
+        assert backend.is_initialized is True
+        # System property methods should not be called if not configured
+        mock_mmc.setAutoShutter.assert_not_called()
+        mock_mmc.setCircularBufferMemoryFootprint.assert_not_called()
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_system_properties_partial_config(self, mock_mm, mock_mmc):
+        """Test initialization with partial system properties (only some fields set)."""
+        config = HardwareConfig(
+            backend="pycromanager",
+            stim_interface="dummy",
+            mm_config_path="test_config.cfg",
+            microscope_name="test_scope",
+            system_properties=SystemProperties(
+                auto_shutter=False,
+                # circular_buffer_mb not set (None)
+                shutters=[]  # Empty shutters list
+            )
+        )
+        
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config)
+        backend.initialize()
+        
+        # Only auto_shutter should be called
+        mock_mmc.setAutoShutter.assert_called_once_with(False)
+        # circular_buffer should not be called (None)
+        mock_mmc.setCircularBufferMemoryFootprint.assert_not_called()
+        # shutters should not be called (empty list)
+        mock_mmc.setShutterOpen.assert_not_called()
+    
+    @patch('hardware.backends.micromanager_backend.MMSubroutines')
+    def test_device_properties_with_extra_fields(self, mock_mm, mock_mmc):
+        """Test that extra device property fields (via extra='allow') are applied."""
+        # Create properties with extra fields
+        props = DeviceProperties(ExposeOutMode="Rolling Shutter")
+        # Add extra field dynamically (simulating extra='allow' behavior)
+        props_dict = props.model_dump()
+        props_dict["CustomProperty"] = "CustomValue"
+        
+        config = HardwareConfig(
+            backend="pycromanager",
+            stim_interface="dummy",
+            mm_config_path="test_config.cfg",
+            microscope_name="test_scope",
+            devices={
+                "camera": DeviceConfig(
+                    device_name="PrimeBSI",
+                    device_type="camera",
+                    properties=DeviceProperties(**props_dict)
+                )
+            }
+        )
+        
+        mock_mm.initialize_mmc.return_value = mock_mmc
+        
+        backend = MicroManagerBackend(config)
+        backend.initialize()
+        
+        # Verify both standard and extra properties were set
+        set_property_calls = [call[0] for call in mock_mmc.setProperty.call_args_list]
+        assert ("PrimeBSI", "ExposeOutMode", "Rolling Shutter") in set_property_calls
+        assert ("PrimeBSI", "CustomProperty", "CustomValue") in set_property_calls
 

@@ -178,6 +178,15 @@ class DummyStage(StageInterface):
     def get_focus_device_name(self) -> str:
         """Get focus device name."""
         return self._focus_device
+    
+    def configure_stage(self, config: Dict[str, Any]) -> None:
+        """Configure stage for acquisition sequences."""
+        z_start = config.get("z_start")
+        z_end = config.get("z_end")
+        z_step = config.get("z_step")
+        logger.debug(
+            f"Dummy stage: Configured sequence from {z_start} to {z_end}, step {z_step}"
+        )
 
 
 class DummyStimulus(StimulusInterface):
