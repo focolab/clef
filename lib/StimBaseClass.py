@@ -163,7 +163,7 @@ class StimBaseClass(ABC):
         elif stim_interface == "InvCore-ThunderscopeLED3" and acquisition_backend == 'pycromanager':
             from lib import InvCoreThunderscopeLED3
             stim = InvCoreThunderscopeLED3.InvCoreThunderscopeLED3(args, local_handles=local_handles)
-        elif stim_interface == "no stim":
+        elif stim_interface == "no stim" or stim_interface == 'test' or stim_interface == 'dummy':
             from lib import DummyStim
             stim = DummyStim.DummyStim(args, local_handles=local_handles)
         elif stim_interface == "InvCore-SpinningDisk-639":

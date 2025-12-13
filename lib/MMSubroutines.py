@@ -29,7 +29,7 @@ def initialize_mmc(
     acquisition_backend = args["gooey_args"]["acquisition_backend"]
     microscope_name = args["gooey_args"]["microscope_name"]
 
-    if acquisition_backend == 'test':
+    if acquisition_backend == 'test' or acquisition_backend == 'dummy':
         return DummyMMC.DummyMMC()
 
     elif acquisition_backend == "pycromanager":

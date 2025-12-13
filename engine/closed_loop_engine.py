@@ -20,6 +20,12 @@ from lib import MMSubroutines
 from lib import StimBaseClass
 from lib import wbliveUtils as utils
 
+# Import config models
+from config.config_manager import (
+    HardwareConfig,
+    ExperimentConfig,
+    AlgorithmConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +42,29 @@ class ClosedLoopEngine:
     - Data saving and cleanup
     """
     
-    def __init__(self, gooey_args: dict[str, Any]):
+    def __init__(
+        self,
+        hardware_config: HardwareConfig,
+        experiment_config: ExperimentConfig,
+        algorithm_config: AlgorithmConfig
+    ):
         """
-        Initialize the closed-loop engine.
+        Initialize the closed-loop engine with configuration objects.
         
         Args:
-            gooey_args: Main configuration from GUI/command line
+            hardware_config: Hardware configuration (backend, devices, etc.)
+            experiment_config: Experiment configuration (acquisition params, metadata)
+            algorithm_config: Algorithm configuration (trigger logic, stimulus params)
         """
-        self.gooey_args = gooey_args
+        self.hardware_config = hardware_config
+        self.experiment_config = experiment_config
+        self.algorithm_config = algorithm_config
         
+        # Build legacy args structure for components that still expect it
+        # This will be gradually eliminated as we refactor components
+        self.args = self._build_legacy_args()
+        self.gooey_args = self.args['gooey_args']
         # Build args structure that matches original format expected by MMSubroutines
-        self.args = {"gooey_args": gooey_args}
         
         # Execution state
         self.is_running = False
@@ -71,7 +89,6 @@ class ClosedLoopEngine:
         self.frame_time_list: list[float] = []
         
         # Timing
-
         self.next_call: float | None = None
         
         # Paths and metadata
@@ -81,6 +98,86 @@ class ClosedLoopEngine:
             
         # Extract commonly used parameters
         self._extract_parameters()
+
+    def _build_legacy_args(self) -> dict[str, Any]:
+        """
+        Build legacy args dictionary for components that haven't been refactored yet.
+        
+        This temporary method converts Config objects back to the old flat dict format.
+        As components are refactored to accept Config objects, calls to this will be removed.
+        
+        Returns:
+            Dictionary matching old gooey_args format
+        """
+        exp = self.experiment_config
+        hw = self.hardware_config
+        alg = self.algorithm_config
+        
+        # Build gooey_args format
+        gooey_args = {
+            # From ExperimentConfig
+            "output_folder": exp.output_dir,
+            "total_frames": exp.acquisition.num_frames,
+            "zsize": exp.acquisition.z_planes,
+            "save_mip": exp.save_mip_video,
+            "strobe_acquisition": hw.strobe_acquisition,
+            "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
+            "save_structural_scan": exp.acquisition.save_structural_scan,
+            "rec_baseline": exp.acquisition.baseline_frames,
+            "z_step_size": exp.z_step_size_um,
+            
+            # Subject metadata
+            "subject_strain": exp.subject.genotype or "unknown",
+            "subject_condition": exp.subject.treatment_details.condition,
+            "atr_concentration": exp.subject.treatment_details.atr_concentration_uM or 0.0,
+            "nose_orientation": exp.subject.orientation.nose,
+            "vnc_orientation": exp.subject.orientation.vnc,
+            "num_eggs": exp.subject.num_eggs,
+            "experimental_notes": exp.subject.notes or "",
+            
+            # From HardwareConfig
+            "acquisition_backend": hw.backend,
+            "mm_configuration_file": hw.mm_config_path or "",
+            "stim_interface": hw.stim_interface,
+            "use_static_stim_roi": hw.use_static_stim_roi,
+            
+            # From AlgorithmConfig
+            "trigger_algorithm": alg.algorithm_type,
+            "GUI_mode": alg.gui_mode,
+            "save_alg_model_plot": alg.save_algorithm_plot,
+            
+            # Stimulus parameters
+            "frames_to_stimulate_for_options": alg.stimulus_params.duration_frames_options,
+            "stim_intensity_options": alg.stimulus_params.intensity_percent_options,
+            "stimulus_diameter": alg.algorithm_params.stimulus_diameter_pixels,
+            
+            # Dev options
+            "input_recording": exp.input_recording_path,
+            "no_save_images": not exp.save_images,
+            "no_save_metadata": not exp.save_metadata,
+            "prefill_wb_ops": exp.dev_options.prefill_wb_ops,
+            "send_sms": exp.dev_options.send_sms_on_completion,
+            
+            # Additional algorithm params
+            "stim_threshold_pos": alg.algorithm_params.stim_threshold_pos,
+            "stim_threshold_neg": alg.algorithm_params.stim_threshold_neg,
+            "stim_cooldown": alg.algorithm_params.stim_cooldown_frames,
+            "skip_stimulation_probability": alg.algorithm_params.skip_stimulation_probability,
+            "delay_stimulation_probability": alg.algorithm_params.delay_stimulation_probability,
+            "stim_delay_frames_options": alg.algorithm_params.stim_delay_frames_options,
+            "stim_onset_list_options": alg.algorithm_params.stim_onset_list,
+            
+            # Backward compatibility - will be removed
+            "microscope_name": hw.microscope_name or "unknown",
+        }
+        
+        # Wrap in expected structure
+        args = {
+            "gooey_args": gooey_args,
+            "configs": {},  # Empty for now
+        }
+        
+        return args
         
     def _extract_parameters(self):
         """Extract frequently used parameters from configs."""
@@ -372,6 +469,11 @@ class ClosedLoopEngine:
         metadata["t0"] = self.t0
         metadata["xsize"] = self.xsize
         metadata["ysize"] = self.ysize
+
+        # store configs
+        metadata['hardware_config'] = self.hardware_config.model_dump(mode='json')
+        metadata['experiment_config'] = self.experiment_config.model_dump(mode='json')
+        metadata["algorithm_config"] = self.algorithm_config.model_dump(mode='json')
         
         # Collect component metadata
         if self.alg:
@@ -533,10 +635,11 @@ class ClosedLoopEngine:
         logger.info("Closed-Loop Acquisition Complete")
         logger.info("="*60)
 
-
 def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
     """
     Legacy entry point for launching from Gooey GUI.
+    
+    Converts flat gooey_args dict to Config objects and calls new run() method.
     
     Args:
         ops: Configuration dictionary from GUI (gooey_args)
@@ -544,25 +647,147 @@ def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
     if not ops:
         logger.error("No configuration provided")
         return
-        
+    
     # Check for dry run mode
     if ops.get("input_recording") is not None:
         fname = ops["input_recording"]
         logger.debug(f"Simulating recording from file: {fname}")
-        # Handle simulation mode
-        # TODO: Implement simulation support
-        return
-        
-    # Run acquisition
+        # Continue with normal flow - DummyMMC will handle the file
+    
     try:
-        engine = ClosedLoopEngine(gooey_args=ops)
+        # Convert gooey_args to Config objects
+        from config.config_manager import ConfigManager
+        
+        configs = convert_gooey_args_to_configs(ops)
+        
+        # Run acquisition with new signature
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.run()
+        
     except Exception as err:
         logger.exception(f"Error running acquisition: {err}")
         raise
     finally:
         logger.info("Session complete")
         sys.exit()
+
+
+
+def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert legacy gooey_args dictionary to Config objects.
+    
+    This function bridges the old flat dict format to the new structured Config objects.
+    
+    Args:
+        gooey_args: Dictionary from Gooey GUI with flat key-value pairs
+        
+    Returns:
+        Dictionary with keys: "hardware", "experiment", "algorithm" containing Config objects
+    """
+    from config.config_manager import (
+        HardwareConfig,
+        ExperimentConfig,
+        AlgorithmConfig,
+        AcquisitionConfig,
+        SubjectMetadata,
+        TreatmentDetails,
+        Orientation,
+        DevOptions,
+        AlgorithmParameters,
+        StimulusParameters,
+    )
+    
+    # Build HardwareConfig
+    hardware_config = HardwareConfig(
+        backend=gooey_args.get("acquisition_backend", "dummy"),
+        mm_config_path=gooey_args.get("mm_configuration_file"),
+        stim_interface=gooey_args.get("stim_interface", "dummy"),
+        microscope_name=gooey_args.get("microscope_name"),  # Temporary
+        strobe_acquisition=gooey_args.get("strobe_acquisition", False),
+        strobe_inter_frame_interval_ms=gooey_args.get("strobe_inter_frame_interval", 80),
+        use_static_stim_roi=gooey_args.get("use_static_stim_roi", False),
+    )
+    
+    # Build ExperimentConfig
+    acquisition_config = AcquisitionConfig(
+        num_frames=gooey_args.get("total_frames", 100),
+        z_planes=gooey_args.get("zsize", 1),
+        z_step=gooey_args.get("z_step_size", 1.0),
+        baseline_frames=gooey_args.get("rec_baseline", 0),
+        save_structural_scan=gooey_args.get("save_structural_scan", "none"),
+    )
+    
+    treatment_details = TreatmentDetails(
+        condition=gooey_args.get("subject_condition", ""),
+        atr_concentration_uM=gooey_args.get("atr_concentration"),
+    )
+    
+    orientation = Orientation(
+        nose=gooey_args.get("nose_orientation"),
+        vnc=gooey_args.get("vnc_orientation"),
+    )
+    
+    subject_metadata = SubjectMetadata(
+        genotype=gooey_args.get("subject_strain"),
+        treatment_details=treatment_details,
+        orientation=orientation,
+        num_eggs=gooey_args.get("num_eggs", 0),
+        notes=gooey_args.get("experimental_notes"),
+    )
+    
+    dev_options = DevOptions(
+        prefill_wb_ops=gooey_args.get("prefill_wb_ops", False),
+        send_sms_on_completion=gooey_args.get("send_sms", False),
+    )
+    
+    experiment_config = ExperimentConfig(
+        experiment_name=gooey_args.get("experiment_name", "default_experiment"),
+        output_dir=gooey_args.get("output_folder", "./data"),
+        save_images=not gooey_args.get("no_save_images", False),
+        save_metadata=not gooey_args.get("no_save_metadata", False),
+        save_mip_video=gooey_args.get("save_mip", False),
+        acquisition=acquisition_config,
+        subject=subject_metadata,
+        z_step_size_um=gooey_args.get("z_step_size", 1.0),
+        input_recording_path=gooey_args.get("input_recording"),
+        dev_options=dev_options,
+    )
+    
+    # Build AlgorithmConfig
+    algorithm_params = AlgorithmParameters(
+        stim_threshold_pos=gooey_args.get("stim_threshold_pos", 0.06),
+        stim_threshold_neg=gooey_args.get("stim_threshold_neg", 0.06),
+        stim_cooldown_frames=gooey_args.get("stim_cooldown", 900),
+        skip_stimulation_probability=gooey_args.get("skip_stimulation_probability", 0.1),
+        delay_stimulation_probability=gooey_args.get("delay_stimulation_probability", 0.4),
+        stim_delay_frames_options=gooey_args.get("stim_delay_frames_options", [200, 400]),
+        stim_onset_list=gooey_args.get("stim_onset_list_options", []),
+        stimulus_diameter_pixels=gooey_args.get("stimulus_diameter", 10),
+    )
+    
+    stimulus_params = StimulusParameters(
+        duration_frames_options=gooey_args.get("frames_to_stimulate_for_options", [48]),
+        intensity_percent_options=gooey_args.get("stim_intensity_options", [10]),
+    )
+    
+    algorithm_config = AlgorithmConfig(
+        algorithm_type=gooey_args.get("trigger_algorithm", "dummy"),
+        gui_mode=gooey_args.get("GUI_mode", "neural_imaging"),
+        save_algorithm_plot=gooey_args.get("save_alg_model_plot", False),
+        algorithm_params=algorithm_params,
+        stimulus_params=stimulus_params,
+    )
+    
+    return {
+        "hardware": hardware_config,
+        "experiment": experiment_config,
+        "algorithm": algorithm_config,
+    }
 
 
 def run_acquisition(args: dict[str, Any]):
@@ -578,69 +803,207 @@ def run_acquisition(args: dict[str, Any]):
 
 
 
-def create_test_config(input_recording: str | None = None) -> dict[str, Any]:
-    """
-    Create a test configuration for running the engine with dummy objects.
+# def create_test_config(input_recording: str | None = None) -> dict[str, Any]:
+#     """
+#     Create a test configuration for running the engine with dummy objects.
     
-    Args:
-        input_recording: Optional path to a TIFF file for simulated acquisition.
-                        If None, will use DummyMMC without data.
+#     Args:
+#         input_recording: Optional path to a TIFF file for simulated acquisition.
+#                         If None, will use DummyMMC without data.
+    
+#     Returns:
+#         Dictionary with test configuration matching gooey_args format
+#     """
+#     test_config = {
+#         # Acquisition controls
+#         "output_folder": "./test_output",
+#         "total_frames": 100,  # Small number for quick testing
+#         "mm_configuration_file": "MMConfig_demo.cfg", # Not used
+#         "zsize": 10,
+#         "save_mip": False,
+#         "strobe_acquisition": False,
+#         "strobe_inter_frame_interval": 80,
+#         "save_structural_scan": "none",
+        
+#         # Experimental metadata (minimal for testing)
+#         "subject_strain": "test_strain",
+#         "subject_condition": "",
+#         "atr_concentration": 0.0,
+#         "z_step_size": 3.0,
+#         "nose_orientation": "left",
+#         "vnc_orientation": "up",
+#         "num_eggs": 0,
+#         "microscope_name": "test",
+#         "experimental_notes": "Test run with dummy objects",
+        
+#         # Closed-loop controls
+#         "trigger_algorithm": "Dummy algorithm (does nothing)",
+#         "GUI_mode": "neural_imaging",
+#         "rec_baseline": 0,
+#         "save_alg_model_plot": False,
+        
+#         # Stimulus settings
+#         "stim_interface": "no stim",
+#         "use_static_stim_roi": False,
+#         "frames_to_stimulate_for_options": [48],
+#         "stim_intensity_options": [10],
+#         "stimulus_diameter": 10,
+        
+#         # Dev ops
+#         "input_recording": input_recording,
+#         "acquisition_backend": "test",
+#         "no_save_images": True,  # Don't save images during testing
+#         "no_save_metadata": True,  # Don't save metadata during testing
+#         "save_gooey_defaults": False,
+#         "prefill_wb_ops": False,
+#         "send_sms": False,
+        
+#         # Additional params that might be needed
+#         "roi": [0, 0, 200, 200],
+#         "exposure": 30,
+#         "binning": "1x1",
+#         "configs": {},
+#     }
+    
+#     return test_config
+
+# def run_test():
+#     """
+#     Run a test acquisition using dummy objects.
+    
+#     This function demonstrates how to run the ClosedLoopEngine with
+#     stub objects for testing without real hardware.
+#     """
+#     print("="*60)
+#     print("Running ClosedLoopEngine Test")
+#     print("="*60)
+    
+#     # Option 1: Test with a real TIFF file for realistic simulation
+#     # Uncomment and provide path to test with actual data:
+#     # test_config = create_test_config(input_recording="path/to/your/test.tiff")
+    
+#     # Option 2: Test with dummy objects (no real data)
+#     test_config = create_test_config()
+    
+#     # Create and run engine
+#     try:
+#         engine = ClosedLoopEngine(gooey_args=test_config)
+#         engine.run()
+#         print("\n" + "="*60)
+#         print("Test completed successfully!")
+#         print("="*60)
+#         return True
+#     except Exception as err:
+#         print("\n" + "="*60)
+#         print(f"Test failed with error: {err}")
+#         print("="*60)
+#         logger.exception("Full test error traceback:")
+#         return False
+
+
+# if __name__ == "__main__":
+
+#     # in parent directory, run:
+#     # python -m engine.closed_loop_engine
+
+#     # Run the test when this module is executed directly
+#     import sys
+    
+#     # Set up logging for test
+#     logging.basicConfig(
+#         level=logging.INFO,
+#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+#     )
+    
+#     # Check if a TIFF file was provided as command line argument
+#     if len(sys.argv) > 1:
+#         test_file = sys.argv[1]
+#         print(f"Running test with input file: {test_file}")
+#         test_config = create_test_config(input_recording=test_file)
+#     else:
+#         print("Running test with dummy objects (no input file)")
+#         test_config = create_test_config()
+    
+#     # Run test
+#     success = run_test()
+#     sys.exit(0 if success else 1)
+
+
+
+# ============================================================================
+# Testing and Development Functions
+# ============================================================================
+
+def create_test_config() -> dict[str, Any]:
+    """
+    Create test configuration objects for running the engine with dummy objects.
     
     Returns:
-        Dictionary with test configuration matching gooey_args format
+        Dictionary with Config objects for testing
     """
-    test_config = {
-        # Acquisition controls
-        "output_folder": "./test_output",
-        "total_frames": 100,  # Small number for quick testing
-        "mm_configuration_file": "MMConfig_demo.cfg", # Not used
-        "zsize": 10,
-        "save_mip": False,
-        "strobe_acquisition": False,
-        "strobe_inter_frame_interval": 80,
-        "save_structural_scan": "none",
-        
-        # Experimental metadata (minimal for testing)
-        "subject_strain": "test_strain",
-        "subject_condition": "",
-        "atr_concentration": 0.0,
-        "z_step_size": 3.0,
-        "nose_orientation": "left",
-        "vnc_orientation": "up",
-        "num_eggs": 0,
-        "microscope_name": "test",
-        "experimental_notes": "Test run with dummy objects",
-        
-        # Closed-loop controls
-        "trigger_algorithm": "Dummy algorithm (does nothing)",
-        "GUI_mode": "neural_imaging",
-        "rec_baseline": 0,
-        "save_alg_model_plot": False,
-        
-        # Stimulus settings
-        "stim_interface": "no stim",
-        "use_static_stim_roi": False,
-        "frames_to_stimulate_for_options": [48],
-        "stim_intensity_options": [10],
-        "stimulus_diameter": 10,
-        
-        # Dev ops
-        "input_recording": input_recording,
-        "acquisition_backend": "test",
-        "no_save_images": True,  # Don't save images during testing
-        "no_save_metadata": True,  # Don't save metadata during testing
-        "save_gooey_defaults": False,
-        "prefill_wb_ops": False,
-        "send_sms": False,
-        
-        # Additional params that might be needed
-        "roi": [0, 0, 200, 200],
-        "exposure": 30,
-        "binning": "1x1",
-        "configs": {},
-    }
+    from config.config_manager import (
+        HardwareConfig,
+        ExperimentConfig,
+        AlgorithmConfig,
+        AcquisitionConfig,
+        SubjectMetadata,
+        DevOptions,
+        AlgorithmParameters,
+        StimulusParameters,
+    )
     
-    return test_config
+    hardware_config = HardwareConfig(
+        backend="dummy",
+        stim_interface="dummy",
+        microscope_name="test",
+    )
+    
+    acquisition_config = AcquisitionConfig(
+        num_frames=100,
+        z_planes=10,
+        z_step=1.0,
+    )
+    
+    subject_metadata = SubjectMetadata(
+        genotype="test_strain",
+        notes="Test run with dummy objects",
+    )
+    
+    dev_options = DevOptions(
+        prefill_wb_ops=False,
+        send_sms_on_completion=False,
+    )
+    
+    experiment_config = ExperimentConfig(
+        experiment_name="test_experiment",
+        output_dir="./test_output",
+        save_images=False,
+        save_metadata=False,
+        acquisition=acquisition_config,
+        subject=subject_metadata,
+        dev_options=dev_options,
+    )
+    
+    algorithm_params = AlgorithmParameters(
+        stimulus_diameter_pixels=10,
+    )
+    
+    stimulus_params = StimulusParameters(
+        enabled=False,
+    )
+    
+    algorithm_config = AlgorithmConfig(
+        algorithm_type="dummy",
+        enable_gui=False,
+        algorithm_params=algorithm_params,
+        stimulus_params=stimulus_params,
+    )
+    
+    return {
+        "hardware": hardware_config,
+        "experiment": experiment_config,
+        "algorithm": algorithm_config,
+    }
 
 
 def run_test():
@@ -648,22 +1011,22 @@ def run_test():
     Run a test acquisition using dummy objects.
     
     This function demonstrates how to run the ClosedLoopEngine with
-    stub objects for testing without real hardware.
+    Config objects for testing without real hardware.
     """
     print("="*60)
     print("Running ClosedLoopEngine Test")
     print("="*60)
     
-    # Option 1: Test with a real TIFF file for realistic simulation
-    # Uncomment and provide path to test with actual data:
-    # test_config = create_test_config(input_recording="path/to/your/test.tiff")
-    
-    # Option 2: Test with dummy objects (no real data)
-    test_config = create_test_config()
+    # Create test configurations
+    configs = create_test_config()
     
     # Create and run engine
     try:
-        engine = ClosedLoopEngine(gooey_args=test_config)
+        engine = ClosedLoopEngine(
+            hardware_config=configs["hardware"],
+            experiment_config=configs["experiment"],
+            algorithm_config=configs["algorithm"]
+        )
         engine.run()
         print("\n" + "="*60)
         print("Test completed successfully!")
@@ -678,27 +1041,13 @@ def run_test():
 
 
 if __name__ == "__main__":
-
-    # in parent directory, run:
-    # python -m engine.closed_loop_engine
-
     # Run the test when this module is executed directly
-    import sys
     
     # Set up logging for test
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # Check if a TIFF file was provided as command line argument
-    if len(sys.argv) > 1:
-        test_file = sys.argv[1]
-        print(f"Running test with input file: {test_file}")
-        test_config = create_test_config(input_recording=test_file)
-    else:
-        print("Running test with dummy objects (no input file)")
-        test_config = create_test_config()
     
     # Run test
     success = run_test()
