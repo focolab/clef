@@ -32,6 +32,11 @@ try:
     from algorithms.demo import DisplayRGBAlgorithm
 except ImportError:
     DisplayRGBAlgorithm = None
+
+try:
+    from algorithms.demo import RingAttractorAlgorithm
+except ImportError:
+    RingAttractorAlgorithm = None
     
 
 class AlgorithmRegistry:
@@ -114,6 +119,13 @@ class AlgorithmRegistry:
         except ImportError as e:
             logger.warning(f"Could not import DisplayRGBAlgorithm: {e}")
 
+        # Register Ring Attractor demo algorithm
+        try:
+            self.register("RingAttractorDemo", RingAttractorAlgorithm)
+            self.register("ring_attractor_demo", RingAttractorAlgorithm)
+            logger.info("Registered RingAttractorAlgorithm")
+        except ImportError as e:
+            logger.warning(f"Could not import RingAttractorAlgorithm: {e}")
 
         # try:
         #     from lib import DynamicRangeDeriv

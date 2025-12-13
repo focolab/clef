@@ -81,7 +81,7 @@ class BaseStimulusController(ABC):
         # Activation check
         if img_count in self.stim_on_list:
             idx = self.stim_on_list.index(img_count)
-            intensity = self.stim_intensity_list[idx] if idx < len(self.stim_intensity_list) else 10
+            intensity = self.stim_intensity_list[idx] if idx < len(self.stim_intensity_list) else 1
             
             logger.info(
                 f"BaseStimulusController: activating {self.stim_interface} stim on frame {img_count}"

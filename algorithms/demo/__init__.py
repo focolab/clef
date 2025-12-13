@@ -1,10 +1,15 @@
 """
-Demo for Lorenz Dynamical System 
+Demo algorithms module.
 
-Illustrative Demo for CLEF capabilities. 
+Contains demonstration algorithms for showcasing CLEF capabilities.
 """
 
-from .lorenz_algorithm import LorenzDemoAlgorithm
-from .display_rgb_algorithm import DisplayRGBAlgorithm
+from algorithms.demo.lorenz_algorithm import LorenzDemoAlgorithm
+from algorithms.demo.display_rgb_algorithm import DisplayRGBAlgorithm
+from algorithms.demo.ring_attractor_algorithm import RingAttractorAlgorithm
 
-__all__ = ['LorenzDemoAlgorithm', 'DisplayRGBAlgorithm']
+__all__ = [
+    'LorenzDemoAlgorithm',
+    'DisplayRGBAlgorithm',
+    'RingAttractorAlgorithm',
+]
