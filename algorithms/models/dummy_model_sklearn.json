@@ -1,0 +1,10 @@
+{
+    "model_name": "dummy_model_sklearn",
+    "model_class": "sklearn",
+    "model_description": "Dummy model for testing",
+    "model_inference_instructions": "Give input, return output. For testing. Testing this to have a much longer text box...",
+    "model": {
+        "clf": "gARLAS4=\n"
+    },
+    "model_card": {}
+}
