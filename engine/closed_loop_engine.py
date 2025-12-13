@@ -3,6 +3,7 @@ Closed-loop acquisition engine for microscopy with real-time stimulus control.
 
 This module provides a class-based wrapper around the acquisition loop,
 separating concerns and making the codebase more testable and maintainable.
+
 """
 
 import sys
@@ -16,9 +17,8 @@ from typing import Any, Dict
 import numpy as np
 
 # Custom libraries and utils
-from lib import StimBaseClass
 from lib import wbliveUtils as utils
-from lib import MMSubroutines # couple more refs then can remove
+from lib import MMSubroutines
 
 # Import config models
 from config.config_manager import (
@@ -27,8 +27,9 @@ from config.config_manager import (
     AlgorithmConfig,
 )
 
-# Import hardware manager
+# Import hardware manager and stimulus controllers
 from hardware.hardware_manager import HardwareManager
+from hardware.stimulus_controllers import create_stimulus_controller
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class ClosedLoopEngine:
     Manages the full lifecycle of an acquisition session including:
     - Hardware initialization (microscope, camera)
     - Algorithm setup (trigger detection)
-    - Stimulus interface
+    - Stimulus interface (via stimulus controllers)
     - Real-time acquisition loop
     - Data saving and cleanup
     """
@@ -81,7 +82,7 @@ class ClosedLoopEngine:
         self.ysize = 200  # default for unit tests
         self.roi = (0, 0, 200, 200)
         self.alg = None
-        self.stim = None
+        self.stim_controller = None  # stimulus controller
         self.t0 = 1.  # default for unit tests
         self.args["t0"] = self.t0
         self.args["id"] = "11111111-11-11-11"  # default for unit tests
@@ -236,60 +237,68 @@ class ClosedLoopEngine:
         logger.info(f"Hardware initialized with camera ROI: {self.roi}")
         
     def initialize_algorithm(self):
-            """
-            Initialize the closed-loop trigger algorithm using the factory pattern.
+        """
+        Initialize the closed-loop trigger algorithm using the factory pattern.
+        
+        Uses AlgorithmFactory to instantiate the correct algorithm based on configuration.
+        The factory handles all imports and provides helpful error messages if the
+        algorithm type is not found.
+        """
+        logger.info(f"Initializing algorithm: {self.trigger_alg}")
+        
+        try:
+            # Import factory
+            from algorithms import create_algorithm
             
-            Uses AlgorithmFactory to instantiate the correct algorithm based on configuration.
-            The factory handles all imports and provides helpful error messages if the
-            algorithm type is not found.
-            """
-            logger.info(f"Initializing algorithm: {self.trigger_alg}")
+            # Create algorithm using factory
+            self.alg = create_algorithm(
+                algorithm_config=self.algorithm_config,
+                experiment_config=self.experiment_config,
+                hardware_config=self.hardware_config,
+                local_handles={"mmc": self.mmc}
+            )
             
-            try:
-                # Import factory
-                from algorithms import create_algorithm
-                
-                # Create algorithm using factory
-                self.alg = create_algorithm(
-                    algorithm_config=self.algorithm_config,
-                    experiment_config=self.experiment_config,
-                    hardware_config=self.hardware_config,
-                    local_handles={"mmc": self.mmc}
-                )
-                
-                # Initialize the algorithm's internal model
-                self.alg.initialize_model()
-                
-            except ValueError as err:
-                # Algorithm not found in registry
-                logger.error(f"Algorithm not found: {err}")
-                raise
-                
-            except Exception as err:
-                logger.exception(f"Error initializing algorithm: {err}")
-                raise
-                
-            logger.info("Algorithm initialized successfully")
+            # Initialize the algorithm's internal model
+            self.alg.initialize_model()
+            
+        except ValueError as err:
+            # Algorithm not found in registry
+            logger.error(f"Algorithm not found: {err}")
+            raise
+            
+        except Exception as err:
+            logger.exception(f"Error initializing algorithm: {err}")
+            raise
+            
+        logger.info("Algorithm initialized successfully")
 
         
     def initialize_stimulus(self):
         """
-        Initialize the stimulus interface.
+        Initialize the stimulus controller using config-based architecture.
         
-        Sets up hardware/software for delivering stimuli based on trigger events.
+        NEW: Uses create_stimulus_controller() factory instead of legacy
+        StimBaseClass.initialize_stim_interface(). The controller handles
+        timing and coordination while hardware_manager handles low-level control.
         """
-        logger.info("Initializing stimulus interface...")
+        logger.info("Initializing stimulus controller...")
         
         try:
-            self.stim = StimBaseClass.StimBaseClass.initialize_stim_interface(
-                self.args, 
-                local_handles={"mmc": self.mmc}
-            )
-        except Exception as err:
-            logger.exception(f"Error initializing stimulus interface: {err}")
-            raise
+            # Get stimulus interface type from hardware config
+            stim_interface = self.hardware_config.stim_interface
             
-        logger.info("Stimulus interface initialized")
+            # Create stimulus controller using factory
+            self.stim_controller = create_stimulus_controller(
+                stim_interface=stim_interface,
+                hardware_manager=self.hardware,
+                config=self.args  # Still passing args for backward compatibility
+            )
+            
+            logger.info(f"Stimulus controller initialized: {type(self.stim_controller).__name__}")
+            
+        except Exception as err:
+            logger.exception(f"Error initializing stimulus controller: {err}")
+            raise
         
     def prepare_acquisition(self):
         """
@@ -326,7 +335,7 @@ class ClosedLoopEngine:
         self._prepare_camera_acquisition()
         
         # Run pre-acquisition structural scan if requested
-        self._run_structural_scan_pre() # TODO break out into separate config instead of bootstrap
+        self._run_structural_scan_pre()
         
         logger.info(f"Acquisition prepared. Saving to: {self.savedir}")
 
@@ -361,17 +370,21 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.error(f"Error in pre-acquisition structural scan: {err}")
 
-
     def run_acquisition_loop(self):
         """
         Execute the main acquisition loop using HardwareManager.
+        
+        UPDATED: Now uses stimulus controller to handle stimulus events instead
+        of direct stimulus interface calls. The algorithm returns stim_params,
+        which are submitted to the controller, which then manages hardware.stimulus.
         
         Continuously:
         1. Snap images from camera
         2. Process frames through algorithm
         3. Check for stimulus triggers
-        4. Submit stimuli if triggered
-        5. Save data
+        4. Submit stimuli to controller if triggered
+        5. Controller manages hardware activation/deactivation
+        6. Save data
         
         Raises:
             Exception: When algorithm processing encounters an error
@@ -426,8 +439,7 @@ class ClosedLoopEngine:
                     if self.img_count % 200 == 0:
                         logger.info(f"Frame: {self.img_count}/{self.frames_to_grab}")
                     
-                    # TODO remove this concept, logic now lives in hardware/algorithm
-                    # Handle cooldown
+                    # Handle cooldown (TODO: move to algorithm/controller)
                     if self.cooldown_counter > 0:
                         self.cooldown_counter -= 1
                         
@@ -438,17 +450,21 @@ class ClosedLoopEngine:
                     except Exception as err:
                         raise Exception(f"Algorithm error at frame {image_ndx}, z={zndx}: {err}") from err
                     
-                    # Check for stimulus trigger
+                    # Check for stimulus trigger from algorithm
                     stim_params, self.cooldown_counter = self.alg.check_stim(
                         image_ndx, self.cooldown_counter
                     )
                     
-                    # Submit stimulus if triggered
-                    self.stim.submit_stim_params(stim_params, image_ndx)
+                    # Submit stimulus params to controller instead of direct stim
+                    # Controller will manage hardware.stimulus activation/deactivation
+                    if stim_params:
+                        logging.debug(f'Submitting stim params: {stim_params} on image_ndx {image_ndx}')
+                        self.stim_controller.submit_stim_params(stim_params, image_ndx)
                     
                     # Volume completion handling
+                    # Controller checks if this frame should trigger hardware changes
                     if zndx == self.zsize - 1:
-                        self.stim.check_stim(self.img_count)
+                        self.stim_controller.check_stim(self.img_count)
                         
                     # Handle strobe timing
                     if self.strobe_acquisition:
@@ -475,10 +491,12 @@ class ClosedLoopEngine:
         """
         Collect and save metadata from all components.
         
+        UPDATED: Gets metadata from stimulus controller instead of direct stim interface.
+        
         Aggregates metadata from:
         - Hardware (via HardwareManager)
         - Algorithm
-        - Stimulus interface
+        - Stimulus controller
         - Acquisition settings
         """
         if self.no_save_metadata:
@@ -507,8 +525,9 @@ class ClosedLoopEngine:
         if self.alg:
             metadata["alg_metadata"] = self.alg.get_metadata(args=metadata)
             
-        if self.stim:
-            metadata["stim_metadata"] = self.stim.get_metadata(args=metadata)
+        # Get metadata from stimulus controller
+        if self.stim_controller:
+            metadata["stim_metadata"] = self.stim_controller.get_metadata(args=metadata)
             
         # Save to file
         utils.save_metadata(
@@ -547,7 +566,7 @@ class ClosedLoopEngine:
             
         if self.save_mip_movie:
             logger.info("Generating MIP movie...")
-            exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps # hardcoded default
+            exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps
             utils.generate_mip_movie(
                 savefilename=self.saveroot + "_mip_movie",
                 frames=self.frames,
@@ -576,6 +595,8 @@ class ClosedLoopEngine:
         """
         Clean up resources and close connections.
         
+        UPDATED: Closes stimulus controller instead of direct stim interface.
+        
         Stops acquisition, closes hardware interfaces, and sends notifications.
         """
         logger.info("Cleaning up...")
@@ -587,12 +608,12 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.warning(f"Error closing algorithm: {err}")
                 
-        # Close stimulus interface
-        if self.stim:
+        # NEW: Close stimulus controller
+        if self.stim_controller:
             try:
-                self.stim.close()
+                self.stim_controller.close()
             except Exception as err:
-                logger.warning(f"Error closing stimulus interface: {err}")
+                logger.warning(f"Error closing stimulus controller: {err}")
                 
         # Close hardware through HardwareManager
         if self.hardware:
@@ -619,8 +640,8 @@ class ClosedLoopEngine:
         1. Initialize hardware (via HardwareManager)
         2. Prepare acquisition
         3. Initialize algorithm
-        4. Initialize stimulus
-        5. Run acquisition loop
+        4. Initialize stimulus controller (NEW: config-based)
+        5. Run acquisition loop (NEW: uses controller)
         6. Save data
         7. Cleanup
         
@@ -635,7 +656,7 @@ class ClosedLoopEngine:
             self.initialize_hardware()
             self.prepare_acquisition()
             self.initialize_algorithm()
-            self.initialize_stimulus()
+            self.initialize_stimulus()  # NEW: Uses config-based controller
             
             # Acquisition phase
             self.run_acquisition_loop()
@@ -657,6 +678,7 @@ class ClosedLoopEngine:
         logger.info("="*60)
         logger.info("Closed-Loop Acquisition Complete")
         logger.info("="*60)
+
 
 def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
     """
@@ -817,9 +839,13 @@ def run_acquisition(args: dict[str, Any]):
         args: Dictionary containing 'gooey_args' key with configuration
     """
     gooey_args = args.get("gooey_args", {})
-    engine = ClosedLoopEngine(gooey_args=gooey_args)
+    configs = convert_gooey_args_to_configs(gooey_args)
+    engine = ClosedLoopEngine(
+        hardware_config=configs["hardware"],
+        experiment_config=configs["experiment"],
+        algorithm_config=configs["algorithm"]
+    )
     engine.run()
-
 
 
 def create_test_config() -> dict[str, Any]:
