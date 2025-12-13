@@ -59,41 +59,41 @@ class IlluminationChannel(BaseModel):
     exposure_ms: Optional[float] = Field(None, description="Exposure time in milliseconds")
 
 
-class HardwareConfig(BaseModel):
-    """Hardware configuration (hardware.yaml)."""
-    backend: str = Field("pycromanager", description="Backend: pycromanager, pymmcore, or dummy")
-    mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
-    stim_interface: str = Field("dummy", description="Stimulus interface class name")
+# class HardwareConfig(BaseModel):
+#     """Hardware configuration (hardware.yaml)."""
+#     backend: str = Field("pycromanager", description="Backend: pycromanager, pymmcore, dummy, or screenshot")
+#     mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
+#     stim_interface: str = Field("dummy", description="Stimulus interface class name")
     
-    # Temporary field for backward compatibility (Phase 1-2)
-    # Will be removed when hardware abstraction complete
-    microscope_name: Optional[str] = Field(None, description="Microscope name (temporary)")
+#     # Temporary field for backward compatibility (Phase 1-2)
+#     # Will be removed when hardware abstraction complete
+#     microscope_name: Optional[str] = Field(None, description="Microscope name (temporary)")
     
-    devices: Dict[str, DeviceConfig] = Field(default_factory=dict)
-    illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
+#     devices: Dict[str, DeviceConfig] = Field(default_factory=dict)
+#     illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
     
-    # System-level Micro-Manager properties
-    system_properties: Optional[SystemProperties] = Field(None, description="System-level MM settings")
+#     # System-level Micro-Manager properties
+#     system_properties: Optional[SystemProperties] = Field(None, description="System-level MM settings")
     
-    # Calibration data
-    polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
+#     # Calibration data
+#     polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
     
-    # Strobe acquisition settings
-    strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
-    strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
+#     # Strobe acquisition settings
+#     strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
+#     strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
     
-    # Static ROI for stimulus
-    use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
+#     # Static ROI for stimulus
+#     use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
     
-    model_config = ConfigDict(extra="allow")  # Allow additional hardware-specific fields
+#     model_config = ConfigDict(extra="allow")  # Allow additional hardware-specific fields
     
-    @field_validator('backend')
-    @classmethod
-    def validate_backend(cls, v):
-        allowed = ['pycromanager', 'pymmcore', 'dummy', 'test']
-        if v not in allowed:
-            raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
-        return v
+#     @field_validator('backend')
+#     @classmethod
+#     def validate_backend(cls, v):
+#         allowed = ['pycromanager', 'pymmcore', 'dummy', 'test', 'lorenz_demo', 'screenshot']  # Added 'screenshot'
+#         if v not in allowed:
+#             raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
+#         return v
 
 
 class AcquisitionConfig(BaseModel):
@@ -298,7 +298,7 @@ class HardwareConfig(BaseModel):
     @field_validator('backend')
     @classmethod
     def validate_backend(cls, v):
-        allowed = ['pycromanager', 'pymmcore', 'dummy', 'test', 'lorenz_demo']
+        allowed = ['pycromanager', 'pymmcore', 'dummy', 'test', 'lorenz_demo', 'screenshot']
 
         if v not in allowed:
             raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
