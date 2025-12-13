@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 # Import MMSubroutines to use existing initialization logic
 from lib import MMSubroutines
+
+# Import JavaObject for pycromanager ASI stage buffer
+try:
+    from pycromanager import JavaObject
+except ImportError:
+    # Fallback if pycromanager not available
+    JavaObject = None
         
 class MicroManagerCamera(CameraInterface):
     """Camera interface wrapping Micro-Manager Core."""
@@ -197,13 +204,105 @@ class MicroManagerStage(StageInterface):
         """
         Configure Z-stack sequence.
         
-        Note: This is a simplified implementation. Full Z-stack configuration
-        may require backend-specific logic (e.g., ASI stage buffer upload).
+        This method configures the stage for Z-stack acquisition using ASI stage buffer
+        for pycromanager backend. For other backends, it may use different methods.
         """
-        # For now, just log - full implementation would use set_asi_stage_buffer
-        # or similar backend-specific methods
-        logger.debug(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}")
-        # TODO: Implement full Z-stack sequence configuration
+        # Use configure_stage to set up ASI stage buffer
+        config = {
+            "z_start": z_start,
+            "z_end": z_end,
+            "z_step": z_step,
+            "pad_z": 0,
+        }
+        self.configure_stage(config)
+        logger.debug(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}, {num_planes} planes")
+    
+    def configure_stage(self, config: Dict[str, Any]) -> None:
+        """
+        Configure stage for acquisition sequences (e.g., ASI stage buffer).
+        
+        This method sets up ASI stage sequences with Z positions and optional
+        TTL property sequences for synchronized acquisition.
+        
+        Args:
+            config: Dictionary containing stage configuration parameters:
+                   - z_start: Starting Z position (float, required)
+                   - z_end: Ending Z position (float, required)
+                   - z_step: Step size (float, required)
+                   - pad_z: Number of padding steps at start (int, default 0)
+                   - ttl_device: TTL device name for property sequences (str, default "TTL1-8")
+                   - ttl_state: TTL state value for each step (str, default "18")
+        """
+        z_start = config.get("z_start")
+        z_end = config.get("z_end")
+        z_step = config.get("z_step")
+        pad_z = config.get("pad_z", 0)
+        ttl_device = config.get("ttl_device", "TTL1-8")
+        ttl_state = config.get("ttl_state", "18")
+        
+        if z_start is None or z_end is None or z_step is None:
+            raise ValueError("z_start, z_end, and z_step are required for stage configuration")
+        
+        # Get focus device
+        stage = self.get_focus_device_name()
+        
+        # Quick semantic check for case of 1Z plane imaging + structural scan
+        # spec loop will hang unless zStepSize is set to some value > 0
+        if z_step == 0:
+            z_step = 1
+            logger.warning("z_step was 0, setting to 1 to avoid hanging")
+        
+        # For pycromanager backend, use JavaObject for stage sequences
+        if self.backend == "pycromanager":
+            if JavaObject is None:
+                raise ImportError("pycromanager.JavaObject required for ASI stage buffer configuration")
+            
+            # Create Java objects for stage sequence
+            dv = JavaObject("mmcorej.DoubleVector")
+            sv = JavaObject("mmcorej.StrVector")
+            dv_list = []
+            
+            z = z_start
+            
+            # Pad zstep array with extra steps at zStart
+            for i in range(pad_z):
+                dv.add(z)
+                dv_list.append(z)
+                sv.add("0")
+            
+            # Ascending z-steps
+            while z <= z_end:
+                dv.add(z)
+                dv_list.append(z)
+                sv.add(ttl_state)
+                z += z_step
+            
+            logger.info(
+                f"Uploading {len(dv_list)} zPositions to ASI stage: {dv_list}"
+            )
+            
+            # Upload and configure
+            self.mmc.setPosition(stage, z_start)
+            self.mmc.waitForDevice(stage)
+            self.mmc.stopStageSequence(stage)
+            self.mmc.loadStageSequence(stage, dv)
+            self.mmc.stopPropertySequence(ttl_device, "State")
+            self.mmc.loadPropertySequence(ttl_device, "State", sv)
+            self.mmc.startStageSequence(stage)
+            self.mmc.startPropertySequence(ttl_device, "State")
+            
+            logger.debug(f"ASI stage buffer configured: {len(dv_list)} positions from {z_start} to {z_end}")
+        
+        else:
+            # For pymmcore backend, ASI stage buffer may not be available
+            # Log a warning and use basic Z-stack configuration
+            logger.warning(
+                f"ASI stage buffer configuration not fully supported for {self.backend} backend. "
+                f"Using basic Z-stack configuration."
+            )
+            # Basic implementation: just set position range
+            self.mmc.setPosition(stage, z_start)
+            self.mmc.waitForDevice(stage)
     
     def stop_sequence(self) -> None:
         """Stop stage sequence."""
@@ -322,6 +421,11 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._stage = MicroManagerStage(self.mmc, self.config.backend)
         self._stimulus = MicroManagerStimulus(self.mmc, self.config.backend)
         
+        # Apply device properties and system properties from config
+        self._apply_device_properties()
+        self._apply_device_configs()
+        self._apply_system_properties()
+        
         self._initialized = True
         logger.info("Micro-Manager backend initialized")
     
@@ -372,4 +476,98 @@ class MicroManagerBackend(BaseHardwareBackend):
             Micro-Manager Core object
         """
         return self.mmc
+    
+    def _apply_device_properties(self) -> None:
+        """
+        Apply device-specific properties from config.
+        
+        Sets properties using mmc.setProperty() for each device configured
+        in HardwareConfig.devices.
+        """
+        if not self.config.devices:
+            return
+        
+        for device_key, device_config in self.config.devices.items():
+            device_name = device_config.device_name
+            properties = device_config.properties
+            
+            # Convert Pydantic model to dict (handles extra="allow" fields)
+            if hasattr(properties, 'model_dump'):
+                props_dict = properties.model_dump(exclude_unset=True)
+            else:
+                props_dict = dict(properties) if hasattr(properties, '__dict__') else {}
+            
+            for prop_name, prop_value in props_dict.items():
+                try:
+                    self.mmc.setProperty(device_name, prop_name, prop_value)
+                    logger.debug(f"Set {device_name}.{prop_name} = {prop_value}")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not set {device_name}.{prop_name} = {prop_value}: {e}"
+                    )
+    
+    def _apply_device_configs(self) -> None:
+        """
+        Apply device config group presets from config.
+        
+        Sets Micro-Manager config group presets using mmc.setConfig() for each
+        device configured in HardwareConfig.devices.
+        """
+        if not self.config.devices:
+            return
+        
+        for device_key, device_config in self.config.devices.items():
+            configs = device_config.configs
+            
+            for config_group, preset_name in configs.items():
+                try:
+                    self.mmc.setConfig(config_group, preset_name)
+                    logger.debug(f"Set config {config_group} = {preset_name}")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not set config {config_group} = {preset_name}: {e}"
+                    )
+    
+    def _apply_system_properties(self) -> None:
+        """
+        Apply system-level properties from config.
+        
+        Sets system-level Micro-Manager settings like auto_shutter,
+        circular_buffer_memory_footprint, and shutter states.
+        """
+        if not self.config.system_properties:
+            return
+        
+        sys_props = self.config.system_properties
+        
+        # Auto shutter
+        if sys_props.auto_shutter is not None:
+            try:
+                self.mmc.setAutoShutter(sys_props.auto_shutter)
+                logger.debug(f"Set auto_shutter = {sys_props.auto_shutter}")
+            except Exception as e:
+                logger.warning(f"Could not set auto_shutter: {e}")
+        
+        # Circular buffer
+        if sys_props.circular_buffer_mb is not None:
+            try:
+                # Note: setCircularBufferMemoryFootprint unit may vary by Micro-Manager version
+                # Existing code uses values like 10000 directly. We pass MB value as-is to match
+                # existing behavior. If your Micro-Manager version expects bytes, multiply by 1024*1024.
+                self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                logger.debug(f"Set circular_buffer_memory_footprint = {sys_props.circular_buffer_mb}")
+            except Exception as e:
+                logger.warning(f"Could not set circular_buffer_memory_footprint: {e}")
+        
+        # Shutters
+        for shutter_config in sys_props.shutters:
+            try:
+                self.mmc.setShutterOpen(shutter_config.device_name, shutter_config.state)
+                logger.debug(
+                    f"Set shutter {shutter_config.device_name} = {'open' if shutter_config.state else 'closed'}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Could not set shutter {shutter_config.device_name}: {e}"
+                )
 

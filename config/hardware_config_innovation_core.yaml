@@ -1,0 +1,123 @@
+# CLEF Hardware Configuration for Innovation Core Spinning Disk
+# This configuration replaces hardcoded device settings in MMSubroutines.py
+# for scope == "innovation core spinning disk"
+
+# Hardware backend selection
+backend: "pycromanager"  # Innovation Core uses pycromanager backend
+
+# Micro-Manager configuration file path
+# Update this path to match your Micro-Manager config file location
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\200212_PRIME_BSI_TIE.cfg"
+
+# Stimulus interface class
+# Common options: "InvCoreSpinningDisk639", "InvCoreLDIPolygon", etc.
+stim_interface: "InvCoreSpinningDisk639"
+
+# Microscope name (temporary, backward compatibility)
+microscope_name: "innovation core spinning disk"
+
+# Device configurations
+# Each device can have:
+#   - properties: Device-specific properties set via mmc.setProperty()
+#   - configs: Micro-Manager config group presets set via mmc.setConfig()
+devices:
+  camera:
+    device_name: "PrimeBSI"
+    device_type: "camera"
+    properties:
+      ExposeOutMode: "Rolling Shutter"
+      # Note: Exposure and Binning are typically set via CameraInterface methods
+      # but can also be set here if needed
+    configs: {}
+  
+  ttl:
+    device_name: "TTL1-8"
+    device_type: "ttl"
+    properties:
+      Blanking: "On"
+      Sequence: "On"
+    configs: {}
+  
+  triggerscope:
+    device_name: "TriggerScopeMM-Hub"
+    device_type: "triggerscope"
+    properties:
+      UseActionLEDs: "Off"
+    configs: {}
+  
+  # DAC voltage settings (optional - can be set here or via illumination_channels)
+  dac405:
+    device_name: "DAC405"
+    device_type: "dac"
+    properties:
+      # Volts: 3.5  # Uncomment and set if needed
+    configs: {}
+  
+  dac488:
+    device_name: "DAC488"
+    device_type: "dac"
+    properties:
+      # Volts: 0.5  # Uncomment and set if needed
+    configs: {}
+  
+  dac561:
+    device_name: "DAC561"
+    device_type: "dac"
+    properties:
+      # Volts: 0.4  # Uncomment and set if needed
+    configs: {}
+  
+  dac639:
+    device_name: "DAC639"
+    device_type: "dac"
+    properties:
+      # Volts: 3.5  # Uncomment and set if needed
+    configs: {}
+
+# System-level Micro-Manager properties
+# These control global Micro-Manager settings
+system_properties:
+  # Auto shutter: false = manual control, true = automatic
+  auto_shutter: false
+  
+  # Circular buffer size in MB
+  circular_buffer_mb: 10000
+  
+  # Shutter states to set during initialization
+  shutters:
+    - device_name: "LaserShutter"
+      state: true  # true = open, false = closed
+
+# Strobe settings
+strobe_acquisition: false
+strobe_inter_frame_interval_ms: 80
+
+# Static ROI
+use_static_stim_roi: false
+
+# Illumination channels
+illumination_channels:
+  - name: "488nm"
+    device: "DAC488"
+    wavelength: 488
+    power: 0.5
+    exposure_ms: 10.0
+  - name: "561nm"
+    device: "DAC561"
+    wavelength: 561
+    power: 0.4
+    exposure_ms: 50.0
+  - name: "405nm"
+    device: "DAC405"
+    wavelength: 405
+    power: 3.5
+    exposure_ms: 150.0
+  - name: "639nm"
+    device: "DAC639"
+    wavelength: 639
+    power: 3.5
+    exposure_ms: 150.0
+
+# Calibration files
+polygon_calibration_path: null
+

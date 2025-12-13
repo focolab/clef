@@ -122,6 +122,9 @@ def initialize_mmc(
 
 def prepare_live_acquisition(mmc, args):
     # configure microsope state
+    # NOTE: Device-specific properties (setProperty, setConfig, setAutoShutter, etc.)
+    # are now handled by MicroManagerBackend during initialization via HardwareConfig.
+    # This function now only handles Z-stack configuration and other acquisition-specific setup.
     try:
 
         # first check acquisition backend
@@ -132,12 +135,27 @@ def prepare_live_acquisition(mmc, args):
 
             if scope == "innovation core spinning disk":
 
+                # Z-stack stage configuration should be done via StageInterface.configure_stage()
+                # or StageInterface.run_z_stack() before calling prepare_live_acquisition().
+                # Example:
+                #   stage.configure_stage({
+                #       "z_start": -(numz - 1) * zStepSize / 2,
+                #       "z_end": (numz - 1) * zStepSize / 2,
+                #       "z_step": zStepSize,
+                #       "pad_z": 0
+                #   })
+                # 
+                # For backward compatibility, if zsize > 1, log a warning that stage
+                # should be configured via stage interface.
                 if args["gooey_args"]["zsize"] > 1:
-
+                    logging.warning(
+                        "Z-stack detected (zsize > 1). Stage configuration should be done "
+                        "via StageInterface.configure_stage() or StageInterface.run_z_stack() "
+                        "before calling prepare_live_acquisition(). Using deprecated "
+                        "set_asi_stage_buffer() for backward compatibility."
+                    )
                     numz = args["gooey_args"]["zsize"]
                     zStepSize = float(args["gooey_args"]["z_step_size"])
-
-                    # upload program using micro-manager api. assumes imaging is in middle
                     set_asi_stage_buffer(
                         mmc,
                         zStart=-(numz - 1) * zStepSize / 2,
@@ -146,125 +164,113 @@ def prepare_live_acquisition(mmc, args):
                         padZ=0,
                     )
 
-                # configure shutters, camera, and triggerscope
-                mmc.setAutoShutter(False)
-                mmc.setProperty("PrimeBSI", "ExposeOutMode", "Rolling Shutter")
-                mmc.setProperty("TTL1-8", "Blanking", "On")
-                mmc.setProperty("TTL1-8", "Sequence", "On")
-                mmc.setProperty("TriggerScopeMM-Hub", "UseActionLEDs", "Off")
-                mmc.setShutterOpen("LaserShutter", True)
+                # Device-specific properties (auto_shutter, device properties, shutters)
+                # are now configured via HardwareConfig in MicroManagerBackend.initialize()
+                # No need to set them here.
 
             elif scope == "innovation core thunderscope":
-                mmc.setAutoShutter(False)
-                mmc.setCircularBufferMemoryFootprint(10000)
+                # Device-specific properties are now configured via HardwareConfig
+                # Only Z-stack or other acquisition-specific logic should remain here
+                pass
 
         else:
+            # pymmcore backend
             if scope == "torstoscope spinning disk":
 
-                cam = "PRIME BSI"
-                mmc.setCameraDevice(cam)
+                # Device-specific properties (exposure, binning, auto_shutter, shutters, configs)
+                # are now configured via HardwareConfig in MicroManagerBackend.initialize()
+                # Only acquisition-specific logic remains here.
 
-                # set params from args
-                mmc.setExposure(args["exposure"])
-                mmc.setProperty(cam, "Binning", args["binning"])
-                mmc.setCircularBufferMemoryFootprint(10000)
-                mmc.setAutoShutter(False)
-                mmc.setShutterOpen("LMM5-Shutter", True)
+                # Set ROI from args (this is acquisition-specific, not device initialization)
                 roi = args["roi"]
                 mmc.setROI(roi[0], roi[1], roi[2], roi[3])
 
-                # get config presets
-                configs = args["configs"]
-                for k in configs:
-                    if k == ">>> Presets":
-                        continue
-                    mmc.setConfig(k, configs[k])
+                # Note: Device-specific properties and configs are now configured via
+                # HardwareConfig in MicroManagerBackend.initialize(). See:
+                # - config/hardware_config_torstoscope.yaml for torstoscope settings
+                # - config/hardware_config_innovation_core.yaml for innovation core settings
+                #
+                # Config presets from args["configs"] are deprecated and kept only for
+                # backward compatibility. New code should use HardwareConfig.devices[].configs
+                configs = args.get("configs", {})
+                if configs:
+                    logging.warning(
+                        "Using deprecated args['configs'] for device configuration. "
+                        "Migrate to HardwareConfig.devices[].configs in YAML config file."
+                    )
+                    for k in configs:
+                        if k == ">>> Presets":
+                            continue
+                        try:
+                            if type(configs[k]) == dict:
+                                # Corner case: DAC voltage settings
+                                label = "DAC{}".format(k[:-2])
+                                prop = "Volts"
+                                val = configs[k][prop]
+                                mmc.setProperty(label, prop, float(val))
+                            else:
+                                mmc.setConfig(k, configs[k])
+                        except Exception as e:
+                            logging.warning(f"Could not set config {k}: {e}")
 
-                # get the stimulus interface in case that affects microscope filters etc
-                stim_interface = args["gooey_args"]["stim_interface"]
-                if stim_interface == "LMM5_561":
-
-                    # set 488/561 so we do dual stim so LMM5 needs to be ready to trigger
-                    mmc.setConfig("LMM5", "488+561")
-
-                    # make sure we start off with 561 at zero
-                    mmc.setConfig("LMM5-561-intensity", "0")
-
-                # set stage moving with serial command
+                # Set stage moving with serial command (acquisition-specific)
                 if args["gooey_args"]["zsize"] > 1:
                     port = "COM11"
                     command = "2"
                     endln = "\r"
-                    mmc.setSerialPortCommand(port, command, endln)
-
-                # return mmc
+                    try:
+                        mmc.setSerialPortCommand(port, command, endln)
+                    except Exception as e:
+                        logging.warning(f"Could not set serial port command: {e}")
 
             elif scope == "innovation core spinning disk":
 
                 raise (Exception("ERROR: pymmcore structural images not tested"))
 
-                try:
-                    cam = mmc.getCameraDevice()
-                    mmc.setCameraDevice(cam)
-                except Exception as err:
-                    logging.error(
-                        "Error while trying to grab and set camera device: {}. Trying to fall back to hardcoded label".format(
-                            err
-                        )
-                    )
-                    mmc.setCameraDevice("PRIME BSI")
+                # Device-specific properties are now configured via HardwareConfig
+                # Only acquisition-specific logic should remain here.
 
-                # set params from args
-                mmc.setCircularBufferMemoryFootprint(10000)
-                mmc.setExposure(args["exposure"])
-                mmc.setProperty(cam, "Binning", args["binning"])
-                mmc.setAutoShutter(False)
-                mmc.setShutterOpen("LaserShutter", True)
+                # Set ROI from args
                 roi = args["roi"]
                 mmc.setROI(roi[0], roi[1], roi[2], roi[3])
 
-                # get config presets
-                configs = args["configs"]
-                for k in configs:
-
-                    # corner case where some configs are set along a single preset, named "NewPreset"
-                    # which is an observed hardcoded name, prefixed with 'DAQ'
-                    if type(configs[k]) == dict:
-
-                        # print('k: {}'.format(k))
-                        # print('configs[k]: {}'.format(configs[k]))
-                        # print('configs[k].keys(): {}'.format(configs[k].keys()))
-
-                        label = "DAC{}".format(k[:-2])
-                        prop = "Volts"
-                        val = configs[k][prop]
-                        mmc.setProperty(label, prop, float(val))
-
-                        """
-                        for prop in configs[k]:
-                            try:
-                                print('configs: {}'.format(configs))
-                                print('k: {}'.format(k))
-                                print('configs[k]: {}'.format(configs[k]))
-                                print('prop: {}'.format(prop))
-                                print('configs[k][prop]: {}'.format(configs[k][prop]))
+                # Note: Device-specific properties and configs are now configured via
+                # HardwareConfig in MicroManagerBackend.initialize(). See:
+                # - config/hardware_config_torstoscope.yaml for torstoscope settings
+                # - config/hardware_config_innovation_core.yaml for innovation core settings
+                #
+                # Config presets from args["configs"] are deprecated and kept only for
+                # backward compatibility. New code should use HardwareConfig.devices[].configs
+                configs = args.get("configs", {})
+                if configs:
+                    logging.warning(
+                        "Using deprecated args['configs'] for device configuration. "
+                        "Migrate to HardwareConfig.devices[].configs in YAML config file."
+                    )
+                    for k in configs:
+                        try:
+                            if type(configs[k]) == dict:
+                                # Corner case: DAC voltage settings
+                                label = "DAC{}".format(k[:-2])
+                                prop = "Volts"
                                 val = configs[k][prop]
                                 mmc.setProperty(label, prop, float(val))
-                            except Exception as err:
+                            else:
+                                mmc.setConfig(k, configs[k])
+                        except Exception as e:
+                            logging.warning(f"Could not set config {k}: {e}")
 
-                                raise(Exception('Error while trying to set label {} property of {} with {}: {}'.format(label, prop, val, err)))
-                        """
-                    else:
-                        # print('normal k: {}'.format(k))
-                        # print('normal configs[k]: {}'.format(configs[k]))
-                        mmc.setConfig(k, configs[k])
-
+                # Z-stack stage configuration should be done via StageInterface.configure_stage()
+                # or StageInterface.run_z_stack() before calling prepare_live_acquisition().
                 if args["gooey_args"]["zsize"] > 1:
-
+                    logging.warning(
+                        "Z-stack detected (zsize > 1). Stage configuration should be done "
+                        "via StageInterface.configure_stage() or StageInterface.run_z_stack() "
+                        "before calling prepare_live_acquisition(). Using deprecated "
+                        "set_asi_stage_buffer() for backward compatibility."
+                    )
                     numz = args["gooey_args"]["zsize"]
                     zStepSize = float(args["gooey_args"]["z_step_size"])
-
-                    # upload program using micro-manager api. assumes imaging is in middle
                     set_asi_stage_buffer(
                         mmc,
                         zStart=-(numz - 1) * zStepSize / 2,
@@ -711,7 +717,20 @@ def upload_asi_stage_program(my_program, mmc, args, stage_port="COM6", stage_bau
 
 
 def set_asi_stage_buffer(mmc, zStart=-16.5, zEnd=16.5, zStepSize=3, padZ=0):
-    """function to upload asi stage positions into internal ring buffer through micro-manager api"""
+    """
+    Upload ASI stage positions into internal ring buffer through micro-manager api.
+    
+    DEPRECATED: This function is kept for backward compatibility only.
+    New code should use StageInterface.configure_stage() or StageInterface.run_z_stack()
+    instead. This provides better abstraction and works with the hardware manager.
+    
+    Args:
+        mmc: Micro-Manager Core object
+        zStart: Starting Z position
+        zEnd: Ending Z position
+        zStepSize: Step size
+        padZ: Number of padding steps at start
+    """
 
     # hardcoded params
     laserTTLs = "TTL1-8"

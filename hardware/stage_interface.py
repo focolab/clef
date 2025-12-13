@@ -82,4 +82,25 @@ class StageInterface(ABC):
             Device name string
         """
         pass
+    
+    @abstractmethod
+    def configure_stage(self, config: dict) -> None:
+        """
+        Configure stage for acquisition sequences (e.g., Z-stack buffer).
+        
+        This method is used to set up stage sequences, buffers, and other
+        acquisition-specific stage configurations that are not part of basic
+        position control.
+        
+        Args:
+            config: Dictionary containing stage configuration parameters.
+                   Common keys:
+                   - z_start: Starting Z position for sequence (float)
+                   - z_end: Ending Z position for sequence (float)
+                   - z_step: Step size for sequence (float)
+                   - pad_z: Number of padding steps at start (int, default 0)
+                   - ttl_device: TTL device name for property sequences (str, optional)
+                   - ttl_state: TTL state value for each step (str, optional)
+        """
+        pass
 

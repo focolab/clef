@@ -32,6 +32,22 @@ class DeviceConfig(BaseModel):
     device_name: str = Field(..., description="Micro-Manager device name")
     device_type: str = Field(..., description="Device type (camera, stage, laser, etc.)")
     properties: DeviceProperties = Field(default_factory=DeviceProperties)
+    configs: Dict[str, str] = Field(default_factory=dict, description="Micro-Manager config group presets (e.g., {'Channel': '488'})")
+
+
+class ShutterConfig(BaseModel):
+    """Shutter configuration."""
+    device_name: str = Field(..., description="Shutter device name")
+    state: bool = Field(..., description="Shutter open state (True=open, False=closed)")
+
+
+class SystemProperties(BaseModel):
+    """System-level Micro-Manager properties."""
+    auto_shutter: Optional[bool] = Field(None, description="Auto shutter enabled")
+    circular_buffer_mb: Optional[int] = Field(None, gt=0, description="Circular buffer size in MB")
+    shutters: List[ShutterConfig] = Field(default_factory=list, description="Shutter states to set")
+    
+    model_config = ConfigDict(extra="allow")  # Allow additional system properties
 
 
 class IlluminationChannel(BaseModel):
@@ -55,6 +71,9 @@ class HardwareConfig(BaseModel):
     
     devices: Dict[str, DeviceConfig] = Field(default_factory=dict)
     illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
+    
+    # System-level Micro-Manager properties
+    system_properties: Optional[SystemProperties] = Field(None, description="System-level MM settings")
     
     # Calibration data
     polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
