@@ -10,8 +10,12 @@ save_algorithm_plot: true
 
 # Core algorithm parameters
 algorithm_params:
+
+  # Real-time visualization flag
+  visualize_real_time: true
+  
   # Cooldown after stimulation (frames)
-  stim_cooldown_frames: 10
+  stim_cooldown_frames: 100
   
   # No probabilistic modulation for this demo
   skip_stimulation_probability: 0.0
@@ -27,7 +31,8 @@ algorithm_params:
   trigger_z_max: 25
     
   # Stimulus perturbation vector [dx, dy, dz]
-  perturbation: [0.1, 0.1, 0.1]
+  # perturbation: [0.1, 0.1, 0.1]
+  perturbation: [2.0, 2.0, 2.0]
   
   # Not used for this algorithm
   stimulus_diameter_pixels: 10

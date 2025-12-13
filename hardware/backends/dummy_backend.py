@@ -35,7 +35,7 @@ class DummyCamera(CameraInterface):
         """
         self.width = width
         self.height = height
-        self.exposure_ms = 5
+        self.exposure_ms = 5 # default...
         self._acquisition_running = False
         self._buffer_count = 0
         self._frame_count = 0

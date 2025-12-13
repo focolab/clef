@@ -79,11 +79,10 @@ class LorenzDemoAlgorithm:
             # Stimulus perturbation vector
             # self.perturbation = self.hardware_manager.config.lorenz_params.get('perturbation')
             self.perturbation = params.perturbation
-            
-            # Cooldown and stimulus params
             self.stim_cooldown_frames = params.stim_cooldown_frames
             self.stim_duration = algorithm_config.stimulus_params.duration_frames
             self.stim_intensity = algorithm_config.stimulus_params.intensity_percent
+            self.visualize_real_time = params.visualize_real_time
         else:
             # Defaults
             self.trigger_volume = {
@@ -95,6 +94,7 @@ class LorenzDemoAlgorithm:
             self.stim_cooldown_frames = 100
             self.stim_duration = 20
             self.stim_intensity = 10
+            self.visualize_real_time = False
         
         # State tracking
         self.frame_count = 0
@@ -106,9 +106,15 @@ class LorenzDemoAlgorithm:
         self.y_history = []
         self.z_history = []
         self.frame_indices = []
-        
-        # Stimulus event tracking
         self.stim_events = []
+
+        # Initialize visualizer
+        self.visualizer = None
+        if self.visualize_real_time:
+            try:
+                self.visualizer = LorenzVisualizer(self)
+            except Exception as e:
+                logger.warning(f"Could not initialize visualizer: {e}")
         
         logger.info(
             f"LorenzDemoAlgorithm initialized with trigger volume: "
@@ -231,7 +237,15 @@ class LorenzDemoAlgorithm:
             self.y_history.append(state[1])
             self.z_history.append(state[2])
             self.frame_indices.append(self.frame_count)
-            
+
+            # Update visualizer
+            if self.visualizer:
+                self.visualizer.update_image(img, maxima_coords)
+                self.visualizer.update_trajectory()
+                self.visualizer.update_stim_markers()
+                self.visualizer.update_info_text()
+                self.visualizer.process_events()
+                    
             # Log periodically
             if self.frame_count % 50 == 0:
                 logger.info(
@@ -258,11 +272,9 @@ class LorenzDemoAlgorithm:
             True if inside trigger volume
         """
         x, y, z = state
-        
         in_x = self.trigger_volume['x_min'] <= x <= self.trigger_volume['x_max']
         in_y = self.trigger_volume['y_min'] <= y <= self.trigger_volume['y_max']
         in_z = self.trigger_volume['z_min'] <= z <= self.trigger_volume['z_max']
-        
         return in_x and in_y and in_z
     
     def check_stim(self, image_ndx: int, cooldown_counter: int = 0) -> Tuple[Dict, int]:
@@ -291,9 +303,7 @@ class LorenzDemoAlgorithm:
         
         # Get most recent state
         current_state = np.array([
-            self.x_history[-1],
-            self.y_history[-1],
-            self.z_history[-1]
+            self.x_history[-1], self.y_history[-1], self.z_history[-1]
         ])
         
         # Check if in trigger volume
@@ -328,6 +338,14 @@ class LorenzDemoAlgorithm:
             logging.info(f'Producing LorenzDemoAlgorithm stim_params: {stim_params}')
             
             return stim_params, self.cooldown_counter
+        
+        # after delivering perturbation, to avoid system sitting in same position, 
+        # let's rotate perturbation vector
+        # pick axis based on (hopefully) uncorrelated property for reproducible randomness
+        perturb_index = self.frame_count % 3
+        new_perturb = self.perturbation
+        new_perturb[perturb_index] = new_perturb[perturb_index] * -1
+        self.perturbation = new_perturb
         
         return {}, 0
     
@@ -496,3 +514,164 @@ class LorenzDemoAlgorithm:
             f"LorenzDemoAlgorithm closing. Processed {self.frame_count} frames, "
             f"triggered {len(self.stim_events)} stimuli"
         )
+
+class LorenzVisualizer:
+    """Real-time visualization for Lorenz attractor demo."""
+    
+    def __init__(self, algorithm: 'LorenzDemoAlgorithm'):
+        """Initialize visualizer."""
+        self.algorithm = algorithm
+        
+        # Import PyQt and pyqtgraph
+        try:
+            from pyqtgraph.Qt import QtCore, QtWidgets
+            import pyqtgraph as pg
+            import pyqtgraph.opengl as gl
+        except ImportError:
+            logger.error("PyQt or pyqtgraph not available")
+            raise
+        
+        self.QtCore = QtCore
+        self.QtWidgets = QtWidgets
+        self.pg = pg
+        self.gl = gl
+        
+        # Create Qt application
+        self.app = pg.mkQApp("LorenzVisualizer")
+        
+        # Create main window
+        self.window = QtWidgets.QWidget()
+        self.window.setWindowTitle("Lorenz Attractor - Real-time Demo")
+        self.window.resize(1400, 600)
+        
+        # Create layout
+        self.layout = QtWidgets.QGridLayout()
+        self.window.setLayout(self.layout)
+        
+        # Image display (left)
+        self.image_widget = pg.ImageView()
+        self.image_widget.ui.roiBtn.hide()
+        self.image_widget.ui.menuBtn.hide()
+        self.layout.addWidget(self.image_widget, 0, 0, 1, 1)
+        
+        # 3D view (right top)
+        self.view_3d = gl.GLViewWidget()
+        self.view_3d.setCameraPosition(distance=80)
+        self.layout.addWidget(self.view_3d, 0, 1, 2, 1)
+        
+        # Add grid
+        grid = gl.GLGridItem()
+        self.view_3d.addItem(grid)
+        
+        # Trajectory line
+        self.trajectory_plot = gl.GLLinePlotItem(
+            color=(0.5, 0.5, 1.0, 0.6), width=1.5, antialias=True
+        )
+        self.view_3d.addItem(self.trajectory_plot)
+        
+        # Stimulus markers
+        self.stim_scatter = gl.GLScatterPlotItem(
+            size=10, color=(1, 0, 0, 1), pxMode=True
+        )
+        self.view_3d.addItem(self.stim_scatter)
+        
+        # Trigger volume box
+        self._create_trigger_volume_box()
+        
+        # Info text (right bottom)
+        self.info_text = QtWidgets.QLabel()
+        self.info_text.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        self.info_text.setStyleSheet("QLabel { background-color: white; padding: 10px; }")
+        self.layout.addWidget(self.info_text, 1, 0, 1, 1)
+        
+        self.window.show()
+        
+        logger.info("LorenzVisualizer initialized")
+    
+    def _create_trigger_volume_box(self):
+        """Create wireframe box for trigger volume."""
+        vol = self.algorithm.trigger_volume
+        x_min, x_max = vol['x_min'], vol['x_max']
+        y_min, y_max = vol['y_min'], vol['y_max']
+        z_min, z_max = vol['z_min'], vol['z_max']
+        
+        # 12 edges of box
+        edges = [
+            [[x_min, y_min, z_min], [x_max, y_min, z_min]],
+            [[x_max, y_min, z_min], [x_max, y_max, z_min]],
+            [[x_max, y_max, z_min], [x_min, y_max, z_min]],
+            [[x_min, y_max, z_min], [x_min, y_min, z_min]],
+            [[x_min, y_min, z_max], [x_max, y_min, z_max]],
+            [[x_max, y_min, z_max], [x_max, y_max, z_max]],
+            [[x_max, y_max, z_max], [x_min, y_max, z_max]],
+            [[x_min, y_max, z_max], [x_min, y_min, z_max]],
+            [[x_min, y_min, z_min], [x_min, y_min, z_max]],
+            [[x_max, y_min, z_min], [x_max, y_min, z_max]],
+            [[x_max, y_max, z_min], [x_max, y_max, z_max]],
+            [[x_min, y_max, z_min], [x_min, y_max, z_max]],
+        ]
+        
+        for edge in edges:
+            pos = np.array(edge)
+            line = self.gl.GLLinePlotItem(
+                pos=pos, color=(0, 1, 0, 0.5), width=2, antialias=True
+            )
+            self.view_3d.addItem(line)
+    
+    def update_image(self, img: np.ndarray, maxima_coords: np.ndarray):
+        """Update image display."""
+
+        self.image_widget.setImage(img.T, autoLevels=True, autoRange=False)
+    
+    def update_trajectory(self):
+        """Update 3D trajectory."""
+        if len(self.algorithm.x_history) < 2:
+            return
+        
+        pos = np.column_stack([
+            self.algorithm.x_history,
+            self.algorithm.y_history,
+            self.algorithm.z_history
+        ])
+        self.trajectory_plot.setData(pos=pos)
+    
+    def update_stim_markers(self):
+        """Update stimulus markers."""
+        if not self.algorithm.stim_events:
+            return
+        
+        stim_positions = np.array([
+            event['state'] for event in self.algorithm.stim_events
+        ])
+        self.stim_scatter.setData(pos=stim_positions)
+    
+    def update_info_text(self):
+        """Update info text."""
+        current_state = np.array([
+            self.algorithm.x_history[-1] if self.algorithm.x_history else 0,
+            self.algorithm.y_history[-1] if self.algorithm.y_history else 0,
+            self.algorithm.z_history[-1] if self.algorithm.z_history else 0,
+        ])
+        
+        info = f"""
+        <b>Lorenz Attractor Closed-Loop Demo</b><br><br>
+        <b>Controls</b>: Mouse wheel: Zoom, Click+Hold: Rotate, CTRL+Click+Hold: Pan.<br>
+        <b>Frame:</b> {self.algorithm.frame_count} / {self.algorithm.frames_to_grab}<br>
+        <b>Current State:</b><br>
+        &nbsp;&nbsp;x = {current_state[0]:.2f}<br>
+        &nbsp;&nbsp;y = {current_state[1]:.2f}<br>
+        &nbsp;&nbsp;z = {current_state[2]:.2f}<br>
+        <br>
+        <b>Stimulus Events:</b> {len(self.algorithm.stim_events)}<br>
+        <b>Cooldown:</b> {self.algorithm.cooldown_counter} frames<br>
+        """
+        self.info_text.setText(info)
+    
+    def process_events(self):
+        """Process Qt events."""
+        self.app.processEvents()
+    
+    def close(self):
+        """Close visualizer."""
+        self.window.close()
+        logger.info("LorenzVisualizer closed")
