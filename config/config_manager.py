@@ -71,7 +71,7 @@ class HardwareConfig(BaseModel):
     @field_validator('backend')
     @classmethod
     def validate_backend(cls, v):
-        allowed = ['pycromanager', 'pymmcore', 'dummy']
+        allowed = ['pycromanager', 'pymmcore', 'dummy', 'test']
         if v not in allowed:
             raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
         return v
@@ -401,9 +401,9 @@ class ConfigManager:
             return False
         
         # Check backend/stim compatibility
-        if self.hardware_config.backend == "dummy":
-            if self.hardware_config.stim_interface not in ["dummy", "no stim"]:
-                logger.warning(f"Backend is 'dummy' but stim_interface is "
+        if self.hardware_config.backend == "dummy" or self.hardware_config.backend == "test":
+            if self.hardware_config.stim_interface not in ["dummy", "no stim", "test"]:
+                logger.warning(f"Backend is {self.hardware_config.backend} but stim_interface is "
                              f"'{self.hardware_config.stim_interface}' - may not work")
         
         # Check z-stack configuration consistency
