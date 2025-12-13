@@ -21,13 +21,23 @@ class DummyAlg:
     - Fallback when a specified algorithm fails to load
     """
     
-    def __init__(self, args=None, local_handles=None):
+    def __init__(
+        self,
+        algorithm_config: Optional[AlgorithmConfig] = None,
+        experiment_config: Optional[ExperimentConfig] = None,
+        hardware_manager: Optional[HardwareManager] = None,
+        local_handles: Optional[Dict[str, Any]] = None,
+        args: Optional[Dict[str, Any]] = None
+        ):
         """
         Initialize dummy algorithm.
         
         Args:
+            algorithm_config: Algorithm configuration (type, params, etc.)
+            experiment_config: Experiment configuration (for building args)
+            hardware_config: Hardware configuration (for building args)
+            local_handles: Dictionary of local handles (e.g., {'mmc': mmc_instance})
             args: Legacy args dictionary (optional, for compatibility)
-            local_handles: Dictionary of local handles like {'mmc': mmc_instance}
         """
         if args is None:
             args = {}

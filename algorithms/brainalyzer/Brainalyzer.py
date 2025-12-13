@@ -3,6 +3,8 @@ Brainalyzer Algorithm
 
 Interactive GUI-based algorithm for closed-loop microscopy with real-time
 visualization and manual/automated ROI-based stimulus triggering.
+
+UPDATED: Now accepts Config objects instead of legacy args dict.
 """
 
 import time
@@ -10,6 +12,16 @@ import logging
 import random
 import numpy as np
 from multiprocessing import Pipe, shared_memory
+from typing import Optional, Dict, Any
+
+# Import config models
+from config.config_manager import (
+    AlgorithmConfig,
+    ExperimentConfig,
+)
+
+# Hardware interaction layer
+from hardware.hardware_manager import HardwareManager
 
 # Import worker process
 try:
@@ -37,38 +49,68 @@ class Brainalyzer:
     - Interactive stimulus triggering
     - Automated closed-loop models
     - Support for both neural imaging and behavior modes
+    
+    UPDATED: Now uses Config objects for initialization.
     """
     
-    def __init__(self, args, local_handles=None):
+    def __init__(
+        self,
+        algorithm_config: AlgorithmConfig,
+        experiment_config: ExperimentConfig,
+        hardware_manager: Optional[HardwareManager] = None,
+        local_handles: Optional[Dict[str, Any]] = None,
+        args:  Optional[Dict[str, Any]] = None
+    ):
         """
-        Initialize Brainalyzer algorithm.
+        Initialize Brainalyzer algorithm with Config objects.
         
         Args:
-            args: Legacy args dictionary containing configuration
+            algorithm_config: Algorithm configuration (GUI mode, params, stimulus)
+            experiment_config: Experiment configuration (acquisition, subject, output)
+            hardware_config: Hardware configuration (optional, for behavior mode)
             local_handles: Dictionary with optional handles (e.g., {'mmc': mmc_instance})
+            args: slated for deprecation
         """
         if local_handles is None:
             local_handles = {}
+        if args is None:
+            args = {}
         
-        # Get general params
-        self.args = args
-        self.rec_id = self.args["id"]
-        self.roi = self.args["roi"]
-        self.frames_to_grab = self.args["gooey_args"]["total_frames"]
-        self.microscope_name = self.args["gooey_args"]["microscope_name"]
-        self.saveroot = self.args.get("saveroot", "")
-        self.zsize = self.args["gooey_args"]["zsize"]
-        self.xsize = self.args["roi"][2]
-        self.ysize = self.args["roi"][3]
-        self.camera_binning = None
-        self.dtype = self.args.get("dtype", np.uint16)
+        # Store configs
+        self.algorithm_config = algorithm_config
+        self.experiment_config = experiment_config
+        self.hardware = hardware_manager
         self.local_handles = local_handles
-
+        
+        # Extract core experiment params
+        self.rec_id = experiment_config.experiment_name
+        self.saveroot = experiment_config.output_dir
+        self.frames_to_grab = experiment_config.acquisition.num_frames
+        self.zsize = experiment_config.acquisition.z_planes
+        
+        # Extract algorithm params
+        self.GUI_mode = algorithm_config.gui_mode
+        self.stim_intensity_ops = algorithm_config.stimulus_params.intensity_percent_options
+        self.stim_intensity = self.stim_intensity_ops[0]
+        
+        # Hardware params (with safe defaults)
+        self.microscope_name = (
+            self.hardware.config.microscope_name if self.hardware else "unknown"
+        )
+        
+        # Data params - will be set by closed_loop_engine after hardware init
+        self.roi = (0, 0, 200, 200)  # Default, will be updated
+        try:
+            self.roi = self.hardware.camera.roi
+        except Exception as err:
+            logger.warning(f'No hardware detected by brainalyzer, defaulting to image roi: {self.roi}')
+        self.xsize = self.roi[2]
+        self.ysize = self.roi[3]
+        self.camera_binning = None
+        self.dtype = np.uint16
+        
         # Data transmission with subprocess IPC
-        self.ipc = self.args.get("data_ipc", "shared_memory")
-
-        # Set behavior mode vs neural imaging mode
-        self.GUI_mode = self.args["gooey_args"].get("GUI_mode", "neural_imaging")
+        self.ipc = "shared_memory"  # Only supported mode
 
         # If we're in behavior mode, initialize behavior-related hardware
         if self.GUI_mode == "behavior":
@@ -82,15 +124,34 @@ class Brainalyzer:
         self.shared_frame_memory_list = []
         self.shared_ndarray_list = []
 
-        # Initialize the worker process
-        self.initialize_worker()
+        # Worker will be initialized after hardware setup
+        self.proc = None
+        self.parent_conn = None
+        self.child_conn = None
+        self.shared_image_count = None
+
+    def set_roi(self, roi: tuple):
+        """
+        Set ROI dimensions after hardware initialization.
+        
+        This must be called by the acquisition engine after hardware setup
+        and before initializing the worker process.
+        
+        Args:
+            roi: Tuple of (x_offset, y_offset, width, height)
+        """
+        self.roi = roi
+        self.xsize = roi[2]
+        self.ysize = roi[3]
+        logger.info(f"Brainalyzer ROI set to: {roi}")
 
     def initialize_worker(self):
-        """Initialize the GUI worker process."""
-        # Algorithm-specific params for subprocess
-        self.stim_intensity_ops = self.args["gooey_args"]["stim_intensity_options"]
-        self.stim_intensity = self.stim_intensity_ops[0]
-
+        """
+        Initialize the GUI worker process.
+        
+        Must be called after set_roi() to ensure dimensions are correct.
+        """
+        # Build vis_args for worker subprocess
         self.vis_args = {
             "id": self.rec_id,
             "saveroot": self.saveroot,
@@ -102,7 +163,10 @@ class Brainalyzer:
             "data_ipc": self.ipc,
             "GUI_mode": self.GUI_mode,
             "camera_binning": self.camera_binning,
+            "dtype": self.dtype,
         }
+
+        logger.info(f'Instantiating worker with vis_args: {self.vis_args}')
 
         # Initialize the visualizer
         try:
@@ -152,23 +216,33 @@ class Brainalyzer:
                 self.child_conn, self.vis_args
             )
             self.proc.start()
+            
+            logger.info("BrainalyzerWorker subprocess started successfully")
 
         except Exception as err:
             logger.error(f"Error while initializing BrainalyzerWorker: {err}")
             raise
-
+        
     def initialize_behavior_mode(self):
         """Initialize behavior mode specific hardware (e.g., stage control)."""
+
+        # TODO: Fix this...
         if self.microscope_name == "innovation core thunderscope":
             # Shared memory for xy stage control
-            self.shared_stage_offset_xy = shared_memory.ShareableList(
-                [0, 0], name="shared_stage_offset_xy"
-            )
+            try:
+                self.shared_stage_offset_xy = shared_memory.ShareableList(
+                    [0, 0], name="shared_stage_offset_xy"
+                )
+            except FileExistsError:
+                self.shared_stage_offset_xy = shared_memory.ShareableList(
+                    None, name="shared_stage_offset_xy"
+                )
 
             # Data structure for xy stage position tracking
             self.xy_stage_position_list = []
 
         # MicroManager handle for stage control
+        # TODO: Fix this...
         self.mmc = self.local_handles.get("mmc", None)
         if self.mmc is None:
             logger.warning(
@@ -179,8 +253,12 @@ class Brainalyzer:
             cam = self.mmc.getCameraDevice()
             self.camera_binning = self.mmc.getProperty(cam, "Binning")
 
+
     def get_xy_offset(self):
         """Get stage offset from shared memory."""
+        if not hasattr(self, 'shared_stage_offset_xy'):
+            return None
+            
         offsetx, offsety = self.shared_stage_offset_xy
 
         if offsetx or offsety:
@@ -190,11 +268,12 @@ class Brainalyzer:
             return int(offsetx), int(offsety)
         return None
 
+    # TODO migrate this to stage controller
     def sync_stage(self):
         """Synchronize microscope stage position with GUI."""
         if (self.GUI_mode == "behavior" and 
             self.microscope_name == "innovation core thunderscope" and
-            self.args["id"] != "test"):
+            self.rec_id != "test"):
             
             self.xy_stage_position_list.append([
                 self.mmc.getXPosition(),
@@ -210,17 +289,34 @@ class Brainalyzer:
     def initialize_model(self):
         """Initialize the algorithm model."""
         # Seed RNG for reproducibility
-        fname_root = self.args["id"]
-        random.seed(fname_root)
+        random.seed(self.rec_id)
+
+        # initialize subprocess
+        self.initialize_worker()
 
     def get_metadata(self, args=None):
-        """Return metadata captured during runtime."""
+        """
+        Return metadata captured during runtime.
+        
+        Args:
+            args: Legacy parameter, ignored (kept for compatibility)
+            
+        Returns:
+            Dictionary containing runtime metadata
+        """
         metadata = {
             "stim_param_list": self.stim_param_list,
+            "algorithm_config": self.algorithm_config.model_dump(mode='json'),
+            "experiment_config": self.experiment_config.model_dump(mode='json'),
         }
+        
+        if self.hardware:
+            metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
 
         # Optional metadata
         if (self.GUI_mode == "behavior" and
+            
+            # TODO remove scope ref, this should get pulled when migrating to stage
             self.microscope_name == "innovation core thunderscope"):
             metadata["xy_stage_position_list"] = self.xy_stage_position_list
 
@@ -241,7 +337,7 @@ class Brainalyzer:
             logger.info(f"Brainalyzer::process_frame> storing event: {data}")
             self.current_event = data
 
-        # Adjust stage if necessary
+        # Adjust stage if necessary -- TODO this should be in hardware
         if self.GUI_mode == "behavior":
             self.sync_stage()
 
@@ -319,7 +415,7 @@ class Brainalyzer:
             logger.info(f"Brainalyzer::check_stim> emitting stim params: {stim_params}")
 
         return stim_params, new_cooldown
-
+    
     def plot_model(self, show_plot=False, savefilename=None):
         """Plot current state of model."""
         logger.warning("There is no alg model to plot!")
@@ -330,21 +426,24 @@ class Brainalyzer:
         for shm in self.shared_frame_memory_list:
             shm.close()
             shm.unlink()
-        self.shared_image_count.shm.close()
-        self.shared_image_count.shm.unlink()
+            
+        if self.shared_image_count:
+            self.shared_image_count.shm.close()
+            self.shared_image_count.shm.unlink()
 
         # Close the worker process
-        self.parent_conn.send("close")
+        if self.parent_conn:
+            self.parent_conn.send("close")
 
         # Close stage-related shared memory
-        if self.GUI_mode == "behavior":
+        if self.GUI_mode == "behavior" and hasattr(self, 'shared_stage_offset_xy'):
             self.shared_stage_offset_xy.shm.close()
             self.shared_stage_offset_xy.shm.unlink()
 
     # Internal methods
     def get_event(self):
         """Check worker to see if there's any events to process."""
-        if self.parent_conn.poll():
+        if self.parent_conn and self.parent_conn.poll():
             data = self.parent_conn.recv()
             return data
         return None
@@ -352,3 +451,46 @@ class Brainalyzer:
     def store_frame_in_shm(self, img, zndx):
         """Store frame in shared memory buffer."""
         self.shared_ndarray_list[zndx][:] = img[:]
+
+def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
+    """
+    Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
+    
+    This function allows existing code to continue using the old args format
+    while the new code uses Config objects internally.
+    
+    Args:
+        args: Legacy args dictionary with gooey_args structure
+        local_handles: Optional dictionary of local handles (mmc, etc.)
+        
+    Returns:
+        Brainalyzer instance
+        
+    Example:
+        >>> # Old way (still works)
+        >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
+        >>> 
+        >>> # New way (preferred)
+        >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
+    """
+    from engine.closed_loop_engine import convert_gooey_args_to_configs
+    from hardware.hardware_manager import HardwareManager
+    
+    # Convert legacy args to configs
+    gooey_args = args.get("gooey_args", args)
+    configs = convert_gooey_args_to_configs(gooey_args)
+    hm = HardwareManager(configs['hardware'])
+    
+    # Create Brainalyzer with configs
+    alg = Brainalyzer(
+        algorithm_config=configs["algorithm"],
+        experiment_config=configs["experiment"],
+        hardware_manager=hm,
+        local_handles=local_handles
+    )
+    
+    # Extract ROI from args if present (for backward compatibility)
+    if "roi" in args:
+        alg.set_roi(args["roi"])
+    
+    return alg

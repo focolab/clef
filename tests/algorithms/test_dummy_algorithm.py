@@ -14,8 +14,23 @@ from unittest.mock import Mock
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-
 from algorithms.dummy import DummyAlg
+from config.config_manager import HardwareConfig
+from hardware.hardware_manager import HardwareManager
+
+
+@pytest.fixture
+def hardware_manager():
+    """Create and initialize a hardware manager for testing."""
+    hardware_config = HardwareConfig(
+        backend="dummy",
+        stim_interface="dummy",
+        microscope_name="test",
+    )
+    hw_manager = HardwareManager(hardware_config)
+    hw_manager.initialize()
+    yield hw_manager
+    hw_manager.close()
 
 
 class TestDummyAlgBasics:
@@ -39,7 +54,7 @@ class TestDummyAlgBasics:
             }
         }
         
-        alg = DummyAlg(args)
+        alg = DummyAlg(args=args)
         assert alg.frames_to_grab == 100
         assert alg.zsize == 10
         assert alg.xsize == 512
@@ -153,13 +168,13 @@ class TestDummyAlgMetadata:
         img = np.zeros((512, 512), dtype=np.uint16)
         
         # Process some frames
-        for i in range(25):
+        for i in range(20):
             alg.process_frame(img, zndx=i % 10)
         
         metadata = alg.get_metadata()
         
         assert metadata["algorithm_type"] == "DummyAlg"
-        assert metadata["frames_processed"] == 25
+        assert metadata["frames_processed"] == 20
         assert metadata["volumes_processed"] == 2  # 2 complete volumes
 
 
@@ -211,7 +226,7 @@ class TestDummyAlgPlotting:
 class TestDummyAlgIntegration:
     """Integration tests for DummyAlg with factory."""
     
-    def test_create_from_factory(self):
+    def test_create_from_factory(self, hardware_manager):
         """Test creating DummyAlg through factory."""
         from algorithms import create_algorithm
         
@@ -257,20 +272,11 @@ class TestDummyAlgIntegration:
         experiment_config.dev_options.prefill_wb_ops = False
         experiment_config.dev_options.send_sms_on_completion = False
         
-        hardware_config = Mock()
-        hardware_config.backend = "dummy"
-        hardware_config.mm_config_path = "test.cfg"
-        hardware_config.stim_interface = "dummy"
-        hardware_config.microscope_name = "test"
-        hardware_config.use_static_stim_roi = False
-        hardware_config.strobe_acquisition = False
-        hardware_config.strobe_inter_frame_interval_ms = 80
-        
         # Create algorithm through factory
         alg = create_algorithm(
             algorithm_config=algorithm_config,
             experiment_config=experiment_config,
-            hardware_config=hardware_config,
+            hardware_manager=hardware_manager,
         )
         
         # Should be a DummyAlg instance

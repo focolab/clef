@@ -20,6 +20,7 @@ from algorithms.algorithm_factory import (
     register_algorithm,
     _registry,
 )
+from hardware.hardware_manager import HardwareManager
 
 
 @pytest.fixture
@@ -88,6 +89,23 @@ def mock_configs():
     }
 
 
+@pytest.fixture
+def hardware_manager(mock_configs):
+    """Create and initialize a hardware manager for testing."""
+    from config.config_manager import HardwareConfig
+    
+    hardware_config = HardwareConfig(
+        backend="dummy",
+        stim_interface="dummy",
+        microscope_name="test",
+    )
+    
+    hw_manager = HardwareManager(hardware_config)
+    hw_manager.initialize()
+    yield hw_manager
+    hw_manager.close()
+
+
 class TestAlgorithmFactory:
     """Test suite for algorithm factory."""
     
@@ -100,7 +118,7 @@ class TestAlgorithmFactory:
         assert len(algorithms) > 0
         assert "dummy" in algorithms or "Dummy algorithm (does nothing)" in algorithms
     
-    def test_create_dummy_algorithm(self, mock_configs):
+    def test_create_dummy_algorithm(self, mock_configs, hardware_manager):
         """Test creation of dummy algorithm (actual instance, not mocked)."""
         mock_configs["algorithm"].algorithm_type = "dummy"
         
@@ -108,7 +126,7 @@ class TestAlgorithmFactory:
         alg = create_algorithm(
             algorithm_config=mock_configs["algorithm"],
             experiment_config=mock_configs["experiment"],
-            hardware_config=mock_configs["hardware"],
+            hardware_manager=hardware_manager,
         )
         
         # Should be actual DummyAlg instance
@@ -123,7 +141,7 @@ class TestAlgorithmFactory:
         stim_params, cooldown = alg.check_stim(0, 0)
         assert stim_params == {}
     
-    def test_create_algorithm_with_local_handles(self, mock_configs):
+    def test_create_algorithm_with_local_handles(self, mock_configs, hardware_manager):
         """Test that local_handles are passed to algorithm."""
         mock_configs["algorithm"].algorithm_type = "dummy"
         mock_mmc = Mock()
@@ -132,7 +150,7 @@ class TestAlgorithmFactory:
         alg = create_algorithm(
             algorithm_config=mock_configs["algorithm"],
             experiment_config=mock_configs["experiment"],
-            hardware_config=mock_configs["hardware"],
+            hardware_manager=hardware_manager,
             local_handles={"mmc": mock_mmc}
         )
         
@@ -141,7 +159,7 @@ class TestAlgorithmFactory:
         assert isinstance(alg, DummyAlg)
         assert alg.local_handles["mmc"] == mock_mmc
     
-    def test_unknown_algorithm_raises_error(self, mock_configs):
+    def test_unknown_algorithm_raises_error(self, mock_configs, hardware_manager):
         """Test that unknown algorithm type raises ValueError."""
         mock_configs["algorithm"].algorithm_type = "nonexistent_algorithm"
         
@@ -149,13 +167,13 @@ class TestAlgorithmFactory:
             create_algorithm(
                 algorithm_config=mock_configs["algorithm"],
                 experiment_config=mock_configs["experiment"],
-                hardware_config=mock_configs["hardware"],
+                hardware_manager=hardware_manager,
             )
         
         assert "Unknown algorithm type" in str(excinfo.value)
         assert "nonexistent_algorithm" in str(excinfo.value)
     
-    def test_register_custom_algorithm(self, mock_configs):
+    def test_register_custom_algorithm(self, mock_configs, hardware_manager):
         """Test registering a custom algorithm."""
         # Create mock custom algorithm class
         mock_custom_alg = Mock()
@@ -171,39 +189,13 @@ class TestAlgorithmFactory:
         alg = create_algorithm(
             algorithm_config=mock_configs["algorithm"],
             experiment_config=mock_configs["experiment"],
-            hardware_config=mock_configs["hardware"],
+            hardware_manager=hardware_manager,
         )
         
         assert alg == mock_custom_instance
         mock_custom_alg.assert_called_once()
     
-    def test_legacy_args_structure(self, mock_configs):
-        """Test that legacy args dict is properly constructed."""
-        mock_configs["algorithm"].algorithm_type = "dummy"
-        
-        # Use real dummy algorithm
-        alg = create_algorithm(
-            algorithm_config=mock_configs["algorithm"],
-            experiment_config=mock_configs["experiment"],
-            hardware_config=mock_configs["hardware"],
-        )
-        
-        # Check that args were passed correctly
-        from algorithms.dummy import DummyAlg
-        assert isinstance(alg, DummyAlg)
-        
-        # Verify structure
-        assert "gooey_args" in alg.args
-        assert "configs" in alg.args
-        
-        # Check some key fields
-        gooey_args = alg.args["gooey_args"]
-        assert gooey_args["total_frames"] == 100
-        assert gooey_args["zsize"] == 10
-        assert gooey_args["trigger_algorithm"] == "dummy"
-        assert gooey_args["acquisition_backend"] == "dummy"
-    
-    def test_algorithm_import_error_handling(self, mock_configs):
+    def test_algorithm_import_error_handling(self, mock_configs, hardware_manager):
         """Test graceful handling of import errors."""
         # Force an import error by using non-existent algorithm
         mock_configs["algorithm"].algorithm_type = "BrokenAlgorithm"
@@ -213,7 +205,7 @@ class TestAlgorithmFactory:
             create_algorithm(
                 algorithm_config=mock_configs["algorithm"],
                 experiment_config=mock_configs["experiment"],
-                hardware_config=mock_configs["hardware"],
+                hardware_manager=hardware_manager,
             )
 
 
@@ -245,54 +237,10 @@ class TestAlgorithmRegistry:
             assert alg_class == mock_dummy.DummyAlg
 
 
-# class TestBrainalyzerCreation:
-#     """Test creation of Brainalyzer algorithm specifically."""
-    
-#     def test_brainalyzer_with_neural_imaging_mode(self, mock_configs):
-#         """Test Brainalyzer creation in neural imaging mode."""
-#         mock_configs["algorithm"].algorithm_type = "Brainalyzer"
-#         mock_configs["algorithm"].gui_mode = "neural_imaging"
-        
-#         with patch("algorithms.algorithm_factory.Brainalyzer") as mock_brain:
-#             mock_instance = Mock()
-#             mock_brain.return_value = mock_instance
-            
-#             alg = create_algorithm(
-#                 algorithm_config=mock_configs["algorithm"],
-#                 experiment_config=mock_configs["experiment"],
-#                 hardware_config=mock_configs["hardware"],
-#             )
-            
-#             # Verify it was called with correct GUI mode
-#             args, kwargs = mock_brain.call_args
-#             legacy_args = args[0]
-#             assert legacy_args["gooey_args"]["GUI_mode"] == "neural_imaging"
-    
-#     def test_brainalyzer_with_behavior_mode(self, mock_configs):
-#         """Test Brainalyzer creation in behavior mode."""
-#         mock_configs["algorithm"].algorithm_type = "Brainalyzer"
-#         mock_configs["algorithm"].gui_mode = "behavior"
-        
-#         with patch("algorithms.algorithm_factory.Brainalyzer") as mock_brain:
-#             mock_instance = Mock()
-#             mock_brain.return_value = mock_instance
-            
-#             alg = create_algorithm(
-#                 algorithm_config=mock_configs["algorithm"],
-#                 experiment_config=mock_configs["experiment"],
-#                 hardware_config=mock_configs["hardware"],
-#             )
-            
-#             # Verify it was called with correct GUI mode
-#             args, kwargs = mock_brain.call_args
-#             legacy_args = args[0]
-#             assert legacy_args["gooey_args"]["GUI_mode"] == "behavior"
-
-
 class TestFactoryLogging:
     """Test logging behavior of factory."""
     
-    def test_logs_algorithm_creation(self, mock_configs, caplog):
+    def test_logs_algorithm_creation(self, mock_configs, hardware_manager, caplog):
         """Test that algorithm creation is logged."""
         mock_configs["algorithm"].algorithm_type = "dummy"
         
@@ -301,14 +249,14 @@ class TestFactoryLogging:
                 create_algorithm(
                     algorithm_config=mock_configs["algorithm"],
                     experiment_config=mock_configs["experiment"],
-                    hardware_config=mock_configs["hardware"],
+                    hardware_manager=hardware_manager,
                 )
         
         # Should log creation
         assert "Creating algorithm: dummy" in caplog.text
         assert "Successfully created algorithm" in caplog.text
     
-    def test_logs_algorithm_not_found(self, mock_configs, caplog):
+    def test_logs_algorithm_not_found(self, mock_configs, hardware_manager, caplog):
         """Test that missing algorithms are logged."""
         mock_configs["algorithm"].algorithm_type = "missing_algorithm"
         
@@ -317,7 +265,7 @@ class TestFactoryLogging:
                 create_algorithm(
                     algorithm_config=mock_configs["algorithm"],
                     experiment_config=mock_configs["experiment"],
-                    hardware_config=mock_configs["hardware"],
+                    hardware_manager=hardware_manager,
                 )
         
         assert "Unknown algorithm type" in caplog.text
