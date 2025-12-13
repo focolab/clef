@@ -317,15 +317,13 @@ def get_metadata(args, mmc):
     acquisition_backend = args["gooey_args"]["acquisition_backend"]
 
     # if acquisition backend is pycromanager we need to grab settings because they weren't already sent to wb-live
-    if acquisition_backend == "pycromanager":
+    cam = mmc.getCameraDevice()
+    binning = mmc.getProperty(cam, "Binning")
 
-        cam = mmc.getCameraDevice()
-        binning = mmc.getProperty(cam, "Binning")
-
+    # metadata
     metadata = {
         "binning": binning,
         "exposure": mmc.getExposure(),
-
     }
 
     if scope == 'innovation core spinning disk':

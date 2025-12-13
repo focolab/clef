@@ -54,17 +54,24 @@ class ClosedLoopEngine:
         self.img_count = 0
         self.cooldown_counter = 0
         
-        # Components (initialized later)
+        # Components (initialized later), defaults for unit tests
         self.mmc = None
+        self.xsize = 200 # default for unit tests
+        self.ysize = 200 # default for unit tests
+        self.roi = (0, 0, 200, 200)
         self.alg = None
         self.stim = None
+        self.t0 = 1. 
+        self.args["t0"] = self.t0
+        self.args["id"] = 11111111-11-11-11
+        self.args["saveroot"] = 'C:/Users/rldun/Downloads/'
         
         # Data storage
         self.frames: np.ndarray | None = None
         self.frame_time_list: list[float] = []
         
         # Timing
-        self.t0: float | None = None
+
         self.next_call: float | None = None
         
         # Paths and metadata
@@ -208,7 +215,7 @@ class ClosedLoopEngine:
         self.args["id"] = self.session_id
         self.args["saveroot"] = self.saveroot
         
-        # Initialize frame storage
+        # Initialize frame storage, requires hardware initialization (ysize, xsize)
         self.frames = np.zeros(
             (self.frames_to_grab, self.ysize, self.xsize), 
             dtype=np.uint16
@@ -229,7 +236,8 @@ class ClosedLoopEngine:
         )
         
         logger.info(f"Acquisition prepared. Saving to: {self.savedir}")
-        
+
+
     def run_acquisition_loop(self):
         """
         Execute the main acquisition loop.
@@ -242,7 +250,7 @@ class ClosedLoopEngine:
         5. Save data
         
         Raises:
-            Exception: When acquisition is complete or error occurs
+            Exception: When algorithm processing encounters an error
         """
         logger.info(f"Starting acquisition loop for {self.frames_to_grab} frames...")
         
@@ -264,10 +272,10 @@ class ClosedLoopEngine:
             self.mmc.startContinuousSequenceAcquisition(0)
             
         try:
-            while self.is_running:
+            while self.is_running and self.img_count < self.frames_to_grab:
                 rem = self.mmc.getRemainingImageCount()
                 
-                while rem > 0 or self.strobe_acquisition:
+                while (rem > 0 or self.strobe_acquisition) and self.img_count < self.frames_to_grab:
                     # Grab image from buffer
                     try:
                         if self.strobe_acquisition:
@@ -301,9 +309,13 @@ class ClosedLoopEngine:
                     if self.cooldown_counter > 0:
                         self.cooldown_counter -= 1
                         
-                    # Process frame through algorithm
+                    # Process frame through algorithm - propagate errors
                     zndx = image_ndx % self.zsize
-                    self.alg.process_frame(img, zndx)
+                    try:
+                        self.alg.process_frame(img, zndx)
+                    except Exception as err:
+                        # Re-raise algorithm errors to be caught by caller
+                        raise Exception(f"Algorithm error at frame {image_ndx}, z={zndx}: {err}") from err
                     
                     # Check for stimulus trigger
                     stim_params, self.cooldown_counter = self.alg.check_stim(
@@ -316,10 +328,6 @@ class ClosedLoopEngine:
                     # Volume completion handling
                     if zndx == self.zsize - 1:
                         self.stim.check_stim(self.img_count)
-                        
-                    # Check if acquisition complete
-                    if self.img_count == self.frames_to_grab:
-                        raise Exception("Acquisition complete!")
                         
                     # Handle strobe timing
                     if self.strobe_acquisition:
@@ -337,13 +345,11 @@ class ClosedLoopEngine:
                     else:
                         rem = self.mmc.getRemainingImageCount()
                         
-        except Exception as err:
-            logger.info(f"Acquisition loop ended: {err}")
         finally:
             self.is_running = False
             t1 = time.time()
             logger.info(f"Acquisition complete. Duration: {t1 - self.t0:.2f}s")
-            
+
     def save_metadata(self):
         """
         Collect and save metadata from all components.
@@ -390,6 +396,9 @@ class ClosedLoopEngine:
             utils.prefill_wb_ops(savefileroot=self.savedir, metadata=metadata)
             
         logger.info("Metadata saved")
+
+        # also return object
+        return metadata
         
     def _save_images(self):
         """Save acquired image stack."""
@@ -445,13 +454,6 @@ class ClosedLoopEngine:
         """
         logger.info("Cleaning up...")
         
-        # Stop hardware
-        if self.mmc:
-            try:
-                self.mmc.stopSequenceAcquisition()
-            except Exception as err:
-                logger.warning(f"Error stopping sequence acquisition: {err}")
-                
         # Close algorithm
         if self.alg:
             try:
@@ -466,7 +468,7 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.warning(f"Error closing stimulus interface: {err}")
                 
-        # Close MicroManager
+        # Close hardware (MicroManager)
         if self.mmc:
             try:
                 MMSubroutines.close(self.mmc, self.args)
@@ -632,7 +634,7 @@ def create_test_config(input_recording: str | None = None) -> dict[str, Any]:
         "send_sms": False,
         
         # Additional params that might be needed
-        "roi": [0, 0, 512, 512],
+        "roi": [0, 0, 200, 200],
         "exposure": 30,
         "binning": "1x1",
         "configs": {},

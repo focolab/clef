@@ -14,6 +14,7 @@ class StimBaseClass(ABC):
         self.rec_id = self.args["id"]
         self.roi = self.args["roi"]
         self.savedir = self.args["saveroot"]  # ctains folder + / + yyyymmdd-hh-mm-ss
+        
 
         # grab params derived from input gooey
         self.zsize = self.args["gooey_args"]["zsize"]
