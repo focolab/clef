@@ -34,7 +34,8 @@ def create_stimulus_controller(
     from hardware.stimulus_controllers.widefield_controller import WidefieldStimulusController
     from hardware.stimulus_controllers.polygon_controller import PolygonStimulusController
     from hardware.stimulus_controllers.demo_lorenz_controller import LorenzStimulusController
-    from hardware.stimulus_controllers.input_stimulus_controller import InputStimulusController  # NEW
+    from hardware.stimulus_controllers.demo_ring_attractor_controller import RingAttractorStimulusController
+    from hardware.stimulus_controllers.input_stimulus_controller import InputStimulusController
     
     # Normalize interface string
     interface_lower = stim_interface.lower()
@@ -63,6 +64,10 @@ def create_stimulus_controller(
     elif "lorenz" in interface_lower:
         logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
         return LorenzStimulusController(hardware_manager, config)
+    
+    elif "ring_attractor" in interface_lower or "ring" in interface_lower:
+        logger.info(f"Creating RingAttractorStimulusController for '{stim_interface}'")
+        return RingAttractorStimulusController(hardware_manager, config)
     
     elif "computer_input" in interface_lower or "keyboard" in interface_lower or "input" in interface_lower:
         logger.info(f"Creating InputStimulusController for '{stim_interface}'")

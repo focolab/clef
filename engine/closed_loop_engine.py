@@ -426,7 +426,8 @@ class ClosedLoopEngine:
                     
                 # Submit stimulus params to controller instead of direct stim
                 # Controller will manage hardware.stimulus activation/deactivation
-                logging.debug(f'Submitting stim params: {stim_params} on image_ndx {sample_ndx}')
+                if stim_params:
+                    logging.debug(f'Submitting stim params: {stim_params} on image_ndx {sample_ndx}')
                 self.stim_controller.submit_stim_params(stim_params, sample_ndx)
                     
                 # check controller for stim on next sample (sample_count not sample_ndx)
