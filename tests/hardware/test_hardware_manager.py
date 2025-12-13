@@ -19,7 +19,7 @@ from hardware.hardware_manager import HardwareManager
 from hardware.backends.dummy_backend import DummyHardwareBackend
 from hardware.backends.micromanager_backend import MicroManagerBackend
 from config.config_manager import HardwareConfig
-
+from hardware.backends.lib import DummyMMC
 
 @pytest.fixture
 def minimal_hardware_config():
@@ -223,7 +223,7 @@ class TestHardwareManagerLegacyAccess:
         manager.initialize()
         
         mmc = manager.get_mmc()
-        assert mmc is None
+        assert isinstance(mmc, DummyMMC.DummyMMC)
     
     @patch('hardware.backends.micromanager_backend.MMSubroutines')
     def test_get_mmc_returns_mmc_for_micromanager(self, mock_mm, pycromanager_config):

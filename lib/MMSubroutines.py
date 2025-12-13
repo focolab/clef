@@ -10,11 +10,12 @@ import os
 import time
 import json
 
-try:
-    from lib import DummyMMC
-except ImportError as err:
-    # change path and try again
-    import DummyMMC
+# try:
+#     from lib import DummyMMC
+# except ImportError as err:
+#     # change path and try again
+#     import DummyMMC
+from hardware.backends.lib import DummyMMC
 
 logging.basicConfig(level=logging.INFO)
 

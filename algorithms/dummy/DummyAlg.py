@@ -124,6 +124,7 @@ class DummyAlg:
             "frames_processed": self.frame_count,
             "volumes_processed": self.volume_count,
             "description": "No-op algorithm for testing",
+            "is_dummy_alg": True,
         }
     
     def plot_model(self, show_plot=False, savefilename=None):
