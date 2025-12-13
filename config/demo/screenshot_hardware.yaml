@@ -1,0 +1,22 @@
+# ========================================
+# screenshot_hardware.yaml
+# ========================================
+backend: "screenshot"
+stim_interface: "keyboard"
+
+# Screenshot capture parameters
+screenshot:
+  x: 100              # Left edge of capture region
+  y: 100              # Top edge of capture region
+  width: 1920         # Capture width in pixels
+  height: 1080        # Capture height in pixels
+  monitor: 1          # Monitor number (1-indexed)
+  backend: "mss"      # Capture backend: "mss" or "pil"
+
+# Input stimulus device configuration
+stimulus_devices:
+  input_stimulus:
+    type: "input"
+    default_key_sequence: ["space"]
+    default_mouse_action: "click"
+    default_mouse_button: "left"
