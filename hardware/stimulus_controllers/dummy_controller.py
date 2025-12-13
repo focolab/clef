@@ -27,7 +27,7 @@ class DummyStimulusController(BaseStimulusController):
         if not stim_params:
             return
         
-        logger.debug(f"Dummy: Received stim params at frame {image_ndx}: {stim_params}")
+        logger.debug(f"DummyStimulusController: Received stim params at frame {image_ndx}: {stim_params}")
         
         # Extract intensity if present
         if "event" in stim_params and "stim_intensity" in stim_params["event"]:
@@ -48,9 +48,9 @@ class DummyStimulusController(BaseStimulusController):
         """
         params = {"intensity": intensity}
         self.hardware_manager.stimulus.activate_stimulus(params)
-        logger.debug(f"Dummy: Activated stimulus at intensity {intensity}")
+        logger.debug(f"DummyStimulusController: Activated stimulus at intensity {intensity}")
     
     def _deactivate_hardware(self) -> None:
         """Deactivate dummy stimulus hardware."""
         self.hardware_manager.stimulus.deactivate_stimulus()
-        logger.debug("Dummy: Deactivated stimulus")
+        logger.debug("DummyStimulusController: Deactivated stimulus")

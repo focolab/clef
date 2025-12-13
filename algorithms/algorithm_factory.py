@@ -21,6 +21,11 @@ try:
     from algorithms.brainalyzer import Brainalyzer
 except ImportError:
     Brainalyzer = None
+
+try:
+    from algorithms.demo import LorenzDemoAlgorithm
+except ImportError:
+    LorenzDemoAlgorithm = None
     
 
 class AlgorithmRegistry:
@@ -87,6 +92,15 @@ class AlgorithmRegistry:
         except ImportError as e:
             logger.error(f"Could not import DummyAlg: {e}")
             raise
+
+        # Register Lorenz demo algorithm
+        try:
+            self.register("LorenzDemo", LorenzDemoAlgorithm)
+            self.register("lorenz_demo", LorenzDemoAlgorithm)
+            logger.info("Registered LorenzDemoAlgorithm")
+        except ImportError as e:
+            logger.warning(f"Could not import LorenzDemoAlgorithm: {e}")
+
 
         # try:
         #     from lib import DynamicRangeDeriv
