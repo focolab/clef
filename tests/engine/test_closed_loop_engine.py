@@ -293,7 +293,7 @@ class TestInitialization:
         assert engine.cooldown_counter == 0
         assert engine.mmc is None
         assert engine.alg is None
-        assert engine.stim is None
+        assert engine.stim_controller is None
     
     def test_algorithm_factory_creates_dummy_alg(self, engine_with_configs):
         """Test that algorithm factory creates DummyAlg for dummy config."""
@@ -312,7 +312,7 @@ class TestInitialization:
         engine.prepare_acquisition()
         engine.initialize_stimulus()
         
-        assert engine.stim is not None
+        assert engine.stim_controller is not None
     
     def test_config_field_access_patterns(self, minimal_configs):
         """Test that Config fields are accessible in expected patterns."""
@@ -478,16 +478,22 @@ class TestAcquisitionLoop:
         engine.prepare_acquisition()
         engine.initialize_algorithm()
         engine.initialize_stimulus()
+
+        # Test generate stimulus events
+        def generate_stim(image_ndx, cooldown_counter):
+            return {'test_stim': 1}, 0
         
         # Track stimulus submissions
         stim_submissions = []
-        original_submit = engine.stim.submit_stim_params
+        original_submit = engine.stim_controller.submit_stim_params
         
         def track_stim(stim_params, image_ndx):
             stim_submissions.append((stim_params, image_ndx))
             return original_submit(stim_params, image_ndx)
         
-        engine.stim.submit_stim_params = track_stim
+        # patch functions
+        engine.alg.check_stim = generate_stim
+        engine.stim_controller.submit_stim_params = track_stim
         
         engine.run_acquisition_loop()
         
@@ -730,11 +736,11 @@ class TestCleanup:
         engine.initialize_stimulus()
         
         # Mock the stimulus close method
-        engine.stim.close = Mock()
+        engine.stim_controller.close = Mock()
         
         engine.cleanup()
         
-        engine.stim.close.assert_called_once()
+        engine.stim_controller.close.assert_called_once()
     
     def test_cleanup_handles_mmc_close_errors(self, engine_with_configs):
         """Test that cleanup gracefully handles MMC errors."""
