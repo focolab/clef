@@ -981,9 +981,9 @@ class TestErrorHandling:
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
-        # Should fall back to DummyAlg
-        engine.initialize_algorithm()
-        assert isinstance(engine.alg, DummyAlg)
+        # Should raise exception
+        with pytest.raises(Exception):
+            engine.initialize_algorithm()
     
     def test_acquisition_interrupted_mid_loop(self, minimal_configs):
         """Test that interrupting acquisition is handled gracefully."""
