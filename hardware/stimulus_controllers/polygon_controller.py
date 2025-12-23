@@ -59,6 +59,7 @@ class PolygonStimulusController(BaseStimulusController):
             pcy = np.array(calib['pcy'])
             icx = np.array(calib['icx'])
             icy = np.array(calib['icy'])
+            logger.info(f'Spooling Polygon for trigger_alg {self.trigger_alg}')
             
             # Spool based on trigger algorithm
             if self.trigger_alg in ["PointAndClick", "HammerOfDawn"]:
@@ -74,14 +75,10 @@ class PolygonStimulusController(BaseStimulusController):
             
             if self.trigger_alg == 'Brainalyzer':
                 # Spool multi-rectangle mask generation
-                # ix_arr = np.array([600, 700, 800, 900])
-                # iy_arr = np.array([100, 200, 300, 400])
-                # width_arr = np.array([20, 50, 20, 50])
-                # height_arr = np.array([20, 30, 40, 50])
-                ix_arr = np.array([100])
-                iy_arr = np.array([100])
-                width_arr = np.array([10])
-                height_arr = np.array([10])
+                ix_arr = np.array([600, 700, 800, 900])
+                iy_arr = np.array([100, 200, 300, 400])
+                width_arr = np.array([20, 50, 20, 50])
+                height_arr = np.array([20, 30, 40, 50])
                 logger.debug(f'Generating dummy mask for polygon with the following arguments: {ix_arr} {iy_arr} {width_arr} {height_arr} {pcx} {pcy} {icx} {icy} {self.roi[0]} {self.roi[1]} {DSI_IMGWIDTH} {DSI_IMGHEIGHT}')
                 trash = numba_utils.generate_pg_multi_rectangle_mask(
                     ix_arr, iy_arr, width_arr, height_arr,
