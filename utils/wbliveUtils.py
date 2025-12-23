@@ -13,7 +13,7 @@ import codecs
 
 # conditional import, necessary for standalone testing
 try:
-    from lib import MMSubroutines
+    from utils import MMSubroutines
 except ImportError as err:
     # change path and try again
     try:
