@@ -593,7 +593,7 @@ class TestMetadata:
         engine.initialize_stimulus()
         engine.run_acquisition_loop()
         
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             # Verify Config objects are in metadata
@@ -623,7 +623,7 @@ class TestMetadata:
         engine.initialize_stimulus()
         engine.run_acquisition_loop()
         
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             assert metadata["t0"] is not None
@@ -644,7 +644,7 @@ class TestMetadata:
         engine.initialize_algorithm()
         engine.initialize_stimulus()
         
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             assert "alg_metadata" in metadata
@@ -665,7 +665,7 @@ class TestMetadata:
         engine.initialize_algorithm()
         engine.initialize_stimulus()
         
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             assert "stim_metadata" in metadata
@@ -688,7 +688,7 @@ class TestMetadata:
         engine.run_acquisition_loop()
         
         from unittest.mock import patch
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             # Verify hardware metadata is collected through HardwareManager
@@ -771,7 +771,7 @@ class TestCleanup:
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
-        with patch('lib.wbliveUtils.notify') as mock_notify:
+        with patch('utils.wbliveUtils.notify') as mock_notify:
             engine.cleanup()
             
             mock_notify.assert_called_once()
@@ -784,7 +784,7 @@ class TestCleanup:
         engine.initialize_hardware()
         engine.prepare_acquisition()
         
-        with patch('lib.wbliveUtils.notify') as mock_notify:
+        with patch('utils.wbliveUtils.notify') as mock_notify:
             engine.cleanup()
             
             mock_notify.assert_not_called()
@@ -893,7 +893,7 @@ class TestIntegration:
             algorithm_config=configs["algorithm"]
         )
         
-        with patch('lib.MMSubroutines.saveScanTiffs') as mock_save:
+        with patch('utils.MMSubroutines.saveScanTiffs') as mock_save:
             engine.run()
             
             # Should call save function
@@ -903,7 +903,7 @@ class TestIntegration:
         """Test that images are not saved when flag is disabled."""
         engine = engine_with_configs
         
-        with patch('lib.MMSubroutines.saveScanTiffs') as mock_save:
+        with patch('utils.MMSubroutines.saveScanTiffs') as mock_save:
             engine.run()
             
             # Should not call save function

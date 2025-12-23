@@ -1,19 +1,10 @@
 import numpy as np
-
-# import napari
 import json
 import logging
-# import scipy.io
-import pickle
-import platform
-from os import path
-import codecs
-import numba
-from numba import jit
 
 # conditional import, necessary for standalone testing
 try:
-    from lib import MMSubroutines
+    from utils import MMSubroutines
 except ImportError as err:
     # change path and try again
     try:
@@ -21,6 +12,18 @@ except ImportError as err:
     except ImportError as err:
         logging.critical('Error while trying to import MMSubroutines: {}'.format(err))
 
+# import numba, patch for testing 
+try:
+    import numba
+    from numba import jit
+except ImportError as err:
+    numba = None
+    def jit(nopython):
+        def decorator(func):
+            return func
+        return decorator
+    
+logger = logging.getLogger(__name__)
 
 # function to apply three point calibration
 @jit(nopython=True)
@@ -452,7 +455,7 @@ if __name__ == "__main__":
     roi = [600,1360,2000,480]
     
     # pick some stims to make
-    ix_arr = [600, 7000, 800, 900]
+    ix_arr = [600, 700, 800, 900]
     iy_arr = [100, 200, 300, 400]
     width_arr = [20, 50, 20, 50]
     height_arr = [20, 30, 40, 50]
