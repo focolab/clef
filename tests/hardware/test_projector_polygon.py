@@ -83,19 +83,19 @@ def mock_calibration_data():
                 "objective": "20x",
                 "binning": "1x1",
                 "datetime": "2024-01-15",
-                "pcx": [100, 200, 300, 400],
-                "pcy": [100, 200, 300, 400],
-                "icx": [50, 150, 250, 350],
-                "icy": [50, 150, 250, 350]
+                "pcx": [250, 500, 750],
+                "pcy": [200, 500, 800],
+                "icx": [880, 1722, 2578],
+                "icy": [981, 1494, 1998]
             },
             {
                 "objective": "20x",
                 "binning": "1x1",
                 "datetime": "2024-01-01",  # Older calibration
-                "pcx": [90, 190, 290, 390],
-                "pcy": [90, 190, 290, 390],
-                "icx": [45, 145, 245, 345],
-                "icy": [45, 145, 245, 345]
+                "pcx": [90, 190, 290],
+                "pcy": [90, 190, 290],
+                "icx": [931, 1762, 2617],
+                "icy": [986, 1490, 1992]
             }
         ]
     }
@@ -278,7 +278,7 @@ class TestMicroManagerStimulusPolygonIntegration:
                     "objective": "40x",  # Different objective
                     "binning": "1x1",
                     "datetime": "2024-01-15",
-                    "pcx": [100, 200],
+                    "pcx": [100, 200,],
                     "pcy": [100, 200],
                     "icx": [50, 150],
                     "icy": [50, 150]
@@ -339,7 +339,7 @@ class TestMicroManagerStimulusPolygonIntegration:
             assert 'icx' in calib
             assert 'icy' in calib
     
-    @patch('hardware.backends.micromanager_backend.utils')
+    @patch('hardware.backends.micromanager_backend.numba_utils')
     def test_polygon_update_mask_circle_event(self, mock_utils, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test update_polygon_mask with circle event."""
         # Mock mask generation
@@ -379,7 +379,7 @@ class TestMicroManagerStimulusPolygonIntegration:
             call_args = mock_mmc.setSLMImage.call_args[0]
             assert call_args[0] == "Polygon-SLM"
     
-    @patch('hardware.backends.micromanager_backend.utils')
+    @patch('hardware.backends.micromanager_backend.numba_utils')
     def test_polygon_update_mask_rectangle_list(self, mock_utils, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test update_polygon_mask with rectangle list event."""
         mock_mask = np.ones((1080, 1920), dtype=np.uint8) * 128
@@ -521,7 +521,7 @@ class TestPolygonStimulusController:
         assert controller.hardware_manager == mock_hardware_manager
         assert controller.calibration_points == {}
     
-    @patch('hardware.backends.micromanager_backend.utils')
+    @patch('hardware.backends.micromanager_backend.numba_utils')
     def test_polygon_controller_spool(self, mock_utils, mock_hardware_manager, controller_config):
         """Test spool pre-compiles JIT functions."""
         mock_utils.generate_pg_ellipse_mask.return_value = np.zeros((1080, 1920), dtype=np.uint8)

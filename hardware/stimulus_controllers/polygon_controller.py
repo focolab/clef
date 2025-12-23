@@ -9,7 +9,7 @@ import logging
 import time
 import numpy as np
 from typing import Dict, Any
-
+from utils import numba_utils
 from hardware.stimulus_controllers.base_controller import BaseStimulusController
 
 logger = logging.getLogger(__name__)
@@ -43,11 +43,15 @@ class PolygonStimulusController(BaseStimulusController):
         
         # Import utilities (these should be available)
         try:
-            from lib import wbliveUtils as utils
             
             # Get polygon dimensions from hardware
             polygon_dims = self.hardware_manager.stimulus.get_polygon_dimensions()
-            DSI_IMGWIDTH, DSI_IMGHEIGHT = polygon_dims
+            if polygon_dims is not None:
+                DSI_IMGWIDTH, DSI_IMGHEIGHT = polygon_dims
+            else:
+                # polygon unsuccessfully initialized. For testing, pass along default values
+                DSI_IMGHEIGHT = 1140
+                DSI_IMGWIDTH = 912
             
             # Get calibration points from hardware
             calib = self.hardware_manager.stimulus.get_calibration_points()
@@ -59,7 +63,7 @@ class PolygonStimulusController(BaseStimulusController):
             # Spool based on trigger algorithm
             if self.trigger_alg in ["PointAndClick", "HammerOfDawn"]:
                 stim_diameter = 20  # default
-                trash = utils.generate_pg_ellipse_mask(
+                trash = numba_utils.generate_pg_ellipse_mask(
                     DSI_IMGWIDTH // 2,
                     DSI_IMGHEIGHT // 2,
                     pcx, pcy, icx, icy,
@@ -70,11 +74,16 @@ class PolygonStimulusController(BaseStimulusController):
             
             if self.trigger_alg == 'Brainalyzer':
                 # Spool multi-rectangle mask generation
-                ix_arr = np.array([600, 7000, 800, 900])
-                iy_arr = np.array([100, 200, 300, 400])
-                width_arr = np.array([20, 50, 20, 50])
-                height_arr = np.array([20, 30, 40, 50])
-                trash = utils.generate_pg_multi_rectangle_mask(
+                # ix_arr = np.array([600, 700, 800, 900])
+                # iy_arr = np.array([100, 200, 300, 400])
+                # width_arr = np.array([20, 50, 20, 50])
+                # height_arr = np.array([20, 30, 40, 50])
+                ix_arr = np.array([100])
+                iy_arr = np.array([100])
+                width_arr = np.array([10])
+                height_arr = np.array([10])
+                logger.debug(f'Generating dummy mask for polygon with the following arguments: {ix_arr} {iy_arr} {width_arr} {height_arr} {pcx} {pcy} {icx} {icy} {self.roi[0]} {self.roi[1]} {DSI_IMGWIDTH} {DSI_IMGHEIGHT}')
+                trash = numba_utils.generate_pg_multi_rectangle_mask(
                     ix_arr, iy_arr, width_arr, height_arr,
                     pcx, pcy, icx, icy,
                     self.roi[0], self.roi[1],

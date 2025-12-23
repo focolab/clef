@@ -14,7 +14,7 @@ from typing import Dict, Any, Tuple, Union, Optional
 from hardware.data_interface import DataInterface
 from hardware.camera_interface import CameraInterface
 from config.config_manager import ExperimentConfig
-from lib import MMSubroutines
+from utils import MMSubroutines
 
 logger = logging.getLogger(__name__)
 
