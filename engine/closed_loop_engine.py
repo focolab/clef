@@ -17,8 +17,8 @@ from typing import Any, Dict
 import numpy as np
 
 # Custom libraries and utils
-from lib import wbliveUtils as utils
-from lib import MMSubroutines
+from utils import wbliveUtils
+from utils import MMSubroutines
 
 # Import config models
 from config.config_manager import (
@@ -483,14 +483,14 @@ class ClosedLoopEngine:
             metadata["stim_metadata"] = self.stim_controller.get_metadata(args=metadata)
             
         # Save to file
-        utils.save_metadata(
+        wbliveUtils.save_metadata(
             savefilename=self.saveroot + "_metadata.json",
             metadata=metadata
         )
         
         # Prefill wb_ops if requested
         if self.prefill_wb_ops:
-            utils.prefill_wb_ops(savefileroot=self.savedir, metadata=metadata)
+            wbliveUtils.prefill_wb_ops(savefileroot=self.savedir, metadata=metadata)
             
         logger.info("Metadata saved")
 
@@ -526,7 +526,7 @@ class ClosedLoopEngine:
         if self.save_mip_movie:
             logger.info("Generating MIP movie...")
             exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps
-            utils.generate_mip_movie(
+            wbliveUtils.generate_mip_movie(
                 savefilename=self.saveroot + "_mip_movie",
                 samples=self.samples,
                 zsize=self.zsize,
@@ -585,7 +585,7 @@ class ClosedLoopEngine:
         if self.notify_sms_on_done:
             try:
                 msg = f"Your wb-live recording {self.session_id} has completed."
-                utils.notify(msg, interface="twilio-sms")
+                wbliveUtils.notify(msg, interface="twilio-sms")
             except Exception as err:
                 logger.warning(f"Error sending notification: {err}")
                 

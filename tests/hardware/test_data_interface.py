@@ -616,7 +616,7 @@ class TestClosedLoopEngineDataInterface:
         engine.initialize_stimulus()
         engine.run_acquisition_loop()
         
-        with patch('lib.wbliveUtils.save_metadata') as mock_save:
+        with patch('utils.wbliveUtils.save_metadata') as mock_save:
             metadata = engine.save_metadata()
             
             # Should include sample properties

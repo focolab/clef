@@ -16,10 +16,15 @@ from hardware.stimulus_interface import StimulusInterface
 from hardware.projector_interface import ProjectorInterface
 from config.config_manager import HardwareConfig
 
+        
+# Import utilities for mask generation
+from utils import wbliveUtils
+from utils import numba_utils
+
 logger = logging.getLogger(__name__)
 
 # Import MMSubroutines to use existing initialization logic
-from lib import MMSubroutines
+from utils import MMSubroutines
 
 # Import JavaObject for pycromanager ASI stage buffer
 try:
@@ -639,13 +644,6 @@ class MicroManagerStimulus(StimulusInterface):
             logger.error("SLM device not configured")
             return
         
-        # Import utilities for mask generation
-        try:
-            from lib import wbliveUtils as utils
-        except ImportError:
-            logger.error("Could not import wbliveUtils for mask generation")
-            return
-        
         event = stim_params.get('event', {})
         event_type = event.get('event_type')
         
@@ -669,7 +667,7 @@ class MicroManagerStimulus(StimulusInterface):
             cy = int(event["y"])
             diameter = int(event.get("stim_diameter", 20))
             
-            mask = utils.generate_pg_ellipse_mask(
+            mask = numba_utils.generate_pg_ellipse_mask(
                 cx, cy, pcx, pcy, icx, icy,
                 diameter, roi[0], roi[1], width, height
             )
@@ -681,7 +679,7 @@ class MicroManagerStimulus(StimulusInterface):
             width_list = np.array(stim_rect_roi_list.get('width', []))
             height_list = np.array(stim_rect_roi_list.get('height', []))
             
-            mask = utils.generate_pg_multi_rectangle_mask(
+            mask = numba_utils.generate_pg_multi_rectangle_mask(
                 x_list, y_list, width_list, height_list,
                 pcx, pcy, icx, icy,
                 roi[0], roi[1], width, height
@@ -750,6 +748,9 @@ class MicroManagerStimulus(StimulusInterface):
                 for cali in calibrations:
                     if (cali["objective"] == obj and 
                         cali["datetime"] == latest_dt):
+                        
+                        logger.info(f'Loaded calibration: {cali}')
+                        
                         return {
                             "pcx": np.array(cali["pcx"]),
                             "pcy": np.array(cali["pcy"]),
