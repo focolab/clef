@@ -1,0 +1,46 @@
+# Hardware configuration for Innovation Core microscope with LDI Polygon
+backend: "pycromanager"
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0\\InnovationCore_Config.cfg"
+stim_interface: "InvCore-LDI-Polygon-640"
+microscope_name: "innovation core spinning disk"
+
+# Stimulus device configurations
+stimulus_devices:
+  InvCore-LDI-Polygon-640:
+    type: "polygon"
+    intensity_device: "89 North Laser Diode Illuminator"
+    intensity_property: "640 Intensity"
+    shutter_device: "89 North Laser Diode Illuminator"
+    slm_device: null  # Will query from MMC
+
+# Device configurations
+devices:
+  camera:
+    device_name: "Camera"
+    device_type: "camera"
+    properties:
+      Exposure: 10.0
+      Binning: 1
+    configs:
+      Channel: "488"
+  
+  stage:
+    device_name: "ZStage"
+    device_type: "stage"
+    properties: {}
+    configs: {}
+
+# System properties
+system_properties:
+  auto_shutter: false
+  circular_buffer_mb: 10000
+  shutters:
+    - device_name: "89 North Laser Diode Illuminator"
+      state: true
+
+# Calibration
+polygon_calibration_path: "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+
+# Strobe settings
+strobe_acquisition: false
+use_static_stim_roi: false

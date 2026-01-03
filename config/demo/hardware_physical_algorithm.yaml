@@ -1,0 +1,23 @@
+# Algorithm configuration for Brainalyzer hardware demo
+algorithm_type: "Brainalyzer"
+enable_gui: true
+gui_mode: "neural_imaging"
+save_algorithm_plot: true
+
+# Algorithm parameters
+algorithm_params:
+  stim_cooldown_frames: 80  # ~8 volumes at 8 z-planes
+  skip_stimulation_probability: 0.0
+  delay_stimulation_probability: 0.0
+  stim_delay_frames_options: [20, 40]
+  stim_onset_list: []
+  stimulus_diameter_pixels: 30
+
+# Stimulus parameters
+stimulus_params:
+  enabled: true
+  randomize: false
+  duration_frames_options: [24, 48]  # 3-6 volumes
+  intensity_percent_options: [10, 20, 30]
+  duration_frames: 24
+  intensity_percent: 10
