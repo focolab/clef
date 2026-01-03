@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.hardware
 
+# Add parent directory to path
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 @pytest.fixture
 def brainalyzer_configs():
@@ -31,9 +35,9 @@ def brainalyzer_configs():
     config_dir = Path("./config/demo")
     
     config_manager.load_all_configs(
-        hardware_path=config_dir / "hardware_brainalyzer_innovation_core.yaml",
-        experiment_path=config_dir / "experiment_brainalyzer_hardware.yaml",
-        algorithm_path=config_dir / "algorithm_brainalyzer_hardware.yaml"
+        hardware_path=config_dir / "hardware_physical_hardware.yaml",
+        experiment_path=config_dir / "hardware_physical_experiment.yaml",
+        algorithm_path=config_dir / "hardware_physical_algorithm.yaml"
     )
     
     return config_manager
