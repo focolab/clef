@@ -6,11 +6,15 @@ Tests are skipped unless --hardware flag is provided.
 """
 
 import pytest
+import os
 import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 def pytest_addoption(parser):
     """Add custom command line options."""
