@@ -41,7 +41,7 @@ def pytest_collection_modifyitems(config, items):
     
     skip_hardware = pytest.mark.skip(reason="need --hardware option to run")
     for item in items:
-        if "hardware" in item.keywords:
+        if "hardware_physical" in item.keywords:
             item.add_marker(skip_hardware)
 
 
@@ -54,7 +54,7 @@ def innovation_core_config():
     config_dir = Path("./config/demo")
     
     config_manager.load_hardware_config(
-        config_dir / "hardware_brainalyzer_innovation_core.yaml"
+        config_dir / "hardware_physical_hardware.yaml"
     )
     
     return config_manager.hardware_config
