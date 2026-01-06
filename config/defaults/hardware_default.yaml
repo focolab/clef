@@ -60,8 +60,8 @@ devices:
   stage:
     device_name: "XYStage"
     device_type: "stage"
-    properties:
-      Speed: 1.0
+    # properties:
+    #   Speed: 1.0
     configs: {}
 
 # System-level Micro-Manager properties
