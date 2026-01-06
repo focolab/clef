@@ -16,11 +16,11 @@ stimulus_devices:
 # Device configurations
 devices:
   camera:
-    device_name: "Camera"
+    device_name: "PrimeBSI"
     device_type: "camera"
     properties:
       Exposure: 10.0
-      Binning: 1
+      Binning: "1x1"
     configs:
       Channel: "488"
   

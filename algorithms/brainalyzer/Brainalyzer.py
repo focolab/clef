@@ -101,7 +101,7 @@ class Brainalyzer:
         # Data params - will be set by closed_loop_engine after hardware init
         self.roi = (0, 0, 200, 200)  # Default, will be updated
         try:
-            self.roi = self.hardware.camera.roi
+            self.roi = self.hardware.camera.get_roi()
         except Exception as err:
             logger.warning(f'No hardware detected by brainalyzer, defaulting to image roi: {self.roi}')
         self.xsize = self.roi[2]
