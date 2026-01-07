@@ -38,9 +38,8 @@ system_properties:
     - device_name: "89 North Laser Diode Illuminator"
       state: true
 
-# Calibration
-polygon_calibration_path: "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+# Calibration of DMD
+polygon_calibration_path: "./hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
 
 # Strobe settings
 strobe_acquisition: false
-use_static_stim_roi: false

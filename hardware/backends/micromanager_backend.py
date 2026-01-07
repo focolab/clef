@@ -341,7 +341,7 @@ class MicroManagerStimulus(StimulusInterface):
     - LED (e.g., InvCore-ThunderscopeLED3)
     """
     
-    def __init__(self, mmc, backend: str, hardware_config):
+    def __init__(self, mmc, backend: str, hardware_config: Optional[HardwareConfig]):
         """
         Initialize Micro-Manager stimulus interface.
         
@@ -428,6 +428,7 @@ class MicroManagerStimulus(StimulusInterface):
     def _configure_polygon(self, config: Dict[str, Any]) -> None:
         """Configure polygon/LDI stimulus."""
         dev = self._device_config
+        logger.debug(f'Configuring polygon device with config {dev}')
         
         # Get SLM device
         try:
@@ -448,12 +449,12 @@ class MicroManagerStimulus(StimulusInterface):
             logger.error(f"Could not configure SLM device: {e}")
             return
         
-        # Set config group for simultaneous imaging (if using pymmcore)
-        if self.backend == "pymmcore":
-            try:
-                self.mmc.setConfig("Mightex-Setup", "640-SP")
-            except Exception as e:
-                logger.warning(f"Could not set Mightex config: {e}")
+        # # Set config group for simultaneous imaging (if using pymmcore)
+        # if self.backend == "pymmcore":
+        #     try:
+        #         self.mmc.setConfig("Mightex-Setup", "640-SP")
+        #     except Exception as e:
+        #         logger.warning(f"Could not set Mightex config: {e}")
         
         # Initialize LDI off but open shutter
         try:
@@ -477,7 +478,10 @@ class MicroManagerStimulus(StimulusInterface):
         else:
             # Try default path
             default_path = "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+            logger.warning(f'No polygon calibration path provided, falling back on default at {default_path}')
             self.calibration_points = self._load_polygon_calibration(default_path)
+            if self.calibration_points is None:
+                logger.error(f'No calibration points detected for Polygon, behavior may be undefined.')
     
     def _configure_led(self, config: Dict[str, Any]) -> None:
         """Configure LED stimulus."""
@@ -506,7 +510,7 @@ class MicroManagerStimulus(StimulusInterface):
                    - diameter: optional diameter for polygon
         """
         if not self._configured or self._device_config is None:
-            logger.warning("Stimulus not configured, activation may be undefined")
+            logger.warning(f"Stimulus not configured: {self._configured}, or device config not set: {self._device_config}, activation may be undefined.")
         
         self._active = True
         self._current_params = params
