@@ -41,7 +41,7 @@ def save_metadata(savefilename, metadata):
 
     except Exception as err:
         logging.critical("Exception during saving metadata file: {}".format(err))
-        print("unsaved metadata: {}".format(metadata))
+        logging.debug(f"unsaved metadata: {metadata}")
 
     finally:
         logging.debug("Done saving acquisition metadata!")

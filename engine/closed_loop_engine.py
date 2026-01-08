@@ -83,7 +83,7 @@ class ClosedLoopEngine:
         # self.ysize = 200  # default for unit tests
         self.roi = (0, 0, 200, 200) # default for unit tests
         self.alg = None
-        self.stim_controller = None  # stimulus controller
+        self.stim_controller = None  # stimulus controller loaded later
         self.t0 = 1.  # default for unit tests
         self.args["t0"] = self.t0
         self.args["id"] = "11111111-11-11-11"  # default for unit tests
@@ -291,13 +291,21 @@ class ClosedLoopEngine:
         try:
             # Get stimulus interface type from hardware config
             stim_interface = self.hardware_config.stim_interface
+
+            # Configure device
+            logger.info('Configuring stimulus device')
+            self.hardware.stimulus.configure_stimulus(config={'interface_type': stim_interface})
             
-            # Create stimulus controller using factory
+            # Create stimulus controller using factory for that device
             self.stim_controller = create_stimulus_controller(
                 stim_interface=stim_interface,
                 hardware_manager=self.hardware,
                 config=self.args  # Still passing args for backward compatibility
             )
+
+            # Spool controller
+            logger.info('Spooling stimulus device')
+            self.stim_controller.spool()
             
             logger.info(f"Stimulus controller initialized: {type(self.stim_controller).__name__}")
             
