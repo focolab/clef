@@ -155,14 +155,23 @@ class TestPolygonStimulusController:
         
         hardware = HardwareManager(brainalyzer_configs.hardware_config)
         hardware.initialize()
-        
+
+        # Also need to configure stimulus with data after hardware e.g. camera is initialized
+        # Get stimulus interface type from hardware config
+        stim_interface = brainalyzer_configs.hardware_config.stim_interface
+
+        # Configure device
+        logger.info('Configuring stimulus device')
+        hardware.stimulus.configure_stimulus(config={'interface_type': stim_interface})
+
         # Build legacy args for controller
         args = {
             "gooey_args": {
                 "trigger_algorithm": "Brainalyzer",
-                "stim_interface": "InvCore-LDI-Polygon-640"
+                "stim_interface": stim_interface
             },
-            "roi": [0, 0, 2048, 2048]
+            # "roi": [0, 0, 2048, 2048]
+            "roi": hardware.camera.get_roi()
         }
         
         controller = PolygonStimulusController(hardware, args)
@@ -226,16 +235,16 @@ class TestPolygonStimulusController:
         polygon_controller.submit_stim_params(stim_params, image_ndx=0)
         
         # Check activation before stim_on
-        polygon_controller.check_stim(image_ndx=5)
+        polygon_controller.check_stim(img_count=5)
         assert not polygon_controller.hardware_manager.stimulus.is_stimulus_active()
         logger.info("✓ Stimulus inactive before stim_on")
         
         # Check activation at stim_on
-        polygon_controller.check_stim(image_ndx=10)
+        polygon_controller.check_stim(img_count=10)
         assert polygon_controller.hardware_manager.stimulus.is_stimulus_active()
         logger.info("✓ Stimulus activated at stim_on")
         
         # Check deactivation at stim_off
-        polygon_controller.check_stim(image_ndx=20)
+        polygon_controller.check_stim(img_count=20)
         assert not polygon_controller.hardware_manager.stimulus.is_stimulus_active()
         logger.info("✓ Stimulus deactivated at stim_off")
