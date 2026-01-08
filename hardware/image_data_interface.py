@@ -114,7 +114,8 @@ class ImageDataInterface(DataInterface):
         Args:
             buffer_size: Circular buffer size (0 = unlimited)
         """
-        self.camera.start_acquisition(buffer_size=buffer_size)
+        # self.camera.start_acquisition(buffer_size=buffer_size)
+        self.camera.start_acquisition()
         logger.debug(f"Started continuous image sampling (buffer_size={buffer_size})")
     
     def stop_sampling(self) -> None:

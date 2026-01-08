@@ -72,7 +72,7 @@ class MicroManagerCamera(CameraInterface):
     
     def start_acquisition(self, buffer_size: int = 0) -> None:
         """Start continuous sequence acquisition."""
-        self.mmc.setCircularBufferMemoryFootprint(buffer_size if buffer_size > 0 else 10000)
+        # self.mmc.setCircularBufferMemoryFootprint(buffer_size if buffer_size > 0 else 10000)
         self.mmc.startContinuousSequenceAcquisition(0)
         logger.debug("Micro-Manager: Started continuous acquisition")
     
@@ -528,8 +528,6 @@ class MicroManagerStimulus(StimulusInterface):
             logger.debug(f"Dummy stimulus activated: intensity={intensity}")
         else:
             logger.warning("No valid stim type found for activation.")
-        
-        
     
     def _activate_widefield_laser(self, intensity: float) -> None:
         """Activate widefield laser."""
@@ -845,7 +843,6 @@ class MicroManagerBackend(BaseHardwareBackend):
         self.mmc = None
         self._projector: Optional[ProjectorInterface] = None
 
-    
     def initialize(self, input_recording: Optional[str] = None) -> None:
         """
         Initialize Micro-Manager hardware.
@@ -896,6 +893,11 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._apply_device_properties()
         self._apply_device_configs()
         self._apply_system_properties()
+
+        # Apply initial component configuration -- could happen here?
+        # self._camera.configure_camera()
+        # self._stage.configure_stage()
+        # self._stimulus.configure_stimulus()
         
         self._initialized = True
         logger.info("Micro-Manager backend initialized")
@@ -1025,7 +1027,8 @@ class MicroManagerBackend(BaseHardwareBackend):
                 # Note: setCircularBufferMemoryFootprint unit may vary by Micro-Manager version
                 # Existing code uses values like 10000 directly. We pass MB value as-is to match
                 # existing behavior. If your Micro-Manager version expects bytes, multiply by 1024*1024.
-                self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                # self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                self.mmc.setCircularBufferMemoryFootprint(10000)
                 logger.debug(f"Set circular_buffer_memory_footprint = {sys_props.circular_buffer_mb}")
             except Exception as e:
                 logger.warning(f"Could not set circular_buffer_memory_footprint: {e}")
