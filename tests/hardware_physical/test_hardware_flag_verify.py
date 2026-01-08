@@ -47,7 +47,7 @@ class TestHardwareFlagClass:
         assert True
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.hardware
 def test_combined_markers():
     """Test that multiple markers work together."""

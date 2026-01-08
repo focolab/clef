@@ -10,6 +10,7 @@ import os
 import time
 from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
+import numpy as np
 
 # Import the engine and supporting modules
 import sys
@@ -449,17 +450,17 @@ class TestPolygonStimulusController:
         """Test polygon metadata includes calibration points."""
         # Mock calibration points
         mock_hardware_manager.stimulus.get_calibration_points.return_value = {
-            "pcx": [1, 2, 3],
-            "pcy": [4, 5, 6],
-            "icx": [7, 8, 9],
-            "icy": [10, 11, 12]
+            "pcx": np.array([1, 2, 3]),
+            "pcy": np.array([4, 5, 6]),
+            "icx": np.array([7, 8, 9]),
+            "icy": np.array([10, 11, 12])
         }
         
         controller = PolygonStimulusController(mock_hardware_manager, minimal_config)
         metadata = controller.get_metadata()
         
         assert "calibration_points" in metadata
-        assert metadata["calibration_points"]["pcx"] == [1, 2, 3]
+        assert metadata["calibration_points"]["pcx"] == [1, 2, 3] # casts back to list
 
 
 class TestStimulusControllerFactory:

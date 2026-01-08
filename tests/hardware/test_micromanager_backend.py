@@ -116,9 +116,9 @@ class TestMicroManagerCamera:
     def test_camera_start_acquisition(self, mock_mmc):
         """Test start_acquisition."""
         camera = MicroManagerCamera(mock_mmc, "pycromanager")
-        camera.start_acquisition(buffer_size=5000)
+        camera.start_acquisition(buffer_size=5000) # default val, 20260108 overrides with 10k
         
-        mock_mmc.setCircularBufferMemoryFootprint.assert_called_once_with(5000)
+        mock_mmc.setCircularBufferMemoryFootprint.assert_called_once_with(10000)
         mock_mmc.startContinuousSequenceAcquisition.assert_called_once_with(0)
     
     def test_camera_stop_acquisition(self, mock_mmc):
