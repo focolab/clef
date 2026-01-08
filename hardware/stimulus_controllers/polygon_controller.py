@@ -30,6 +30,9 @@ class PolygonStimulusController(BaseStimulusController):
         
         # Polygon-specific attributes will be set by hardware backend
         self.calibration_points = {}
+
+        # We need camera ROI for calibration
+        self.roi = self.hardware_manager.camera.get_roi()
     
     def spool(self) -> None:
         """
@@ -52,9 +55,11 @@ class PolygonStimulusController(BaseStimulusController):
                 # polygon unsuccessfully initialized. For testing, pass along default values
                 DSI_IMGHEIGHT = 1140
                 DSI_IMGWIDTH = 912
+            logger.debug(f'Retrieved Polygon dimensions: {polygon_dims}')
             
             # Get calibration points from hardware
             calib = self.hardware_manager.stimulus.get_calibration_points()
+            logger.debug(f'Retrieved Polygon calibration: {calib}')
             pcx = np.array(calib['pcx'])
             pcy = np.array(calib['pcy'])
             icx = np.array(calib['icx'])
@@ -240,6 +245,13 @@ class PolygonStimulusController(BaseStimulusController):
         # Add polygon-specific metadata
         try:
             calib = self.hardware_manager.stimulus.get_calibration_points()
+
+            # replace numpy array vals with lists
+            calib['pcx'] = calib['pcx'].tolist()
+            calib['pcy'] = calib['pcy'].tolist()
+            calib['icx'] = calib['icx'].tolist()
+            calib['icy'] = calib['icy'].tolist()
+
             metadata["calibration_points"] = calib
         except Exception as e:
             logger.warning(f"Could not get calibration points for metadata: {e}")
