@@ -87,7 +87,7 @@ class TestBrainalyzerHardwareIntegration:
         # Cleanup
         closed_loop_engine.cleanup()
     
-    @pytest.mark.slow
+    # @pytest.mark.slow
     def test_short_acquisition_with_stimulus(self, closed_loop_engine):
         """Test short acquisition with stimulus trigger."""
         logger.info("Testing short acquisition with stimulus...")
