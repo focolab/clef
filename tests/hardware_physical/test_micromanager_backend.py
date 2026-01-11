@@ -176,7 +176,7 @@ class TestStageOperations:
         stage_connected.wait_for_device()
         logger.info("✓ Returned to initial position")
     
-    @pytest.mark.slow
+    # @pytest.mark.slow
     def test_configure_zstack(self, stage_connected):
         """Test configuring Z-stack sequence."""
         logger.info("Testing Z-stack configuration...")
@@ -306,7 +306,7 @@ class TestDataInterface:
 class TestIntegratedAcquisition:
     """Test integrated acquisition with all hardware components."""
     
-    @pytest.mark.slow
+    # @pytest.mark.slow
     def test_acquire_small_zstack(self, hardware_manager_connected):
         """Test acquiring a small Z-stack with all components."""
         logger.info("Testing integrated Z-stack acquisition...")

@@ -72,7 +72,9 @@ class MicroManagerCamera(CameraInterface):
     
     def start_acquisition(self, buffer_size: int = 0) -> None:
         """Start continuous sequence acquisition."""
-        # self.mmc.setCircularBufferMemoryFootprint(buffer_size if buffer_size > 0 else 10000)
+        if buffer_size != 0:
+            logger.warning('Attempting to set camera buffer with {}, but overwriting!')
+        self.mmc.setCircularBufferMemoryFootprint(10000)
         self.mmc.startContinuousSequenceAcquisition(0)
         logger.debug("Micro-Manager: Started continuous acquisition")
     
