@@ -211,7 +211,7 @@ class MicroManagerStage(StageInterface):
             self.mmc.setPosition(focus_dev, float(position[0]))
         logger.debug(f"Micro-Manager: Moved stage to {position}")
     
-    def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+    def configure_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
         """
         Configure Z-stack sequence.
         
@@ -248,9 +248,9 @@ class MicroManagerStage(StageInterface):
         z_end = config.get("z_end")
         z_step = config.get("z_step")
         pad_z = config.get("pad_z", 0)
-        ttl_device = config.get("ttl_device", "TTL1-8")
-        ttl_state = config.get("ttl_state", "18")
-        
+
+        logger.info(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}")
+
         if z_start is None or z_end is None or z_step is None:
             raise ValueError("z_start, z_end, and z_step are required for stage configuration")
         
@@ -267,6 +267,10 @@ class MicroManagerStage(StageInterface):
         if self.backend == "pycromanager":
             if JavaObject is None:
                 raise ImportError("pycromanager.JavaObject required for ASI stage buffer configuration")
+            
+            # position buffer is sent as ttl property sequence by MM
+            ttl_device = config.get("ttl_device")
+            ttl_state = config.get("ttl_state")
             
             # Create Java objects for stage sequence
             dv = JavaObject("mmcorej.DoubleVector")
