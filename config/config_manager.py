@@ -89,38 +89,31 @@ class AcquisitionConfig(BaseModel):
 class TreatmentDetails(BaseModel):
     """Treatment/condition details."""
     condition: str = Field("", description="Experimental condition")
-    atr_concentration_uM: Optional[float] = Field(None, description="ATR concentration (µM)")
-    
     model_config = ConfigDict(extra="allow")
-
 
 class Orientation(BaseModel):
     """Anatomical orientation (domain-specific, e.g., C. elegans)."""
-    nose: Optional[str] = Field(None, description="Nose orientation (e.g., left/right/other)")
-    vnc: Optional[str] = Field(None, description="VNC orientation (e.g., up/down/other)")
-    
+    # nose: Optional[str] = Field(None, description="Nose orientation (e.g., left/right/other)")
+    # vnc: Optional[str] = Field(None, description="VNC orientation (e.g., up/down/other)")
     model_config = ConfigDict(extra="allow")
 
+class SubjectDetails(BaseModel):
+    treatment: Optional[str] = Field(None, description="Experimental treatment (summary)")
+    treatment_details: TreatmentDetails = Field(default_factory=TreatmentDetails)
+    orientation: Orientation = Field(default_factory=Orientation)
 
 class SubjectMetadata(BaseModel):
     """Experimental subject metadata (generic, not worm-specific)."""
     subject_id: Optional[str] = Field(None, description="Subject identifier")
     subject_type: Optional[str] = Field(None, description="Subject type (e.g., 'C. elegans', 'cell culture')")
-    genotype: Optional[str] = Field(None, description="Genetic background or strain")
-    treatment: Optional[str] = Field(None, description="Experimental treatment (summary)")
-    treatment_details: TreatmentDetails = Field(default_factory=TreatmentDetails)
-    orientation: Orientation = Field(default_factory=Orientation)
-    num_eggs: int = Field(0, ge=0, description="Number of eggs (for egg-laying organisms)")
+    subject_details: SubjectDetails = Field(default_factor=SubjectDetails)
     notes: Optional[str] = Field(None, description="Additional notes")
-    
     model_config = ConfigDict(extra="allow")  # Allow domain-specific fields
-
 
 class DevOptions(BaseModel):
     """Development/testing options."""
-    prefill_wb_ops: bool = Field(False, description="Prefill wboptions.mat and meta.mat")
-    send_sms_on_completion: bool = Field(False, description="Send SMS when acquisition completes")
-    
+    # prefill_wb_ops: bool = Field(False, description="Prefill wboptions.mat and meta.mat")
+    # send_sms_on_completion: bool = Field(False, description="Send SMS when acquisition completes")
     model_config = ConfigDict(extra="allow")
 
 
@@ -131,16 +124,16 @@ class ExperimentConfig(BaseModel):
     output_dir: str = Field("./data", description="Output directory for data")
     save_images: bool = Field(True, description="Save acquired images")
     save_metadata: bool = Field(True, description="Save metadata JSON")
-    save_mip_video: bool = Field(False, description="Save maximum intensity projection video")
+    save_sample_video: bool = Field(False, description="Save maximum intensity projection video")
     
     acquisition: AcquisitionConfig = Field(default_factory=AcquisitionConfig)
     subject: SubjectMetadata = Field(default_factory=SubjectMetadata)
     
     # Z-step size (duplicated for backward compatibility)
-    z_step_size_um: float = Field(1.0, gt=0, description="Z-step size in micrometers")
+    # z_step_size_um: float = Field(1.0, gt=0, description="Z-step size in micrometers")
     
     # Input recording for playback/simulation
-    input_recording_path: Optional[str] = Field(None, description="Path to input TIFF for playback")
+    # input_recording_path: Optional[str] = Field(None, description="Path to input TIFF for playback")
     
     # Development options
     dev_options: DevOptions = Field(default_factory=DevOptions)
@@ -151,49 +144,53 @@ class ExperimentConfig(BaseModel):
 class AlgorithmParameters(BaseModel):
     """Algorithm-specific parameters."""
     # Threshold parameters (for derivative-based algorithms)
-    stim_threshold_pos: float = Field(0.06, description="Positive threshold to trigger")
-    stim_threshold_neg: float = Field(0.06, description="Negative threshold (abs value)")
+    # stim_threshold_pos: float = Field(0.06, description="Positive threshold to trigger")
+    # stim_threshold_neg: float = Field(0.06, description="Negative threshold (abs value)")
     
     # Refractory period
-    stim_cooldown_frames: int = Field(900, ge=0, description="Frames between allowed stims")
+    # stim_cooldown_frames: int = Field(900, ge=0, description="Frames between allowed stims")
     
     # Stochastic stimulation
-    skip_stimulation_probability: float = Field(0.1, ge=0.0, le=1.0, description="Prob of skipping stim")
-    delay_stimulation_probability: float = Field(0.4, ge=0.0, le=1.0, description="Prob of delaying stim")
-    stim_delay_frames_options: List[int] = Field(default_factory=lambda: [200, 400], description="Delay options")
+    # skip_stimulation_probability: float = Field(0.1, ge=0.0, le=1.0, description="Prob of skipping stim")
+    # delay_stimulation_probability: float = Field(0.4, ge=0.0, le=1.0, description="Prob of delaying stim")
+    # stim_delay_frames_options: List[int] = Field(default_factory=lambda: [200, 400], description="Delay options")
     
     # Fixed timing (for StimOnsetFromList)
-    stim_onset_list: List[int] = Field(default_factory=list, description="Fixed stim frame numbers")
+    # stim_onset_list: List[int] = Field(default_factory=list, description="Fixed stim frame numbers")
     
     # PointAndClick specific
-    stimulus_diameter_pixels: int = Field(10, gt=0, description="ROI diameter for point-and-click")
+    # stimulus_diameter_pixels: int = Field(10, gt=0, description="ROI diameter for point-and-click")
+    enable_gui: bool = Field(False, description="Enable algorithm GUI")
+    gui_mode: str = Field("neural_imaging", description="GUI mode (neural_imaging/behavior)")
+
     
-    model_config = ConfigDict(extra="allow")  # Allow arbitrary algorithm parameters
+    # Allow arbitrary algorithm parameters
+    model_config = ConfigDict(extra="allow")  
 
 
 class StimulusParameters(BaseModel):
     """Stimulus-specific parameters."""
     enabled: bool = Field(False, description="Enable stimulus delivery")
-    randomize: bool = Field(False, description="Use stochastic skip/delay")
+    # randomize: bool = Field(False, description="Use stochastic skip/delay")
     
     # Stimulus timing and intensity options
-    duration_frames_options: List[int] = Field(default_factory=lambda: [48], description="Duration options (frames)")
-    intensity_percent_options: List[int] = Field(default_factory=lambda: [10], description="Intensity options (0-100%)")
+    # duration_frames_options: List[int] = Field(default_factory=lambda: [48], description="Duration options (frames)")
+    # intensity_percent_options: List[int] = Field(default_factory=lambda: [10], description="Intensity options (0-100%)")
     
     # Selected values (from options)
-    duration_frames: int = Field(48, gt=0, description="Actual duration used")
-    intensity_percent: int = Field(10, ge=0, le=100, description="Actual intensity used")
+    # duration_frames: int = Field(48, gt=0, description="Actual duration used")
+    # intensity_percent: int = Field(10, ge=0, le=100, description="Actual intensity used")
     
     model_config = ConfigDict(extra="allow")
 
 
 class AlgorithmConfig(BaseModel):
     """Algorithm configuration (algorithm.yaml)."""
+
     algorithm_type: str = Field("dummy", description="Algorithm class name")
-    enable_gui: bool = Field(False, description="Enable algorithm GUI")
-    gui_mode: str = Field("neural_imaging", description="GUI mode (neural_imaging/behavior)")
     save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
     
+    # sub parameters
     algorithm_params: AlgorithmParameters = Field(default_factory=AlgorithmParameters)
     stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
     
@@ -227,12 +224,12 @@ class StimulusDeviceConfig(BaseModel):
 class HardwareConfig(BaseModel):
     """Hardware configuration (hardware.yaml)."""
     backend: str = Field("pycromanager", description="Backend: pycromanager, pymmcore, or dummy")
-    mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
+    # mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
     stim_interface: str = Field("dummy", description="Stimulus interface class name")
     
     # Temporary field for backward compatibility (Phase 1-2)
     # Will be removed when hardware abstraction complete
-    microscope_name: Optional[str] = Field(None, description="Microscope name (temporary)")
+    system_name: Optional[str] = Field(None, description="Microscope name (temporary)")
     
     # Stimulus device configurations
     stimulus_devices: Dict[str, StimulusDeviceConfig] = Field(
