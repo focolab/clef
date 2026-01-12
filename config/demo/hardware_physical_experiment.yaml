@@ -9,16 +9,23 @@ save_mip_video: false
 # Acquisition parameters
 acquisition:
   num_samples: 800  # ~80 seconds at 10fps
-  frame_rate: null
-  z_stack: true
   z_planes: 8
-  z_start: -10.5
-  z_end: 10.5
-  z_step: 3.0
-  baseline_samples: 0
+  
+  # THIS SHOULD BE IN HARDWARE or removed
+  # z_stack: true # compute from if z-planes > 1
+  # frame_rate: null
+  # z_start: -10.5
+  # z_end: 10.5
+  # z_step: 3.0
+
+  # this should be in algorithm or removed
+  baseline_samples: 0 
+
+  # this should be removed
   save_structural_scan: "none"
 
 # Subject metadata
+# FEWER REQUIRED FIELDS MORE EXTRA FIELDS FOR SUBJECT DETAILS
 subject:
   subject_id: "demo_subject"
   subject_type: "C. elegans"
@@ -33,7 +40,8 @@ subject:
   num_eggs: 0
   notes: "Hardware validation demo with LDI Polygon stimulus"
 
-z_step_size_um: 3.0
+# THIS SHOULD BE ELSEWHERE
+# z_step_size_um: 3.0
 input_recording_path: null
 
 dev_options:

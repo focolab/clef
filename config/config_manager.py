@@ -33,7 +33,7 @@ class DeviceConfig(BaseModel):
     device_type: str = Field(..., description="Device type (camera, stage, laser, etc.)")
     properties: DeviceProperties = Field(default_factory=DeviceProperties)
     configs: Dict[str, str] = Field(default_factory=dict, description="Micro-Manager config group presets (e.g., {'Channel': '488'})")
-
+    model_config = ConfigDict(extra='allow')
 
 class ShutterConfig(BaseModel):
     """Shutter configuration."""
@@ -58,45 +58,6 @@ class IlluminationChannel(BaseModel):
     power: Optional[float] = Field(None, description="Power setting (device-specific units)")
     exposure_ms: Optional[float] = Field(None, description="Exposure time in milliseconds")
 
-
-# IF we want checking on demo params... maybe this better lives elsewhere
-# # Add these new parameter classes to the AlgorithmParameters model:
-
-# class AlgorithmParameters(BaseModel):
-#     """Algorithm-specific parameters."""
-    
-#     # ... existing parameters ...
-    
-#     # Ring Attractor specific parameters
-#     default_stim_intensity: int = Field(default=50, ge=0, le=100, description="Default stimulus intensity (0-100%)")
-#     auto_stim_enabled: bool = Field(default=False, description="Enable automatic stimulus triggering")
-#     auto_stim_theta_min: float = Field(default=0.0, description="Minimum theta for auto-trigger (radians)")
-#     auto_stim_theta_max: float = Field(default=0.785, description="Maximum theta for auto-trigger (radians)")
-#     fading_trajectory_samples: int = Field(default=100, ge=10, description="Number of trajectory samples to display")
-    
-#     # ... rest of existing parameters ...
-
-
-# # And add ring_params to HardwareConfig:
-
-# class HardwareConfig(BaseModel):
-#     """Hardware configuration including backend, devices, and system parameters."""
-    
-#     # ... existing fields ...
-    
-#     # Ring attractor parameters (optional)
-#     ring_params: Dict[str, Any] = Field(
-#         default_factory=dict,
-#         description="Ring attractor system parameters"
-#     )
-    
-#     # Lorenz parameters (optional)
-#     lorenz_params: Dict[str, Any] = Field(
-#         default_factory=dict,
-#         description="Lorenz attractor system parameters"
-#     )
-    
-#     # ... rest of existing fields ...
 
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
@@ -273,7 +234,7 @@ class HardwareConfig(BaseModel):
     # Will be removed when hardware abstraction complete
     microscope_name: Optional[str] = Field(None, description="Microscope name (temporary)")
     
-    # NEW: Stimulus device configurations
+    # Stimulus device configurations
     stimulus_devices: Dict[str, StimulusDeviceConfig] = Field(
         default_factory=dict,
         description="Stimulus device configurations keyed by interface name"
