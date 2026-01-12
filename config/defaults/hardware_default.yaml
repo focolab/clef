@@ -5,13 +5,14 @@
 backend: "dummy"  # Options: pycromanager, pymmcore, dummy
 
 # Micro-Manager configuration (ignored for dummy backend)
-mm_config_path: null
+backend_configuration:
+  backend_type: "dummy"
 
 # Stimulus interface class
 stim_interface: "dummy"  # Options: InvCoreLDIPolygon, InvCoreSpinningDisk639, dummy, etc.
 
 # Microscope name (temporary, backward compatibility)
-microscope_name: null
+system_name: null
 
 # Strobe settings
 strobe_acquisition: false

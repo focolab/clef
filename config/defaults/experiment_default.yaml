@@ -1,6 +1,5 @@
 # CLEF Minimal Experiment Configuration
 # Place this in: config/defaults/experiment_default.yaml
-# For comprehensive defaults with all gooey fields, see experiment_default_comprehensive.yaml
 
 # Experiment metadata
 experiment_name: "default_experiment"
@@ -8,40 +7,37 @@ experimenter: "Unknown"
 output_dir: "./data"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false # experiments may want to save a summary plot
 
 # Acquisition parameters
 acquisition:
   num_samples: 100
   frame_rate: null  # As fast as possible
-  z_stack: false
   z_planes: 1
-  z_start: 0.0
-  z_end: 0.0
-  z_step: 1.0
-  baseline_frames: 0
-  save_structural_scan: "none"
+
+  # z_stack: false
+  # z_start: 0.0
+  # z_end: 0.0
+  # z_step: 1.0
+  # baseline_frames: 0
+  # save_structural_scan: "none"
 
 # Subject metadata (generic, domain-agnostic)
 subject:
   subject_id: null
   subject_type: null
-  genotype: null
-  treatment: null
-  treatment_details:
-    condition: ""
-    atr_concentration_uM: null
-  orientation:
-    nose: null
-    vnc: null
-  num_eggs: 0
+  subject_details:
+    treatment: null
+    treatment_details:
+      condition: null
+    orientation: null
   notes: null
 
 # Z-step size (duplicated for backward compatibility)
-z_step_size_um: 1.0
+# z_step_size_um: 1.0
 
 # Input recording path
-input_recording_path: null
+# input_recording_path: null
 
 # Development options
 dev_options:
