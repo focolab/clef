@@ -237,7 +237,10 @@ class HardwareConfig(BaseModel):
         description="Stimulus device configurations keyed by interface name"
     )
     
-    devices: Dict[str, DeviceConfig] = Field(default_factory=dict)
+    system_devices: Dict[str, DeviceConfig] = Field(
+        default_factory=dict,
+        description='Nonstimulus devices present on the system'
+    )
     illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
     
     # System-level Micro-Manager properties
@@ -251,7 +254,7 @@ class HardwareConfig(BaseModel):
     strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
     
     # Static ROI for stimulus
-    use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
+    # use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
     
     model_config = ConfigDict(extra="allow")  # Allow additional hardware-specific fields
     

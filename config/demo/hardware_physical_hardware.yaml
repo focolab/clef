@@ -1,8 +1,11 @@
 # Hardware configuration for Innovation Core microscope with LDI Polygon
-backend: "pycromanager"
-mm_config_path: "C:\\Program Files\\Micro-Manager-2.0\\InnovationCore_Config.cfg"
-stim_interface: "InvCore-LDI-Polygon-640"
-microscope_name: "innovation core spinning disk"
+backend_configuration:
+  backend_name: "pycromanager"
+  mm_config_path: "C:\\Program Files\\Micro-Manager-2.0\\InnovationCore_Config.cfg"
+  microscope_name: "innovation core spinning disk"
+
+stimulus_configuration:
+  stim_interface: "InvCore-LDI-Polygon-640"
 
 # Stimulus device configurations
 stimulus_devices:
@@ -12,43 +15,65 @@ stimulus_devices:
     intensity_property: "640 Intensity"
     shutter_device: "89 North Laser Diode Illuminator"
     slm_device: null  # Will query from MMC
+    
+    # Calibration of DMD
+    polygon_calibration_path: "./hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
+
+  InvCore-SpinningDisk-639:
+    type: "widefield_laser"
+    voltage_device: "DAC639"
+    voltage_property: "Volts"
+    ttl_device: "TTL1-8"
+    ttl_line: "TTL-4"
+    max_volts: 3.5
 
 # Device configurations
-devices:
+system_devices:
   camera:
     device_name: "PrimeBSI"
     device_type: "camera"
     properties:
       Exposure: 10.0
       Binning: "1x1"
-    configs:
-      Channel: "488"
   
   stage:
-    device_name: "ZStage"
-    device_type: "stage"
-    properties: {}
-    configs: {}
-    ttl_device: "TTL1-8"
-    ttl_state: "18"
+    XYStage:
+      device_name: "XYStage"
+      device_type: "stage"
+      configs: {}
 
-    # COMPUTE THESE OR PARAMETERIZE IN CONFIG???
-    # COMPUTE
-    z_step_size_um: 3.0
-    z_start: -10.5
-    z_end: 10.5
-    z_step: 3.0
+    ZStage:
+      device_name: "ZStage"
+      device_type: "stage"
+      configs: {}
+      properties: {}
+      ttl_device: "TTL1-8"
+      ttl_state: "18"
+      z_step_size_um: 2.5
+      num_z_planes: 
+
+  # Illumination channels
+  illumination_channels:
+    - name: "dummy"
+      device: "dummy"
+      wavelength: null
+      power: 50.0
+      exposure_ms: 100.0
+
+      # Strobe settings
+      strobe_illumination: false
+      strobe_inter_frame_interval_ms: 160 # not used if strobe_acquisition is false
 
 # System properties
 system_properties:
+
+  # Microscope name (temporary, backward compatibility)
+  system_name: 'InnovationCoreSpinningDisk'
   auto_shutter: false
   circular_buffer_mb: 10000
+  configs:
+    Channel: "488"
   shutters:
     - device_name: "89 North Laser Diode Illuminator"
       state: true
 
-# Calibration of DMD
-polygon_calibration_path: "./hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
-
-# Strobe settings
-strobe_acquisition: false

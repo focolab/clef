@@ -12,15 +12,6 @@ save_sample_video: false # experiments may want to save a summary plot
 # Acquisition parameters
 acquisition:
   num_samples: 100
-  frame_rate: null  # As fast as possible
-  z_planes: 1
-
-  # z_stack: false
-  # z_start: 0.0
-  # z_end: 0.0
-  # z_step: 1.0
-  # baseline_frames: 0
-  # save_structural_scan: "none"
 
 # Subject metadata (generic, domain-agnostic)
 subject:
@@ -33,13 +24,5 @@ subject:
     orientation: null
   notes: null
 
-# Z-step size (duplicated for backward compatibility)
-# z_step_size_um: 1.0
-
-# Input recording path
-# input_recording_path: null
-
 # Development options
-dev_options:
-  prefill_wb_ops: false
-  send_sms_on_completion: false
+dev_options: null
