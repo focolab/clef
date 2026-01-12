@@ -6,7 +6,7 @@ algorithm_type: "dummy"  # Options: dummy, Brainalyzer, PointAndClick, etc.
 save_algorithm_plot: false # Algorithms may provide convenient summary plots
 
 # Core algorithm parameters
-algorithm_params:
+algorithm_configuration:
 
   # GUI settings
   enable_gui: false
@@ -25,11 +25,11 @@ algorithm_params:
   # ROI/stimulus size (pixels)
   # stimulus_diameter_pixels: 10
 
-# Stimulus parameters to initialize for algorithm
-stimulus_params:
-  enabled: false
-  # randomize: false  # Randomly select from options below
-  # duration_frames_options: [48]  # Options for stimulus duration (frames)
-  # intensity_percent_options: [10]  # Options for stimulus intensity (%)
-  # duration_frames: 48  # Default duration if not randomizing
-  # intensity_percent: 10  # Default intensity if not randomizing
+  # Stimulus parameters to initialize for algorithm
+  stimulus_params:
+    enabled: false
+    # randomize: false  # Randomly select from options below
+    # duration_frames_options: [48]  # Options for stimulus duration (frames)
+    # intensity_percent_options: [10]  # Options for stimulus intensity (%)
+    # duration_frames: 48  # Default duration if not randomizing
+    # intensity_percent: 10  # Default intensity if not randomizing
