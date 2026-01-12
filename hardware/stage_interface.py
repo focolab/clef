@@ -43,18 +43,18 @@ class StageInterface(ABC):
         """
         pass
     
-    @abstractmethod
-    def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
-        """
-        Configure and run a Z-stack acquisition sequence.
+    # @abstractmethod
+    # def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+    #     """
+    #     Configure and run a Z-stack acquisition sequence.
         
-        Args:
-            z_start: Starting Z position in micrometers
-            z_end: Ending Z position in micrometers
-            z_step: Step size in micrometers
-            num_planes: Number of Z planes
-        """
-        pass
+    #     Args:
+    #         z_start: Starting Z position in micrometers
+    #         z_end: Ending Z position in micrometers
+    #         z_step: Step size in micrometers
+    #         num_planes: Number of Z planes
+    #     """
+    #     pass
     
     @abstractmethod
     def stop_sequence(self) -> None:
@@ -74,7 +74,7 @@ class StageInterface(ABC):
         pass
     
     @abstractmethod
-    def get_focus_device_name(self) -> str:
+    def get_device_name(self) -> str:
         """
         Get the name of the focus device.
         

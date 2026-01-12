@@ -5,7 +5,7 @@ Centralized configuration loading, validation, and merging for CLEF platform.
 Implements YAML + Pydantic validation strategy from refactor planning.
 
 Author: Raymond Dunn
-Version: 2.0.0
+Version: 2.1.0
 """
 
 import yaml
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class DeviceProperties(BaseModel):
     """Device-specific properties (e.g., camera exposure, laser power)."""
-    model_config = ConfigDict(extra="allow")  # Allow arbitrary device-specific properties
+    model_config = ConfigDict(extra="allow")
 
 
 class DeviceConfig(BaseModel):
@@ -32,8 +32,9 @@ class DeviceConfig(BaseModel):
     device_name: str = Field(..., description="Micro-Manager device name")
     device_type: str = Field(..., description="Device type (camera, stage, laser, etc.)")
     properties: DeviceProperties = Field(default_factory=DeviceProperties)
-    configs: Dict[str, str] = Field(default_factory=dict, description="Micro-Manager config group presets (e.g., {'Channel': '488'})")
+    configs: Dict[str, str] = Field(default_factory=dict, description="Micro-Manager config group presets")
     model_config = ConfigDict(extra='allow')
+
 
 class ShutterConfig(BaseModel):
     """Shutter configuration."""
@@ -43,11 +44,13 @@ class ShutterConfig(BaseModel):
 
 class SystemProperties(BaseModel):
     """System-level Micro-Manager properties."""
+    system_name: Optional[str] = Field(None, description="System/microscope name")
     auto_shutter: Optional[bool] = Field(None, description="Auto shutter enabled")
     circular_buffer_mb: Optional[int] = Field(None, gt=0, description="Circular buffer size in MB")
+    configs: Dict[str, str] = Field(default_factory=dict, description="System-level config presets")
     shutters: List[ShutterConfig] = Field(default_factory=list, description="Shutter states to set")
     
-    model_config = ConfigDict(extra="allow")  # Allow additional system properties
+    model_config = ConfigDict(extra="allow")
 
 
 class IlluminationChannel(BaseModel):
@@ -59,21 +62,28 @@ class IlluminationChannel(BaseModel):
     exposure_ms: Optional[float] = Field(None, description="Exposure time in milliseconds")
 
 
+class SystemDevices(BaseModel):
+    """System devices configuration."""
+    camera: Optional[DeviceConfig] = Field(None, description="Camera device configuration")
+    stage: Optional[DeviceConfig] = Field(None, description="Stage device configuration")
+    illumination_channels: List[IlluminationChannel] = Field(default_factory=list, description="Illumination channels")
+    
+    model_config = ConfigDict(extra="allow")
+
+
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
     num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
     frame_rate: Optional[float] = Field(None, gt=0, description="Target frame rate (Hz)")
-    
-    # Z-stack settings
     z_stack: bool = Field(False, description="Enable Z-stack acquisition")
     z_planes: int = Field(1, gt=0, description="Number of Z planes")
     z_start: float = Field(0.0, description="Z-stack start position (µm)")
     z_end: float = Field(0.0, description="Z-stack end position (µm)")
     z_step: float = Field(1.0, gt=0, description="Z-stack step size (µm)")
-    
-    # Baseline and structural scan
     baseline_samples: int = Field(0, ge=0, description="Samples before stims allowed")
     save_structural_scan: str = Field("none", description="Structural scan type")
+    
+    model_config = ConfigDict(extra="allow")
     
     @field_validator('z_end')
     @classmethod
@@ -82,38 +92,39 @@ class AcquisitionConfig(BaseModel):
         if values.get('z_stack') and values.get('z_planes', 1) > 1:
             if v <= values.get('z_start', 0):
                 raise ValueError("z_end must be greater than z_start for z-stack acquisition")
-
         return v
 
 
 class TreatmentDetails(BaseModel):
     """Treatment/condition details."""
-    condition: str = Field("", description="Experimental condition")
+    condition: Optional[str] = Field(None, description="Experimental condition")
     model_config = ConfigDict(extra="allow")
+
 
 class Orientation(BaseModel):
-    """Anatomical orientation (domain-specific, e.g., C. elegans)."""
-    # nose: Optional[str] = Field(None, description="Nose orientation (e.g., left/right/other)")
-    # vnc: Optional[str] = Field(None, description="VNC orientation (e.g., up/down/other)")
+    """Anatomical orientation (domain-specific)."""
     model_config = ConfigDict(extra="allow")
 
+
 class SubjectDetails(BaseModel):
+    """Subject details including treatment and orientation."""
     treatment: Optional[str] = Field(None, description="Experimental treatment (summary)")
     treatment_details: TreatmentDetails = Field(default_factory=TreatmentDetails)
-    orientation: Orientation = Field(default_factory=Orientation)
+    orientation: Optional[Orientation] = Field(None, description="Anatomical orientation")
+    model_config = ConfigDict(extra="allow")
+
 
 class SubjectMetadata(BaseModel):
-    """Experimental subject metadata (generic, not worm-specific)."""
+    """Experimental subject metadata (generic, not domain-specific)."""
     subject_id: Optional[str] = Field(None, description="Subject identifier")
     subject_type: Optional[str] = Field(None, description="Subject type (e.g., 'C. elegans', 'cell culture')")
-    subject_details: SubjectDetails = Field(default_factor=SubjectDetails)
+    subject_details: SubjectDetails = Field(default_factory=SubjectDetails)
     notes: Optional[str] = Field(None, description="Additional notes")
-    model_config = ConfigDict(extra="allow")  # Allow domain-specific fields
+    model_config = ConfigDict(extra="allow")
+
 
 class DevOptions(BaseModel):
     """Development/testing options."""
-    # prefill_wb_ops: bool = Field(False, description="Prefill wboptions.mat and meta.mat")
-    # send_sms_on_completion: bool = Field(False, description="Send SMS when acquisition completes")
     model_config = ConfigDict(extra="allow")
 
 
@@ -124,159 +135,120 @@ class ExperimentConfig(BaseModel):
     output_dir: str = Field("./data", description="Output directory for data")
     save_images: bool = Field(True, description="Save acquired images")
     save_metadata: bool = Field(True, description="Save metadata JSON")
-    save_sample_video: bool = Field(False, description="Save maximum intensity projection video")
+    save_sample_video: bool = Field(False, description="Save sample/summary video")
     
     acquisition: AcquisitionConfig = Field(default_factory=AcquisitionConfig)
     subject: SubjectMetadata = Field(default_factory=SubjectMetadata)
-    
-    # Z-step size (duplicated for backward compatibility)
-    # z_step_size_um: float = Field(1.0, gt=0, description="Z-step size in micrometers")
-    
-    # Input recording for playback/simulation
-    # input_recording_path: Optional[str] = Field(None, description="Path to input TIFF for playback")
-    
-    # Development options
-    dev_options: DevOptions = Field(default_factory=DevOptions)
+    dev_options: Optional[DevOptions] = Field(None, description="Development options")
     
     model_config = ConfigDict(extra="allow")
 
 
 class AlgorithmParameters(BaseModel):
     """Algorithm-specific parameters."""
-    # Threshold parameters (for derivative-based algorithms)
-    # stim_threshold_pos: float = Field(0.06, description="Positive threshold to trigger")
-    # stim_threshold_neg: float = Field(0.06, description="Negative threshold (abs value)")
-    
-    # Refractory period
-    # stim_cooldown_frames: int = Field(900, ge=0, description="Frames between allowed stims")
-    
-    # Stochastic stimulation
-    # skip_stimulation_probability: float = Field(0.1, ge=0.0, le=1.0, description="Prob of skipping stim")
-    # delay_stimulation_probability: float = Field(0.4, ge=0.0, le=1.0, description="Prob of delaying stim")
-    # stim_delay_frames_options: List[int] = Field(default_factory=lambda: [200, 400], description="Delay options")
-    
-    # Fixed timing (for StimOnsetFromList)
-    # stim_onset_list: List[int] = Field(default_factory=list, description="Fixed stim frame numbers")
-    
-    # PointAndClick specific
-    # stimulus_diameter_pixels: int = Field(10, gt=0, description="ROI diameter for point-and-click")
     enable_gui: bool = Field(False, description="Enable algorithm GUI")
-    gui_mode: str = Field("neural_imaging", description="GUI mode (neural_imaging/behavior)")
-
+    gui_mode: str = Field("none", description="GUI mode (neural_imaging/behavior/none)")
     
-    # Allow arbitrary algorithm parameters
-    model_config = ConfigDict(extra="allow")  
+    model_config = ConfigDict(extra="allow")
 
 
 class StimulusParameters(BaseModel):
     """Stimulus-specific parameters."""
     enabled: bool = Field(False, description="Enable stimulus delivery")
-    # randomize: bool = Field(False, description="Use stochastic skip/delay")
     
-    # Stimulus timing and intensity options
-    # duration_frames_options: List[int] = Field(default_factory=lambda: [48], description="Duration options (frames)")
-    # intensity_percent_options: List[int] = Field(default_factory=lambda: [10], description="Intensity options (0-100%)")
-    
-    # Selected values (from options)
-    # duration_frames: int = Field(48, gt=0, description="Actual duration used")
-    # intensity_percent: int = Field(10, ge=0, le=100, description="Actual intensity used")
+    model_config = ConfigDict(extra="allow")
+
+
+class AlgorithmConfiguration(BaseModel):
+    """Algorithm configuration container."""
+    enable_gui: bool = Field(False, description="Enable algorithm GUI")
+    gui_mode: str = Field("none", description="GUI mode")
+    stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
     
     model_config = ConfigDict(extra="allow")
 
 
 class AlgorithmConfig(BaseModel):
     """Algorithm configuration (algorithm.yaml)."""
-
     algorithm_type: str = Field("dummy", description="Algorithm class name")
     save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
-    
-    # sub parameters
-    algorithm_params: AlgorithmParameters = Field(default_factory=AlgorithmParameters)
-    stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
+    algorithm_configuration: AlgorithmConfiguration = Field(default_factory=AlgorithmConfiguration)
     
     model_config = ConfigDict(extra="allow")
 
 
 class StimulusDeviceConfig(BaseModel):
-    """
-    Configuration for a specific stimulus device type.
-    
-    Defines how to control different stimulus hardware through Micro-Manager.
-    """
+    """Configuration for a specific stimulus device type."""
     type: str = Field(..., description="Stimulus type: widefield_laser, polygon, led, dummy")
-    
-    # Widefield laser fields
-    voltage_device: Optional[str] = Field(None, description="Voltage control device (e.g., DAC639)")
-    voltage_property: Optional[str] = Field(None, description="Voltage property name (e.g., Volts)")
-    ttl_device: Optional[str] = Field(None, description="TTL control device (e.g., TTL1-8)")
-    ttl_line: Optional[str] = Field(None, description="TTL line name (e.g., TTL-4)")
-    max_volts: Optional[float] = Field(None, description="Maximum voltage (for intensity scaling)")
-    
-    # Polygon/LED fields
+    voltage_device: Optional[str] = Field(None, description="Voltage control device")
+    voltage_property: Optional[str] = Field(None, description="Voltage property name")
+    ttl_device: Optional[str] = Field(None, description="TTL control device")
+    ttl_line: Optional[str] = Field(None, description="TTL line name")
+    max_volts: Optional[float] = Field(None, description="Maximum voltage")
     intensity_device: Optional[str] = Field(None, description="Intensity control device")
     intensity_property: Optional[str] = Field(None, description="Intensity property name")
     shutter_device: Optional[str] = Field(None, description="Shutter device name")
-    slm_device: Optional[str] = Field(None, description="SLM device (polygon only, None = query MMC)")
+    slm_device: Optional[str] = Field(None, description="SLM device")
     
-    model_config = ConfigDict(extra="allow")  # Allow additional device-specific fields
+    model_config = ConfigDict(extra="allow")
+
+
+class BackendConfiguration(BaseModel):
+    """Backend configuration container."""
+    backend_name: str = Field("dummy", description="Backend: pycromanager, pymmcore, or dummy")
+    mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
+    
+    model_config = ConfigDict(extra="allow")
+
+
+class StimulusConfiguration(BaseModel):
+    """Stimulus configuration container."""
+    stim_interface: str = Field("dummy", description="Stimulus interface class name")
+    
+    model_config = ConfigDict(extra="allow")
 
 
 class HardwareConfig(BaseModel):
     """Hardware configuration (hardware.yaml)."""
-    backend: str = Field("pycromanager", description="Backend: pycromanager, pymmcore, or dummy")
-    # mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
-    stim_interface: str = Field("dummy", description="Stimulus interface class name")
-    
-    # Temporary field for backward compatibility (Phase 1-2)
-    # Will be removed when hardware abstraction complete
-    system_name: Optional[str] = Field(None, description="Microscope name (temporary)")
-    
-    # Stimulus device configurations
+    backend_configuration: BackendConfiguration = Field(default_factory=BackendConfiguration)
+    stimulus_configuration: StimulusConfiguration = Field(default_factory=StimulusConfiguration)
     stimulus_devices: Dict[str, StimulusDeviceConfig] = Field(
         default_factory=dict,
-        description="Stimulus device configurations keyed by interface name"
+        description="Stimulus device configurations"
     )
-    
-    system_devices: Dict[str, DeviceConfig] = Field(
-        default_factory=dict,
-        description='Nonstimulus devices present on the system'
-    )
-    illumination_channels: List[IlluminationChannel] = Field(default_factory=list)
-    
-    # System-level Micro-Manager properties
-    system_properties: Optional[SystemProperties] = Field(None, description="System-level MM settings")
-    
-    # Calibration data
+    system_devices: SystemDevices = Field(default_factory=SystemDevices)
+    system_properties: SystemProperties = Field(default_factory=SystemProperties)
     polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
-    
-    # Strobe acquisition settings
     strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
     strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
     
-    # Static ROI for stimulus
-    # use_static_stim_roi: bool = Field(False, description="Use static stimulus ROI")
+    model_config = ConfigDict(extra="allow")
     
-    model_config = ConfigDict(extra="allow")  # Allow additional hardware-specific fields
+    @property
+    def backend(self) -> str:
+        """Alias for backend_name for backward compatibility."""
+        return self.backend_configuration.backend_name
     
-    @field_validator('backend')
+    @property
+    def stim_interface(self) -> str:
+        """Alias for stim_interface for backward compatibility."""
+        return self.stimulus_configuration.stim_interface
+    
+    @property
+    def system_name(self) -> Optional[str]:
+        """Alias for system_name for backward compatibility."""
+        return self.system_properties.system_name
+    
+    @field_validator('backend_configuration')
     @classmethod
     def validate_backend(cls, v):
         allowed = ['pycromanager', 'pymmcore', 'dummy', 'test', 'lorenz_demo', 'ring_attractor_demo', 'screenshot']
-
-        if v not in allowed:
-            raise ValueError(f"Backend must be one of {allowed}, got '{v}'")
+        if v.backend_name not in allowed:
+            raise ValueError(f"Backend must be one of {allowed}, got '{v.backend_name}'")
         return v
     
     def get_stimulus_device_config(self, interface_name: Optional[str] = None) -> Optional[StimulusDeviceConfig]:
-        """
-        Get stimulus device configuration for a given interface.
-        
-        Args:
-            interface_name: Stimulus interface name (uses self.stim_interface if None)
-        
-        Returns:
-            StimulusDeviceConfig if found, None otherwise
-        """
+        """Get stimulus device configuration for a given interface."""
         interface_name = interface_name or self.stim_interface
         return self.stimulus_devices.get(interface_name)
 
@@ -293,14 +265,8 @@ class ConfigManager:
     """
     
     def __init__(self, package_root: Optional[Path] = None):
-        """
-        Initialize ConfigManager.
-        
-        Args:
-            package_root: Root directory of CLEF package (auto-detected if None)
-        """
+        """Initialize ConfigManager."""
         if package_root is None:
-            # Auto-detect: assume config_manager.py is in clef/config/
             package_root = Path(__file__).parent.parent
         
         self.package_root = Path(package_root)
@@ -327,16 +293,7 @@ class ConfigManager:
             raise
     
     def merge_configs(self, default: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Deep merge two config dictionaries (override wins).
-        
-        Args:
-            default: Base configuration dictionary
-            override: User override dictionary
-            
-        Returns:
-            Merged configuration dictionary
-        """
+        """Deep merge two config dictionaries (override wins)."""
         merged = deepcopy(default)
         
         for key, value in override.items():
@@ -350,27 +307,16 @@ class ConfigManager:
         return merged
     
     def load_hardware_config(self, user_path: Optional[Path] = None) -> HardwareConfig:
-        """
-        Load hardware configuration.
-        
-        Args:
-            user_path: Optional user override config path
-            
-        Returns:
-            Validated HardwareConfig object
-        """
-        # Load package default
+        """Load hardware configuration."""
         default_path = self.defaults_dir / "hardware_default.yaml"
         default_data = self.load_yaml(default_path) if default_path.exists() else {}
         
-        # Merge with user override if provided
         if user_path:
             user_data = self.load_yaml(Path(user_path))
             config_data = self.merge_configs(default_data, user_data)
         else:
             config_data = default_data
         
-        # Validate with Pydantic
         try:
             self.hardware_config = HardwareConfig(**config_data)
             logger.info(f"Hardware config loaded: backend={self.hardware_config.backend}, "
@@ -381,15 +327,7 @@ class ConfigManager:
             raise
     
     def load_experiment_config(self, user_path: Optional[Path] = None) -> ExperimentConfig:
-        """
-        Load experiment configuration.
-        
-        Args:
-            user_path: Optional user override config path
-            
-        Returns:
-            Validated ExperimentConfig object
-        """
+        """Load experiment configuration."""
         default_path = self.defaults_dir / "experiment_default.yaml"
         default_data = self.load_yaml(default_path) if default_path.exists() else {}
         
@@ -408,15 +346,7 @@ class ConfigManager:
             raise
     
     def load_algorithm_config(self, user_path: Optional[Path] = None) -> AlgorithmConfig:
-        """
-        Load algorithm configuration.
-        
-        Args:
-            user_path: Optional user override config path
-            
-        Returns:
-            Validated AlgorithmConfig object
-        """
+        """Load algorithm configuration."""
         default_path = self.defaults_dir / "algorithm_default.yaml"
         default_data = self.load_yaml(default_path) if default_path.exists() else {}
         
@@ -438,14 +368,7 @@ class ConfigManager:
                         hardware_path: Optional[Path] = None,
                         experiment_path: Optional[Path] = None,
                         algorithm_path: Optional[Path] = None):
-        """
-        Load all three configuration files.
-        
-        Args:
-            hardware_path: Optional hardware config override
-            experiment_path: Optional experiment config override
-            algorithm_path: Optional algorithm config override
-        """
+        """Load all three configuration files."""
         self.load_hardware_config(hardware_path)
         self.load_experiment_config(experiment_path)
         self.load_algorithm_config(algorithm_path)
@@ -453,12 +376,7 @@ class ConfigManager:
         logger.info("All configurations loaded successfully")
     
     def validate_config(self) -> bool:
-        """
-        Validate loaded configurations for compatibility.
-        
-        Returns:
-            True if all configs are valid and compatible
-        """
+        """Validate loaded configurations for compatibility."""
         if not all([self.hardware_config, self.experiment_config, self.algorithm_config]):
             logger.error("Not all configs loaded - call load_all_configs() first")
             return False
@@ -472,16 +390,8 @@ class ConfigManager:
                 return False
         
         # Check stimulus parameters consistency
-        if self.algorithm_config.stimulus_params.enabled:
-            if not self.algorithm_config.stimulus_params.duration_frames_options:
-                logger.warning("Stimulus enabled but no duration_frames_options specified")
-            if not self.algorithm_config.stimulus_params.intensity_percent_options:
-                logger.warning("Stimulus enabled but no intensity_percent_options specified")
-        
-        # Warn about microscope_name (temporary field)
-        if self.hardware_config.microscope_name:
-            logger.info(f"Using microscope_name: '{self.hardware_config.microscope_name}' "
-                       "(temporary field, will be removed in Phase 2)")
+        if self.algorithm_config.algorithm_configuration.stimulus_params.enabled:
+            logger.info("Stimulus enabled in algorithm configuration")
         
         logger.info("Configuration validation passed")
         return True
