@@ -14,7 +14,7 @@ This guide maps all parameters from the old `gooey-setup.py` GUI launcher to the
 | `-d, --total-frames` | `experiment.yaml` → `acquisition.num_frames` | Default: 30000 |
 | `-cfg, --mm-configuration-file` | `hardware.yaml` → `mm_config_path` | MM .cfg file path |
 | `-z, --zsize` | `experiment.yaml` → `acquisition.z_planes` | Number of Z planes |
-| `-mip, --save-mip` | `experiment.yaml` → `save_mip_video` | Boolean flag |
+| `-mip, --save-mip` | `experiment.yaml` → `save_sample_video` | Boolean flag |
 | `-strobe, --strobe-acquisition` | `hardware.yaml` → `strobe_acquisition` | Boolean flag |
 | `-sifi, --strobe-inter-frame-interval` | `hardware.yaml` → `strobe_inter_frame_interval_ms` | Default: 80ms |
 | `-struct, --save-structural-scan` | `experiment.yaml` → `acquisition.save_structural_scan` | Options: none/GFP+RFP/NeuroPAL |

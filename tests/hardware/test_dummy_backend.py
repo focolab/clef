@@ -225,10 +225,10 @@ class TestDummyStage:
         stage = DummyStage()
         stage.wait_for_device()  # Should not raise
     
-    def test_dummy_stage_get_focus_device_name(self):
+    def test_dummy_stage_get_device_name(self):
         """Test get_focus_device_name."""
         stage = DummyStage()
-        name = stage.get_focus_device_name()
+        name = stage.get_focus_name()
         assert isinstance(name, str)
         assert name == "ZStage"
 

@@ -166,10 +166,10 @@ class TestPolygonStimulusController:
 
         # Build legacy args for controller
         args = {
-            "gooey_args": {
-                "trigger_algorithm": "Brainalyzer",
-                "stim_interface": stim_interface
-            },
+            # "gooey_args": {
+            #     "trigger_algorithm": "Brainalyzer",
+            #     "stim_interface": stim_interface
+            # },
             # "roi": [0, 0, 2048, 2048]
             "roi": hardware.camera.get_roi()
         }

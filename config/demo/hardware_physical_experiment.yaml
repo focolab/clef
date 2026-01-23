@@ -4,12 +4,12 @@ experimenter: "CLEF_Demo"
 output_dir: "./demo_output_hardware"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false
 
 # Acquisition parameters
 acquisition:
   num_samples: 800  # ~80 seconds at 10fps
-  z_planes: 8
+  z_planes: 12
   
   # THIS SHOULD BE IN HARDWARE or removed
   # z_stack: true # compute from if z-planes > 1
@@ -45,5 +45,5 @@ subject:
 input_recording_path: null
 
 dev_options:
-  prefill_wb_ops: false
+  # prefill_wb_ops: false
   send_sms_on_completion: false

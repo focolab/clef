@@ -5,7 +5,7 @@ experimenter: "CLEF_Demo"
 output_dir: "./demo_output/ring_attractor"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false
 
 # Acquisition parameters
 acquisition:
@@ -36,7 +36,7 @@ subject:
 
 # Development options
 dev_options:
-  prefill_wb_ops: false
+  # prefill_wb_ops: false
   send_sms_on_completion: false
 
 # Not used for ring demo

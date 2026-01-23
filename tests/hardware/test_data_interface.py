@@ -102,7 +102,7 @@ def minimal_experiment_config(temp_output_dir):
         ),
         subject=SubjectMetadata(genotype="test_strain"),
         dev_options=DevOptions(
-            prefill_wb_ops=False,
+            # prefill_wb_ops=False,
             send_sms_on_completion=False,
         ),
     )

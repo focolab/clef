@@ -57,7 +57,7 @@ def minimal_experiment_config(test_output_dir):
         output_dir=test_output_dir,
         save_images=False,
         save_metadata=True,
-        save_mip_video=False,
+        save_sample_video=False,
         acquisition=AcquisitionConfig(
             num_frames=10,  # Small for fast testing
             z_planes=2,
@@ -70,7 +70,7 @@ def minimal_experiment_config(test_output_dir):
             orientation=Orientation(),
         ),
         dev_options=DevOptions(
-            prefill_wb_ops=False,
+            # prefill_wb_ops=False,
             send_sms_on_completion=False,
         ),
     )
@@ -345,21 +345,21 @@ class TestClosedLoopEngineIntegration:
         # Verify close was called
         assert close_called
     
-    def test_backward_compatibility_with_legacy_args(
-        self, minimal_hardware_config, minimal_experiment_config, minimal_algorithm_config
-    ):
-        """Test that engine still builds legacy args dict for backward compatibility."""
-        engine = ClosedLoopEngine(
-            hardware_config=minimal_hardware_config,
-            experiment_config=minimal_experiment_config,
-            algorithm_config=minimal_algorithm_config,
-        )
+    # def test_backward_compatibility_with_legacy_args(
+    #     self, minimal_hardware_config, minimal_experiment_config, minimal_algorithm_config
+    # ):
+    #     """Test that engine still builds legacy args dict for backward compatibility."""
+    #     engine = ClosedLoopEngine(
+    #         hardware_config=minimal_hardware_config,
+    #         experiment_config=minimal_experiment_config,
+    #         algorithm_config=minimal_algorithm_config,
+    #     )
         
-        # Verify args dict exists and has expected structure
-        assert "gooey_args" in engine.args
-        assert "stim_interface" in engine.args["gooey_args"]
-        assert "acquisition_backend" in engine.args["gooey_args"]
-        assert "trigger_algorithm" in engine.args["gooey_args"]
+    #     # Verify args dict exists and has expected structure
+    #     assert "gooey_args" in engine.args
+    #     assert "stim_interface" in engine.args["gooey_args"]
+    #     assert "acquisition_backend" in engine.args["gooey_args"]
+    #     assert "trigger_algorithm" in engine.args["gooey_args"]
 
 
 class TestConfigBasedStimulusPattern:
@@ -453,47 +453,47 @@ class TestConfigBasedStimulusPattern:
 class TestLegacyCompatibility:
     """Test backward compatibility with legacy interfaces."""
     
-    def test_convert_gooey_args_to_configs(self):
-        """Test conversion function for legacy gooey_args."""
-        from closed_loop_engine import convert_gooey_args_to_configs
+    # def test_convert_gooey_args_to_configs(self):
+    #     """Test conversion function for legacy gooey_args."""
+    #     from closed_loop_engine import convert_gooey_args_to_configs
         
-        gooey_args = {
-            "acquisition_backend": "dummy",
-            "stim_interface": "dummy",
-            "microscope_name": "test_scope",
-            "total_frames": 50,
-            "zsize": 5,
-            "trigger_algorithm": "dummy",
-            "output_folder": "./test_output",
-        }
+    #     gooey_args = {
+    #         "acquisition_backend": "dummy",
+    #         "stim_interface": "dummy",
+    #         "microscope_name": "test_scope",
+    #         "total_frames": 50,
+    #         "zsize": 5,
+    #         "trigger_algorithm": "dummy",
+    #         "output_folder": "./test_output",
+    #     }
         
-        configs = convert_gooey_args_to_configs(gooey_args)
+    #     configs = convert_gooey_args_to_configs(gooey_args)
         
-        assert "hardware" in configs
-        assert "experiment" in configs
-        assert "algorithm" in configs
+    #     assert "hardware" in configs
+    #     assert "experiment" in configs
+    #     assert "algorithm" in configs
         
-        # Verify conversion
-        assert configs["hardware"].backend == "dummy"
-        assert configs["hardware"].stim_interface == "dummy"
-        assert configs["experiment"].acquisition.num_frames == 50
-        assert configs["algorithm"].algorithm_type == "dummy"
+    #     # Verify conversion
+    #     assert configs["hardware"].backend == "dummy"
+    #     assert configs["hardware"].stim_interface == "dummy"
+    #     assert configs["experiment"].acquisition.num_frames == 50
+    #     assert configs["algorithm"].algorithm_type == "dummy"
     
-    def test_legacy_args_dict_still_available(
-        self, minimal_hardware_config, minimal_experiment_config, minimal_algorithm_config
-    ):
-        """Test that engine still provides args dict for legacy components."""
-        engine = ClosedLoopEngine(
-            hardware_config=minimal_hardware_config,
-            experiment_config=minimal_experiment_config,
-            algorithm_config=minimal_algorithm_config,
-        )
+    # def test_legacy_args_dict_still_available(
+    #     self, minimal_hardware_config, minimal_experiment_config, minimal_algorithm_config
+    # ):
+    #     """Test that engine still provides args dict for legacy components."""
+    #     engine = ClosedLoopEngine(
+    #         hardware_config=minimal_hardware_config,
+    #         experiment_config=minimal_experiment_config,
+    #         algorithm_config=minimal_algorithm_config,
+    #     )
         
-        # Legacy args should be available
-        assert hasattr(engine, 'args')
-        assert "gooey_args" in engine.args
+    #     # Legacy args should be available
+    #     assert hasattr(engine, 'args')
+    #     assert "gooey_args" in engine.args
         
-        # Should contain key fields
-        assert "stim_interface" in engine.args["gooey_args"]
-        assert "acquisition_backend" in engine.args["gooey_args"]
+    #     # Should contain key fields
+    #     assert "stim_interface" in engine.args["gooey_args"]
+    #     assert "acquisition_backend" in engine.args["gooey_args"]
 

@@ -506,13 +506,13 @@ class TestPolygonStimulusController:
             "roi": [0, 0],
             "saveroot": "/tmp/test",
             "t0": time.time(),
-            "gooey_args": {
-                "zsize": 1,
-                "stim_interface": "InvCore-LDI-Polygon-640",
-                "acquisition_backend": "pycromanager",
-                "trigger_algorithm": "Brainalyzer",
-                "microscope_name": "test_polygon_scope"
-            }
+            # "gooey_args": {
+            #     "zsize": 1,
+            #     "stim_interface": "InvCore-LDI-Polygon-640",
+            #     "acquisition_backend": "pycromanager",
+            #     "trigger_algorithm": "Brainalyzer",
+            #     "microscope_name": "test_polygon_scope"
+            # }
         }
     
     def test_polygon_controller_initialization(self, mock_hardware_manager, controller_config):
@@ -677,12 +677,12 @@ class TestPolygonIntegrationWithHardwareManager:
                 "roi": [0, 0],
                 "saveroot": "/tmp",
                 "t0": time.time(),
-                "gooey_args": {
-                    "stim_interface": "InvCore-LDI-Polygon-640",
-                    "acquisition_backend": "pycromanager",
-                    "trigger_algorithm": "Brainalyzer",
-                    "microscope_name": "test_polygon_scope"
-                }
+                # "gooey_args": {
+                #     "stim_interface": "InvCore-LDI-Polygon-640",
+                #     "acquisition_backend": "pycromanager",
+                #     "trigger_algorithm": "Brainalyzer",
+                #     "microscope_name": "test_polygon_scope"
+                # }
             }
             
             controller = create_stimulus_controller(

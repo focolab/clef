@@ -164,7 +164,7 @@ class DummyStage(StageInterface):
         self.y_position = 0.0
         self.z_position = 0.0
         self._sequence_running = False
-        self._focus_device = "ZStage"
+        self._focus_device = "DummyStage"
     
     def get_position(self, axis: Optional[str] = None) -> Union[float, Tuple[float, ...]]:
         """Get stage position."""
@@ -206,7 +206,7 @@ class DummyStage(StageInterface):
         """Wait for stage movement."""
         pass
     
-    def get_focus_device_name(self) -> str:
+    def get_device_name(self) -> str:
         """Get focus device name."""
         return self._focus_device
     

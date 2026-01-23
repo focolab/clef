@@ -6,7 +6,7 @@ experimenter: "Demo User"
 output_dir: "./demo/demo_output"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false
 
 acquisition:
   num_samples: 200         # Number of frames to capture
@@ -22,5 +22,5 @@ subject:
   notes: "Demonstration of RGB screen capture with input stimulus"
 
 dev_options:
-  prefill_wb_ops: false
+  # prefill_wb_ops: false
   send_sms_on_completion: false

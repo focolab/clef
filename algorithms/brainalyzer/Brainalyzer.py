@@ -86,12 +86,20 @@ class Brainalyzer:
         self.rec_id = experiment_config.experiment_name
         self.saveroot = experiment_config.output_dir
         self.frames_to_grab = experiment_config.acquisition.num_samples
-        self.zsize = experiment_config.acquisition.z_planes
+        # self.zsize = experiment_config.acquisition.z_planes
+
+        # try to get zsize (from configuration, not backend)
+        try: 
+            self.zsize = hardware_manager.config.stage.ZStage.num_z_planes
+        except Exception as err:
+            logger.warning('ZSize not detected in hardware configuration, defaulting to 1')
+            self.zsize = 1
         
         # Extract algorithm params
         self.GUI_mode = algorithm_config.gui_mode
-        self.stim_intensity_ops = algorithm_config.stimulus_params.intensity_percent_options
-        self.stim_intensity = self.stim_intensity_ops[0]
+        # self.stim_intensity_ops = algorithm_config.stimulus_params.intensity_percent_options
+        # self.stim_intensity = self.stim_intensity_ops[0]
+        self.stim_intensity=0
         
         # Hardware params (with safe defaults)
         self.microscope_name = (
@@ -455,45 +463,45 @@ class Brainalyzer:
         """Store frame in shared memory buffer."""
         self.shared_ndarray_list[zndx][:] = img[:]
 
-def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
-    """
-    Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
+# def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
+#     """
+#     Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
     
-    This function allows existing code to continue using the old args format
-    while the new code uses Config objects internally.
+#     This function allows existing code to continue using the old args format
+#     while the new code uses Config objects internally.
     
-    Args:
-        args: Legacy args dictionary with gooey_args structure
-        local_handles: Optional dictionary of local handles (mmc, etc.)
+#     Args:
+#         args: Legacy args dictionary with gooey_args structure
+#         local_handles: Optional dictionary of local handles (mmc, etc.)
         
-    Returns:
-        Brainalyzer instance
+#     Returns:
+#         Brainalyzer instance
         
-    Example:
-        >>> # Old way (still works)
-        >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
-        >>> 
-        >>> # New way (preferred)
-        >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
-    """
-    from engine.closed_loop_engine import convert_gooey_args_to_configs
-    from hardware.hardware_manager import HardwareManager
+#     Example:
+#         >>> # Old way (still works)
+#         >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
+#         >>> 
+#         >>> # New way (preferred)
+#         >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
+#     """
+#     from engine.closed_loop_engine import convert_gooey_args_to_configs
+#     from hardware.hardware_manager import HardwareManager
     
-    # Convert legacy args to configs
-    gooey_args = args.get("gooey_args", args)
-    configs = convert_gooey_args_to_configs(gooey_args)
-    hm = HardwareManager(configs['hardware'])
+#     # Convert legacy args to configs
+#     gooey_args = args.get("gooey_args", args)
+#     configs = convert_gooey_args_to_configs(gooey_args)
+#     hm = HardwareManager(configs['hardware'])
     
-    # Create Brainalyzer with configs
-    alg = Brainalyzer(
-        algorithm_config=configs["algorithm"],
-        experiment_config=configs["experiment"],
-        hardware_manager=hm,
-        local_handles=local_handles
-    )
+#     # Create Brainalyzer with configs
+#     alg = Brainalyzer(
+#         algorithm_config=configs["algorithm"],
+#         experiment_config=configs["experiment"],
+#         hardware_manager=hm,
+#         local_handles=local_handles
+#     )
     
-    # Extract ROI from args if present (for backward compatibility)
-    if "roi" in args:
-        alg.set_roi(args["roi"])
+#     # Extract ROI from args if present (for backward compatibility)
+#     if "roi" in args:
+#         alg.set_roi(args["roi"])
     
-    return alg
+#     return alg
