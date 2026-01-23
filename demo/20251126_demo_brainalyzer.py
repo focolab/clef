@@ -92,12 +92,12 @@ def create_demo_configs(input_tiff_path: str) -> dict:
         output_dir="./demo_output",
         save_images=True,
         save_metadata=True,
-        save_mip_video=False,
+        save_sample_video=False,
         acquisition=acquisition_config,
         subject=subject_metadata,
         input_recording_path=input_tiff_path,  # Key for dummy backend
         dev_options={
-            "prefill_wb_ops": False,
+            # "prefill_wb_ops": False,
             "send_sms_on_completion": False,
         }
     )

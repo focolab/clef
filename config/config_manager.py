@@ -74,26 +74,8 @@ class SystemDevices(BaseModel):
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
     num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
-    frame_rate: Optional[float] = Field(None, gt=0, description="Target frame rate (Hz)")
-    z_stack: bool = Field(False, description="Enable Z-stack acquisition")
-    z_planes: int = Field(1, gt=0, description="Number of Z planes")
-    z_start: float = Field(0.0, description="Z-stack start position (µm)")
-    z_end: float = Field(0.0, description="Z-stack end position (µm)")
-    z_step: float = Field(1.0, gt=0, description="Z-stack step size (µm)")
-    baseline_samples: int = Field(0, ge=0, description="Samples before stims allowed")
-    save_structural_scan: str = Field("none", description="Structural scan type")
-    
     model_config = ConfigDict(extra="allow")
     
-    @field_validator('z_end')
-    @classmethod
-    def validate_z_range(cls, v, info):
-        values = info.data
-        if values.get('z_stack') and values.get('z_planes', 1) > 1:
-            if v <= values.get('z_start', 0):
-                raise ValueError("z_end must be greater than z_start for z-stack acquisition")
-        return v
-
 
 class TreatmentDetails(BaseModel):
     """Treatment/condition details."""
@@ -196,7 +178,6 @@ class StimulusDeviceConfig(BaseModel):
 class BackendConfiguration(BaseModel):
     """Backend configuration container."""
     backend_name: str = Field("dummy", description="Backend: pycromanager, pymmcore, or dummy")
-    mm_config_path: Optional[str] = Field(None, description="Path to Micro-Manager .cfg file")
     
     model_config = ConfigDict(extra="allow")
 
@@ -228,6 +209,10 @@ class HardwareConfig(BaseModel):
     def backend(self) -> str:
         """Alias for backend_name for backward compatibility."""
         return self.backend_configuration.backend_name
+    
+    @backend.setter
+    def backend(self, value: str) -> None:
+        self.backend_configuration.backend_name = value
     
     @property
     def stim_interface(self) -> str:
@@ -381,13 +366,13 @@ class ConfigManager:
             logger.error("Not all configs loaded - call load_all_configs() first")
             return False
         
-        # Check z-stack configuration consistency
-        if self.experiment_config.acquisition.z_stack:
-            if self.experiment_config.acquisition.z_planes <= 1:
-                logger.warning("z_stack enabled but z_planes <= 1")
-            if self.experiment_config.acquisition.z_step <= 0:
-                logger.error("z_stack enabled but z_step <= 0")
-                return False
+        # # Check z-stack configuration consistency
+        # if self.experiment_config.acquisition.z_stack:
+        #     if self.experiment_config.acquisition.z_planes <= 1:
+        #         logger.warning("z_stack enabled but z_planes <= 1")
+        #     if self.experiment_config.acquisition.z_step <= 0:
+        #         logger.error("z_stack enabled but z_step <= 0")
+        #         return False
         
         # Check stimulus parameters consistency
         if self.algorithm_config.algorithm_configuration.stimulus_params.enabled:

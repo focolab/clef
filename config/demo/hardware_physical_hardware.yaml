@@ -50,7 +50,7 @@ system_devices:
       ttl_device: "TTL1-8"
       ttl_state: "18"
       z_step_size_um: 2.5
-      num_z_planes: 
+      num_z_planes: 12
 
   # Illumination channels
   illumination_channels:

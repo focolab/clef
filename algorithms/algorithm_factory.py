@@ -170,7 +170,7 @@ def create_algorithm(
     algorithm_config: 'AlgorithmConfig',
     experiment_config: 'ExperimentConfig',
     hardware_manager: 'HardwareManager',
-    local_handles: Dict[str, Any] = None
+    # local_handles: Dict[str, Any] = None
 ) -> Any:
     """
     Create an algorithm instance from configuration objects.
@@ -202,8 +202,8 @@ def create_algorithm(
         ...     local_handles={"mmc": mmc}
         ... )
     """
-    if local_handles is None:
-        local_handles = {}
+    # if local_handles is None:
+    #     local_handles = {}
     
     alg_type = algorithm_config.algorithm_type
     logger.info(f"Creating algorithm: {alg_type}")
@@ -216,7 +216,7 @@ def create_algorithm(
         raise
     
     # Build legacy args for algorithms that still expect it
-    args = _build_legacy_args(algorithm_config, experiment_config, hardware_manager.config)
+    # args = _build_legacy_args(algorithm_config, experiment_config, hardware_manager.config)
     
     try:
         # Instantiate algorithm
@@ -224,7 +224,7 @@ def create_algorithm(
         # - Most take: (args, local_handles={})
         # - Some take: (args) only
         # alg_instance = alg_class(args, local_handles=local_handles)
-        alg_instance = alg_class(algorithm_config=algorithm_config, experiment_config=experiment_config, hardware_manager=hardware_manager, args=args, local_handles=local_handles)
+        alg_instance = alg_class(algorithm_config=algorithm_config, experiment_config=experiment_config, hardware_manager=hardware_manager)
         
         logger.info(f"Successfully created algorithm: {alg_type}")
         return alg_instance
@@ -234,97 +234,97 @@ def create_algorithm(
         raise
 
 
-def _build_legacy_args(
-    algorithm_config: 'AlgorithmConfig',
-    experiment_config: 'ExperimentConfig',
-    hardware_config: 'HardwareConfig'
-) -> Dict[str, Any]:
-    """
-    Build legacy args dictionary for backwards compatibility.
+# def _build_legacy_args(
+#     algorithm_config: 'AlgorithmConfig',
+#     experiment_config: 'ExperimentConfig',
+#     hardware_config: 'HardwareConfig'
+# ) -> Dict[str, Any]:
+#     """
+#     Build legacy args dictionary for backwards compatibility.
     
-    This recreates the flat dict structure that existing algorithms expect.
-    As algorithms are refactored to accept Config objects directly,
-    this function can be gradually simplified or removed.
+#     This recreates the flat dict structure that existing algorithms expect.
+#     As algorithms are refactored to accept Config objects directly,
+#     this function can be gradually simplified or removed.
     
-    Args:
-        algorithm_config: Algorithm configuration
-        experiment_config: Experiment configuration
-        hardware_config: Hardware configuration
+#     Args:
+#         algorithm_config: Algorithm configuration
+#         experiment_config: Experiment configuration
+#         hardware_config: Hardware configuration
     
-    Returns:
-        Dictionary matching old gooey_args format
-    """
-    exp = experiment_config
-    hw = hardware_config
-    alg = algorithm_config
+#     Returns:
+#         Dictionary matching old gooey_args format
+#     """
+#     exp = experiment_config
+#     hw = hardware_config
+#     alg = algorithm_config
     
-    # Build gooey_args format
-    gooey_args = {
-        # From ExperimentConfig
-        "output_folder": exp.output_dir,
-        "total_frames": exp.acquisition.num_samples,
-        "zsize": exp.acquisition.z_planes,
-        "save_mip": exp.save_mip_video,
-        "save_structural_scan": exp.acquisition.save_structural_scan,
-        "rec_baseline": exp.acquisition.baseline_samples,
-        "z_step_size": exp.z_step_size_um,
+    # # Build gooey_args format
+    # gooey_args = {
+    #     # From ExperimentConfig
+    #     "output_folder": exp.output_dir,
+    #     "total_frames": exp.acquisition.num_samples,
+    #     "zsize": exp.acquisition.z_planes,
+    #     "save_mip": exp.save_sample_video,
+    #     "save_structural_scan": exp.acquisition.save_structural_scan,
+    #     "rec_baseline": exp.acquisition.baseline_samples,
+    #     "z_step_size": exp.z_step_size_um,
         
-        # Subject metadata
-        "subject_strain": exp.subject.genotype or "unknown",
-        "subject_condition": exp.subject.treatment_details.condition,
-        "atr_concentration": exp.subject.treatment_details.atr_concentration_uM or 0.0,
-        "nose_orientation": exp.subject.orientation.nose,
-        "vnc_orientation": exp.subject.orientation.vnc,
-        "num_eggs": exp.subject.num_eggs,
-        "experimental_notes": exp.subject.notes or "",
+    #     # Subject metadata
+    #     "subject_strain": exp.subject.genotype or "unknown",
+    #     "subject_condition": exp.subject.treatment_details.condition,
+    #     "atr_concentration": exp.subject.treatment_details.atr_concentration_uM or 0.0,
+    #     "nose_orientation": exp.subject.orientation.nose,
+    #     "vnc_orientation": exp.subject.orientation.vnc,
+    #     "num_eggs": exp.subject.num_eggs,
+    #     "experimental_notes": exp.subject.notes or "",
         
-        # From HardwareConfig
-        "acquisition_backend": hw.backend,
-        "mm_configuration_file": hw.mm_config_path or "",
-        "stim_interface": hw.stim_interface,
-        "use_static_stim_roi": hw.use_static_stim_roi,
-        "strobe_acquisition": hw.strobe_acquisition,
-        "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
-        "microscope_name": hw.microscope_name or "unknown",
+    #     # From HardwareConfig
+    #     "acquisition_backend": hw.backend,
+    #     # "mm_configuration_file": hw.mm_config_path or "",
+    #     "stim_interface": hw.stim_interface,
+    #     "use_static_stim_roi": hw.use_static_stim_roi,
+    #     "strobe_acquisition": hw.strobe_acquisition,
+    #     "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
+    #     "microscope_name": hw.microscope_name or "unknown",
         
-        # From AlgorithmConfig
-        "trigger_algorithm": alg.algorithm_type,
-        "GUI_mode": alg.gui_mode,
-        "save_alg_model_plot": alg.save_algorithm_plot,
+    #     # From AlgorithmConfig
+    #     "trigger_algorithm": alg.algorithm_type,
+    #     "GUI_mode": alg.gui_mode,
+    #     "save_alg_model_plot": alg.save_algorithm_plot,
         
-        # Stimulus parameters
-        "frames_to_stimulate_for_options": alg.stimulus_params.duration_frames_options,
-        "stim_intensity_options": alg.stimulus_params.intensity_percent_options,
-        "stimulus_diameter": alg.algorithm_params.stimulus_diameter_pixels,
+    #     # Stimulus parameters
+    #     "frames_to_stimulate_for_options": alg.stimulus_params.duration_frames_options,
+    #     "stim_intensity_options": alg.stimulus_params.intensity_percent_options,
+    #     "stimulus_diameter": alg.algorithm_params.stimulus_diameter_pixels,
         
-        # Dev options
-        "input_recording": exp.input_recording_path,
-        "no_save_images": not exp.save_images,
-        "no_save_metadata": not exp.save_metadata,
-        "prefill_wb_ops": exp.dev_options.prefill_wb_ops,
-        "send_sms": exp.dev_options.send_sms_on_completion,
+    #     # Dev options
+    #     "input_recording": exp.input_recording_path,
+    #     "no_save_images": not exp.save_images,
+    #     "no_save_metadata": not exp.save_metadata,
+    #     "prefill_wb_ops": exp.dev_options.prefill_wb_ops,
+    #     "send_sms": exp.dev_options.send_sms_on_completion,
         
-        # Additional algorithm params
-        "stim_cooldown": alg.algorithm_params.stim_cooldown_frames,
-        "skip_stimulation_probability": alg.algorithm_params.skip_stimulation_probability,
-        "delay_stimulation_probability": alg.algorithm_params.delay_stimulation_probability,
-        "stim_delay_frames_options": alg.algorithm_params.stim_delay_frames_options,
-        "stim_onset_list_options": alg.algorithm_params.stim_onset_list,
-    }
+    #     # Additional algorithm params
+    #     "stim_cooldown": alg.algorithm_params.stim_cooldown_frames,
+    #     "skip_stimulation_probability": alg.algorithm_params.skip_stimulation_probability,
+    #     "delay_stimulation_probability": alg.algorithm_params.delay_stimulation_probability,
+    #     "stim_delay_frames_options": alg.algorithm_params.stim_delay_frames_options,
+    #     "stim_onset_list_options": alg.algorithm_params.stim_onset_list,
+    # }
     
-    # Wrap in expected structure
-    args = {
-        "id": '11111111-11-11-11',
-        'roi': [0, 0, 200, 200],
-        "gooey_args": gooey_args,
-        "configs": {
-            "algorithm": algorithm_config,
-            "experiment": experiment_config,
-            "hardware": hardware_config,
-        },
-    }
+    # # Wrap in expected structure
+    # args = {
+    #     "id": '11111111-11-11-11',
+    #     'roi': [0, 0, 200, 200],
+    #     # "gooey_args": gooey_args,
+    #     "configs": {
+    #         "algorithm": algorithm_config,
+    #         "experiment": experiment_config,
+    #         "hardware": hardware_config,
+    #     },
+    # }
     
-    return args
+    # return args
 
 
 def list_available_algorithms() -> list[str]:

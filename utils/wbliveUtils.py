@@ -97,76 +97,76 @@ def generate_mip_movie(savefilename, frames, zsize, exposure, quality=6, bitrate
         logging.exception("Exception during MIP movie generation: {}".format(err))
 
 
-def prefill_wb_ops(
-    savefileroot,
-    metadata,
-    meta_template_fname="res/meta_template.mat",
-    wboptions_template_fname="res/wboptions_template.mat",
-):
+# def prefill_wb_ops(
+#     savefileroot,
+#     metadata,
+#     meta_template_fname="res/meta_template.mat",
+#     wboptions_template_fname="res/wboptions_template.mat",
+# ):
     
-    import scipy.io
+#     import scipy.io
 
-    # load
-    try:
-        meta = scipy.io.loadmat(meta_template_fname)
-        wbops = scipy.io.loadmat(wboptions_template_fname)
-    except FileNotFoundError as err:
-        logging.exception(
-            "Error while trying to load wb-matlab template param files: {}".format(err)
-        )
-        return
+#     # load
+#     try:
+#         meta = scipy.io.loadmat(meta_template_fname)
+#         wbops = scipy.io.loadmat(wboptions_template_fname)
+#     except FileNotFoundError as err:
+#         logging.exception(
+#             "Error while trying to load wb-matlab template param files: {}".format(err)
+#         )
+#         return
 
-    try:
-        # grab fields from metadata
-        num_frames = metadata["gooey_args"]["total_frames"]
-        zsize = metadata["gooey_args"]["zsize"]
-        total_time = metadata["frame_time_list"][-1]
-        rec_id = metadata["id"]
+#     try:
+#         # grab fields from metadata
+#         num_frames = metadata["gooey_args"]["total_frames"]
+#         zsize = metadata["gooey_args"]["zsize"]
+#         total_time = metadata["frame_time_list"][-1]
+#         rec_id = metadata["id"]
 
-        # prefill form fields eww gross
-        meta["totalTime"][0][0] = total_time
+#         # prefill form fields eww gross
+#         meta["totalTime"][0][0] = total_time
 
-        meta["fileInfoOverride"][0][0][0][0] = np.array([num_frames // zsize])
-        meta["fileInfoOverride"][0][0][1][0] = np.array([zsize])
-        meta["fileInfoOverride"][0][0][2][0] = np.array([1])
+#         meta["fileInfoOverride"][0][0][0][0] = np.array([num_frames // zsize])
+#         meta["fileInfoOverride"][0][0][1][0] = np.array([zsize])
+#         meta["fileInfoOverride"][0][0][2][0] = np.array([1])
 
-        if "stim_metadata" in metadata:
-            ons = metadata["stim_metadata"]["stim_onset_times_simple"]
-            meta["stimulus"][0][0][2] = np.array(ons)
+#         if "stim_metadata" in metadata:
+#             ons = metadata["stim_metadata"]["stim_onset_times_simple"]
+#             meta["stimulus"][0][0][2] = np.array(ons)
 
-        meta["fileInfo"][0][0][1][0][0] = np.array(rec_id + ".tiff")
+#         meta["fileInfo"][0][0][1][0][0] = np.array(rec_id + ".tiff")
 
-        # x
-        meta["fileInfo"][0][0][2][0][0] = metadata["xsize"]
-        meta["fileInfo"][0][0][6][0][0] = metadata["xsize"]
+#         # x
+#         meta["fileInfo"][0][0][2][0][0] = metadata["xsize"]
+#         meta["fileInfo"][0][0][6][0][0] = metadata["xsize"]
 
-        # y
-        meta["fileInfo"][0][0][3][0][0] = metadata["ysize"]
-        meta["fileInfo"][0][0][7][0][0] = metadata["ysize"]
+#         # y
+#         meta["fileInfo"][0][0][3][0][0] = metadata["ysize"]
+#         meta["fileInfo"][0][0][7][0][0] = metadata["ysize"]
 
-        # total frames
-        meta["fileInfo"][0][0][4][0][0] = num_frames
-        meta["fileInfo"][0][0][5][0][0] = num_frames
+#         # total frames
+#         meta["fileInfo"][0][0][4][0][0] = num_frames
+#         meta["fileInfo"][0][0][5][0][0] = num_frames
 
-    except Exception as err:
-        logging.exception(
-            "Error while setting prefilled wb-matlab form fields: {}".format(err)
-        )
-        return
+#     except Exception as err:
+#         logging.exception(
+#             "Error while setting prefilled wb-matlab form fields: {}".format(err)
+#         )
+#         return
 
-    # write
-    try:
+#     # write
+#     try:
 
-        meta_savefilename = savefileroot + "/meta.mat"
-        wbops_savefilename = savefileroot + "/wboptions.mat"
-        scipy.io.savemat(meta_savefilename, meta)
-        scipy.io.savemat(wbops_savefilename, wbops)
+#         meta_savefilename = savefileroot + "/meta.mat"
+#         wbops_savefilename = savefileroot + "/wboptions.mat"
+#         scipy.io.savemat(meta_savefilename, meta)
+#         scipy.io.savemat(wbops_savefilename, wbops)
 
-    except Exception as err:
-        logging.exception(
-            "Error while trying to write wb-matlab prefilled files: {}".format(err)
-        )
-        return
+#     except Exception as err:
+#         logging.exception(
+#             "Error while trying to write wb-matlab prefilled files: {}".format(err)
+#         )
+#         return
 
 def lazy_serialize(res, to_str=True):
 

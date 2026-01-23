@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def create_stimulus_controller(
     stim_interface: str,
     hardware_manager,
-    config: Dict[str, Any]
+    # config: Dict[str, Any]
 ):
     """
     Factory to create appropriate stimulus controller.
@@ -43,35 +43,35 @@ def create_stimulus_controller(
     # Dummy/test interfaces
     if interface_lower in ["no stim", "dummy", "test"]:
         logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
-        return DummyStimulusController(hardware_manager, config)
+        return DummyStimulusController(hardware_manager)
     
     # Widefield interfaces
     elif "spinningdisk" in interface_lower or "spinning-disk" in interface_lower or "639" in interface_lower:
         logger.info(f"Creating WidefieldStimulusController for '{stim_interface}'")
-        return WidefieldStimulusController(hardware_manager, config)
+        return WidefieldStimulusController(hardware_manager)
     
     # Polygon/LDI interfaces
     elif "polygon" in interface_lower or "ldi" in interface_lower or "640" in interface_lower:
         logger.info(f"Creating PolygonStimulusController for '{stim_interface}'")
-        return PolygonStimulusController(hardware_manager, config)
+        return PolygonStimulusController(hardware_manager)
     
     # Thunderscope LED
     elif "thunderscope" in interface_lower or "led" in interface_lower:
         # For now, use widefield controller (can be specialized later)
         logger.info(f"Creating WidefieldStimulusController for '{stim_interface}' (LED)")
-        return WidefieldStimulusController(hardware_manager, config)
+        return WidefieldStimulusController(hardware_manager)
     
     elif "lorenz" in interface_lower:
         logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
-        return LorenzStimulusController(hardware_manager, config)
+        return LorenzStimulusController(hardware_manager)
     
     elif "ring_attractor" in interface_lower or "ring" in interface_lower:
         logger.info(f"Creating RingAttractorStimulusController for '{stim_interface}'")
-        return RingAttractorStimulusController(hardware_manager, config)
+        return RingAttractorStimulusController(hardware_manager)
     
     elif "computer_input" in interface_lower or "keyboard" in interface_lower or "input" in interface_lower:
         logger.info(f"Creating InputStimulusController for '{stim_interface}'")
-        return InputStimulusController(hardware_manager, config)
+        return InputStimulusController(hardware_manager)
     
     else:
         raise ValueError(

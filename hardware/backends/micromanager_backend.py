@@ -15,7 +15,7 @@ from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
 from hardware.projector_interface import ProjectorInterface
 from config.config_manager import HardwareConfig
-
+from hardware.backends.lib import DummyMMC
         
 # Import utilities for mask generation
 from utils import wbliveUtils
@@ -24,7 +24,7 @@ from utils import numba_utils
 logger = logging.getLogger(__name__)
 
 # Import MMSubroutines to use existing initialization logic
-from utils import MMSubroutines
+# from utils import MMSubroutines
 
 # Import JavaObject for pycromanager ASI stage buffer
 try:
@@ -191,7 +191,7 @@ class MicroManagerStage(StageInterface):
     def get_position(self, axis: Optional[str] = None) -> Union[float, Tuple[float, ...]]:
         """Get stage position."""
         if axis == 'Z' or axis is None:
-            focus_dev = self.get_focus_device_name()
+            focus_dev = self.get_device_name()
             pos = self.mmc.getPosition(focus_dev)
             if axis == 'Z':
                 return pos
@@ -199,12 +199,12 @@ class MicroManagerStage(StageInterface):
         else:
             # For X/Y stages, would need to get XYStage device
             # For now, just return Z position
-            focus_dev = self.get_focus_device_name()
+            focus_dev = self.get_device_name()
             return (self.mmc.getPosition(focus_dev),)
     
     def move_to_position(self, position: Union[float, Tuple[float, ...]], axis: Optional[str] = None) -> None:
         """Move stage to position."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         if isinstance(position, (int, float)):
             self.mmc.setPosition(focus_dev, float(position))
         elif isinstance(position, (tuple, list)) and len(position) > 0:
@@ -255,7 +255,7 @@ class MicroManagerStage(StageInterface):
             raise ValueError("z_start, z_end, and z_step are required for stage configuration")
         
         # Get focus device
-        stage = self.get_focus_device_name()
+        stage = self.get_device_name()
         
         # Quick semantic check for case of 1Z plane imaging + structural scan
         # spec loop will hang unless zStepSize is set to some value > 0
@@ -321,16 +321,16 @@ class MicroManagerStage(StageInterface):
     
     def stop_sequence(self) -> None:
         """Stop stage sequence."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         self.mmc.stopStageSequence(focus_dev)
         logger.debug("Micro-Manager: Stopped stage sequence")
     
     def wait_for_device(self, timeout_ms: Optional[int] = None) -> None:
         """Wait for stage movement."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         self.mmc.waitForDevice(focus_dev)
     
-    def get_focus_device_name(self) -> str:
+    def get_device_name(self) -> str:
         """Get focus device name."""
         if self._focus_device is None:
             self._focus_device = self.mmc.getFocusDevice()
@@ -860,20 +860,32 @@ class MicroManagerBackend(BaseHardwareBackend):
 
         # Build args dict for MMSubroutines (temporary bridge)
         # This will be removed when MMSubroutines is fully refactored
-        args = {
-            "gooey_args": {
-                "acquisition_backend": self.config.backend,
-                "microscope_name": self.config.microscope_name or "unknown",
-                "input_recording": input_recording,
-            }
-        }
+        # args = {
+        #     "gooey_args": {
+        #         "acquisition_backend": self.config.backend,
+        #         "microscope_name": self.config.microscope_name or "unknown",
+        #         "input_recording": input_recording,
+        #     }
+        # }
+        acquisition_backend = self.config.backend_configuration.backend_name
+        # microscope_name = self.config.microscope_name or "unknown"
         
         # Use config file from HardwareConfig
-        config_file = self.config.mm_config_path
+        # config_file = self.config.mm_config_path
         
         # Initialize MMC using existing function
-        self.mmc = MMSubroutines.initialize_mmc(args, config_file=config_file)
+        if acquisition_backend == 'test' or acquisition_backend == 'dummy':
+            self.mmc = DummyMMC.DummyMMC()
+
+        elif acquisition_backend == "pycromanager":
+
+            # simple single image acquisition example with snap
+            from pycromanager import Core, JavaObject
+            self.mmc = Core(convert_camel_case=False)
         
+        else:
+            raise Exception(f'Attempting to initialize mmc object with unrecognized backend {acquisition_backend}')
+            
         # Get ROI
         roi_obj = self.mmc.getROI()
         if self.config.backend == "pycromanager":
@@ -915,15 +927,22 @@ class MicroManagerBackend(BaseHardwareBackend):
         if self._camera:
             self._camera.stop_acquisition()
         
-        # Use MMSubroutines.close for cleanup
         if self.mmc:
+
             # Build minimal args for close function
-            args = {
-                "gooey_args": {
-                    "microscope_name": self.config.microscope_name or "unknown",
-                }
-            }
-            MMSubroutines.close(self.mmc, args)
+            # hardcoded
+            try: 
+                laserTTLs = "TTL1-8"
+                stage = self.mmc.getFocusDevice()
+                self.mmc.stopStageSequence(stage)
+                self.mmc.waitForDevice(stage)
+                self.mmc.setPosition(stage, 0)
+                self.mmc.waitForDevice(stage)
+                self.mmc.stopPropertySequence(laserTTLs, "State")
+
+            # fail clunkily :)
+            except Exception as err:
+                logging.warning("Error during MMSubroutines.close(): {}".format(err))
         
         self._initialized = False
         logger.info("Micro-Manager backend closed")
@@ -934,12 +953,33 @@ class MicroManagerBackend(BaseHardwareBackend):
             return {}
         
         # Use MMSubroutines.get_metadata
-        args = {
-            "gooey_args": {
-                "microscope_name": self.config.microscope_name or "unknown",
-            }
+        # args = {
+        #     "gooey_args": {
+        #         "microscope_name": self.config.microscope_name or "unknown",
+        #     }
+        # }
+        cam = self.mmc.getCameraDevice()
+        binning = self.mmc.getProperty(cam, "Binning")
+
+        metadata = {
+            "binning": binning,
+            "exposure": self.mmc.getExposure(),
         }
-        metadata = MMSubroutines.get_metadata(args, self.mmc)
+
+        intensity_405 = self.mmc.getProperty("DAC405", "Volts")
+        intensity_488 = self.mmc.getProperty("DAC488", "Volts")
+        intensity_561 = self.mmc.getProperty("DAC561", "Volts")
+        intensity_639 = self.mmc.getProperty("DAC639", "Volts")
+        more_metadata = {
+            "camera_mode": self.mmc.getCurrentConfig("Camera Mode"),
+            "objective": self.mmc.getCurrentConfig("Objective"),
+            "intensity_488": intensity_488,
+            "intensity_561": intensity_561,
+            "intensity_405": intensity_405,
+            "intensity_639": intensity_639,
+        }
+        metadata.update(more_metadata)
+
         metadata['backend'] = self.config.backend
         return metadata
     

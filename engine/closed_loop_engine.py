@@ -68,8 +68,8 @@ class ClosedLoopEngine:
         
         # Build legacy args structure for components that still expect it
         # This will be gradually eliminated as we refactor components
-        self.args = self._build_legacy_args()
-        self.gooey_args = self.args['gooey_args']
+        # self.args = self._build_legacy_args()
+        # self.gooey_args = self.args['gooey_args']
         
         # Execution state - RENAMED FOR GENERIC DATA
         self.is_running = False
@@ -81,14 +81,9 @@ class ClosedLoopEngine:
         self.mmc = None  # Legacy - will be removed
         # self.xsize = 200  # default for unit tests
         # self.ysize = 200  # default for unit tests
-        self.roi = (0, 0, 200, 200) # default for unit tests
         self.alg = None
         self.stim_controller = None  # stimulus controller loaded later
-        self.t0 = 1.  # default for unit tests
-        self.args["t0"] = self.t0
-        self.args["id"] = "11111111-11-11-11"  # default for unit tests
-        self.args["saveroot"] = 'C:/Users/rldun/Downloads/'
-        
+
         # Data storage - RENAMED FOR GENERIC DATA
         # self.samples: np.ndarray | None = None  # RENAMED: was frames
         # self.sample_time_list: list[float] = []  # RENAMED: was frame_time_list
@@ -100,114 +95,119 @@ class ClosedLoopEngine:
         
         # Timing
         self.next_call: float | None = None
+
+        # initialize runtime experiment config settings
+        self.t0 = 1
+        self.exp_id = "11111111-11-11-11"  # default for unit tests
+        self.roi = (0, 0, 200, 200) # default for unit tests
         
-        # Paths and metadata
+        # Paths and metadata, null initialized for testing
         self.savedir: str | None = None
         self.saveroot: str | None = None
-        self.session_id: str | None = None  
+        self.session_id: str | None = None
             
         # Extract commonly used parameters
-        self._extract_parameters()
+        # self._extract_parameters()
 
-    def _build_legacy_args(self) -> dict[str, Any]:
-        """
-        Build legacy args dictionary for components that haven't been refactored yet.
+    # def _build_legacy_args(self) -> dict[str, Any]:
+    #     """
+    #     Build legacy args dictionary for components that haven't been refactored yet.
         
-        This temporary method converts Config objects back to the old flat dict format.
-        As components are refactored to accept Config objects, calls to this will be removed.
+    #     This temporary method converts Config objects back to the old flat dict format.
+    #     As components are refactored to accept Config objects, calls to this will be removed.
         
-        Returns:
-            Dictionary matching old gooey_args format
-        """
-        exp = self.experiment_config
-        hw = self.hardware_config
-        alg = self.algorithm_config
+    #     Returns:
+    #         Dictionary matching old gooey_args format
+    #     """
+    #     exp = self.experiment_config
+    #     hw = self.hardware_config
+    #     alg = self.algorithm_config
         
-        # Build gooey_args format
-        gooey_args = {
-            # From ExperimentConfig
-            "output_folder": exp.output_dir,
-            "total_frames": exp.acquisition.num_samples,
-            "zsize": exp.acquisition.z_planes,
-            "save_mip": exp.save_mip_video,
-            "strobe_acquisition": hw.strobe_acquisition,
-            "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
-            "save_structural_scan": exp.acquisition.save_structural_scan,
-            "rec_baseline": exp.acquisition.baseline_samples,
-            "z_step_size": exp.z_step_size_um,
+    #     # Build gooey_args format
+    #     gooey_args = {
+    #         # From ExperimentConfig
+    #         "output_folder": exp.output_dir,
+    #         "total_frames": exp.acquisition.num_samples,
+    #         # "zsize": exp.acquisition.z_planes,
+    #         "save_mip": exp.save_sample_video,
+    #         "strobe_acquisition": hw.strobe_acquisition,
+    #         "strobe_inter_frame_interval": hw.strobe_inter_frame_interval_ms,
+    #         # "save_structural_scan": exp.acquisition.save_structural_scan,
+    #         # "rec_baseline": exp.acquisition.baseline_samples,
+    #         # "z_step_size": exp.z_step_size_um,
             
-            # Subject metadata
-            "subject_strain": exp.subject.genotype or "unknown",
-            "subject_condition": exp.subject.treatment_details.condition,
-            "atr_concentration": exp.subject.treatment_details.atr_concentration_uM or 0.0,
-            "nose_orientation": exp.subject.orientation.nose,
-            "vnc_orientation": exp.subject.orientation.vnc,
-            "num_eggs": exp.subject.num_eggs,
-            "experimental_notes": exp.subject.notes or "",
+    #         # Subject metadata
+    #         "subject_strain": exp.subject.genotype or "unknown",
+    #         "subject_condition": exp.subject.treatment_details.condition,
+    #         "atr_concentration": exp.subject.treatment_details.atr_concentration_uM or 0.0,
+    #         "nose_orientation": exp.subject.orientation.nose,
+    #         "vnc_orientation": exp.subject.orientation.vnc,
+    #         "num_eggs": exp.subject.num_eggs,
+    #         "experimental_notes": exp.subject.notes or "",
             
-            # From HardwareConfig
-            "acquisition_backend": hw.backend,
-            "mm_configuration_file": hw.mm_config_path or "",
-            "stim_interface": hw.stim_interface,
-            "use_static_stim_roi": hw.use_static_stim_roi,
+    #         # From HardwareConfig
+    #         "acquisition_backend": hw.backend,
+    #         "mm_configuration_file": hw.mm_config_path or "",
+    #         "stim_interface": hw.stim_interface,
+    #         "use_static_stim_roi": hw.use_static_stim_roi,
             
-            # From AlgorithmConfig
-            "trigger_algorithm": alg.algorithm_type,
-            "GUI_mode": alg.gui_mode,
-            "save_alg_model_plot": alg.save_algorithm_plot,
+    #         # From AlgorithmConfig
+    #         "trigger_algorithm": alg.algorithm_type,
+    #         "GUI_mode": alg.gui_mode,
+    #         "save_alg_model_plot": alg.save_algorithm_plot,
             
-            # Stimulus parameters
-            "frames_to_stimulate_for_options": alg.stimulus_params.duration_frames_options,
-            "stim_intensity_options": alg.stimulus_params.intensity_percent_options,
-            "stimulus_diameter": alg.algorithm_params.stimulus_diameter_pixels,
+    #         # Stimulus parameters
+    #         "frames_to_stimulate_for_options": alg.stimulus_params.duration_frames_options,
+    #         "stim_intensity_options": alg.stimulus_params.intensity_percent_options,
+    #         "stimulus_diameter": alg.algorithm_params.stimulus_diameter_pixels,
             
-            # Dev options
-            "input_recording": exp.input_recording_path,
-            "no_save_images": not exp.save_images,
-            "no_save_metadata": not exp.save_metadata,
-            "prefill_wb_ops": exp.dev_options.prefill_wb_ops,
-            "send_sms": exp.dev_options.send_sms_on_completion,
+    #         # Dev options
+    #         "input_recording": exp.input_recording_path,
+    #         "no_save_images": not exp.save_images,
+    #         "no_save_metadata": not exp.save_metadata,
+    #         "prefill_wb_ops": exp.dev_options.prefill_wb_ops,
+    #         "send_sms": exp.dev_options.send_sms_on_completion,
             
-            # Additional algorithm params
-            "stim_threshold_pos": alg.algorithm_params.stim_threshold_pos,
-            "stim_threshold_neg": alg.algorithm_params.stim_threshold_neg,
-            "stim_cooldown": alg.algorithm_params.stim_cooldown_frames,
-            "skip_stimulation_probability": alg.algorithm_params.skip_stimulation_probability,
-            "delay_stimulation_probability": alg.algorithm_params.delay_stimulation_probability,
-            "stim_delay_frames_options": alg.algorithm_params.stim_delay_frames_options,
-            "stim_onset_list_options": alg.algorithm_params.stim_onset_list,
+    #         # Additional algorithm params
+    #         # "stim_threshold_pos": alg.algorithm_params.stim_threshold_pos,
+    #         # "stim_threshold_neg": alg.algorithm_params.stim_threshold_neg,
+    #         # "stim_cooldown": alg.algorithm_params.stim_cooldown_frames,
+    #         # "skip_stimulation_probability": alg.algorithm_params.skip_stimulation_probability,
+    #         # "delay_stimulation_probability": alg.algorithm_params.delay_stimulation_probability,
+    #         # "stim_delay_frames_options": alg.algorithm_params.stim_delay_frames_options,
+    #         # "stim_onset_list_options": alg.algorithm_params.stim_onset_list,
             
-            # Backward compatibility - will be removed
-            "microscope_name": hw.microscope_name or "unknown",
-        }
+    #         # Backward compatibility - will be removed
+    #         "microscope_name": hw.microscope_name or "unknown",
+    #     }
         
-        # Wrap in expected structure
-        args = {
-            "gooey_args": gooey_args,
-            "configs": {},  # Empty for now
-        }
+    #     # Wrap in expected structure
+    #     args = {
+    #         "gooey_args": gooey_args,
+    #         "configs": {},  # Empty for now
+    #     }
         
-        return args
+    #     return args
         
-    def _extract_parameters(self):
-        """Extract frequently used parameters from configs."""
-        self.zsize = self.gooey_args.get("zsize", 1)
-        self.samples_to_grab = self.gooey_args.get("total_frames", 100)
-        self.samples_baseline_window = self.gooey_args.get("rec_baseline", 0)
-        self.NO_SAVE_DATA = self.gooey_args.get("no_save_images", False)
-        self.NO_SAVE_METADATA = self.gooey_args.get("no_save_metadata", False)
-        self.save_mip_movie = self.gooey_args.get("save_mip", False)
-        self.save_alg_model_plot = self.gooey_args.get("save_alg_model_plot", False)
-        self.strobe_acquisition = self.hardware_config.strobe_acquisition
-        self.strobe_inter_frame_interval = self.hardware_config.strobe_inter_frame_interval_ms
-        self.config_file = self.hardware_config.mm_config_path or ""
-        self.is_demo_acquisition = self.config_file.endswith("MMConfig_demo.cfg")
-        self.save_structural_scan = self.gooey_args.get("save_structural_scan", "")
-        self.prefill_wb_ops = self.gooey_args.get("prefill_wb_ops", False)
-        self.notify_sms_on_done = self.gooey_args.get("send_sms", True)
-        self.trigger_alg = self.gooey_args.get("trigger_algorithm", "DummyAlg")
-        self.acquisition_backend = self.hardware_config.backend
-        self.gui_mode = self.gooey_args.get("GUI_mode", "neural_imaging")
+    # def _extract_parameters(self):
+    #     """Extract frequently used parameters from configs."""
+    #     self.zsize = self.gooey_args.get("zsize", 1)
+    #     self.samples_to_grab = self.gooey_args.get("total_frames", 100)
+    #     self.samples_baseline_window = self.gooey_args.get("rec_baseline", 0)
+    #     self.NO_SAVE_DATA = self.gooey_args.get("no_save_images", False)
+    #     self.NO_SAVE_METADATA = self.gooey_args.get("no_save_metadata", False)
+    #     self.save_mip_movie = self.gooey_args.get("save_mip", False)
+    #     self.save_alg_model_plot = self.gooey_args.get("save_alg_model_plot", False)
+    #     self.strobe_acquisition = self.hardware_config.strobe_acquisition
+    #     self.strobe_inter_frame_interval = self.hardware_config.strobe_inter_frame_interval_ms
+    #     self.config_file = self.hardware_config.mm_config_path or ""
+    #     self.is_demo_acquisition = self.config_file.endswith("MMConfig_demo.cfg")
+    #     self.save_structural_scan = self.gooey_args.get("save_structural_scan", "")
+    #     self.prefill_wb_ops = self.gooey_args.get("prefill_wb_ops", False)
+    #     self.notify_sms_on_done = self.gooey_args.get("send_sms", True)
+    #     self.trigger_alg = self.gooey_args.get("trigger_algorithm", "DummyAlg")
+    #     self.acquisition_backend = self.hardware_config.backend
+    #     self.gui_mode = self.gooey_args.get("GUI_mode", "neural_imaging")
           
     def initialize_hardware(self):
         """
@@ -239,7 +239,7 @@ class ClosedLoopEngine:
         
         # For legacy components that still need mmc directly
         # This will be removed as components are refactored
-        self.mmc = self.hardware.get_mmc()
+        # self.mmc = self.hardware.get_mmc()
         
         logger.info(f"Hardware initialized with shape/dtype: {self.sample_shape}/{self.sample_dtype}")
         
@@ -259,8 +259,8 @@ class ClosedLoopEngine:
             self.alg = create_algorithm(
                 algorithm_config=self.algorithm_config,
                 experiment_config=self.experiment_config,
-                hardware_manager=self.hardware,
-                local_handles={"mmc": self.mmc}
+                hardware_manager=self.hardware, 
+                # local_handles={"mmc": self.mmc} # now optionally in hardware_manager
             )
             
             # Initialize the algorithm's internal model
@@ -300,7 +300,7 @@ class ClosedLoopEngine:
             self.stim_controller = create_stimulus_controller(
                 stim_interface=stim_interface,
                 hardware_manager=self.hardware,
-                config=self.args  # Still passing args for backward compatibility
+                # config=self.args  # Still passing args for backward compatibility
             )
 
             # Spool controller
@@ -334,8 +334,8 @@ class ClosedLoopEngine:
         self.session_id = dt
         
         # Update args dict with session info (needed by legacy components)
-        self.args["id"] = self.session_id
-        self.args["saveroot"] = self.saveroot
+        # self.args["id"] = self.session_id
+        # self.args["saveroot"] = self.saveroot
         
         # Configure camera for acquisition through hardware manager
         self.data_interface.configure_sampling(self.experiment_config) # send expeirment config to data interface
@@ -343,27 +343,27 @@ class ClosedLoopEngine:
         logger.debug("Data interface prepared for acquisition")
         
         # Run pre-acquisition structural scan if requested
-        self._run_structural_scan_pre()
+        # self._run_structural_scan_pre()
         
         logger.info(f"Acquisition prepared. Saving to: {self.savedir}")
 
-    def _run_structural_scan_pre(self):
-        """Run pre-acquisition structural scan if requested."""
-        if self.save_structural_scan and "pre" in self.save_structural_scan.lower():
-            logger.info("Running pre-acquisition structural scan...")
-            try:
-                # TODO This still uses MMSubroutines temporarily
-                # Will be refactored when structural scans are moved to hardware layer
-                MMSubroutines.run_structural_scan(
-                    self.save_structural_scan,
-                    self.mmc,
-                    self.args,
-                    self.saveroot,
-                    self.session_id,
-                    self.zsize
-                )
-            except Exception as err:
-                logger.error(f"Error in pre-acquisition structural scan: {err}")
+    # def _run_structural_scan_pre(self):
+    #     """Run pre-acquisition structural scan if requested."""
+    #     if self.save_structural_scan and "pre" in self.save_structural_scan.lower():
+    #         logger.info("Running pre-acquisition structural scan...")
+    #         try:
+    #             # TODO This still uses MMSubroutines temporarily
+    #             # Will be refactored when structural scans are moved to hardware layer
+    #             MMSubroutines.run_structural_scan(
+    #                 self.save_structural_scan,
+    #                 self.mmc,
+    #                 self.args,
+    #                 self.saveroot,
+    #                 self.session_id,
+    #                 self.zsize
+    #             )
+    #         except Exception as err:
+    #             logger.error(f"Error in pre-acquisition structural scan: {err}")
 
     def run_acquisition_loop(self):
         """
@@ -497,8 +497,8 @@ class ClosedLoopEngine:
         )
         
         # Prefill wb_ops if requested
-        if self.prefill_wb_ops:
-            wbliveUtils.prefill_wb_ops(savefileroot=self.savedir, metadata=metadata)
+        # if self.prefill_wb_ops:
+        #     wbliveUtils.prefill_wb_ops(savefileroot=self.savedir, metadata=metadata)
             
         logger.info("Metadata saved")
 
@@ -535,7 +535,7 @@ class ClosedLoopEngine:
             logger.info("Generating MIP movie...")
             exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps
             wbliveUtils.generate_mip_movie(
-                savefilename=self.saveroot + "_mip_movie",
+                savefilename=self.saveroot + "_movie",
                 samples=self.samples,
                 zsize=self.zsize,
                 exposure=exposure,
@@ -647,172 +647,172 @@ class ClosedLoopEngine:
         logger.info("="*60)
 
 
-def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
-    """
-    Legacy entry point for launching from Gooey GUI.
+# def launch_wblive_from_gooey(ops: dict[str, Any] | None = None):
+#     """
+#     Legacy entry point for launching from Gooey GUI.
     
-    Converts flat gooey_args dict to Config objects and calls new run() method.
+#     Converts flat gooey_args dict to Config objects and calls new run() method.
     
-    Args:
-        ops: Configuration dictionary from GUI (gooey_args)
-    """
-    if not ops:
-        logger.error("No configuration provided")
-        return
+#     Args:
+#         ops: Configuration dictionary from GUI (gooey_args)
+#     """
+#     if not ops:
+#         logger.error("No configuration provided")
+#         return
     
-    # Check for dry run mode
-    if ops.get("input_recording") is not None:
-        fname = ops["input_recording"]
-        logger.debug(f"Simulating recording from file: {fname}")
+#     # Check for dry run mode
+#     if ops.get("input_recording") is not None:
+#         fname = ops["input_recording"]
+#         logger.debug(f"Simulating recording from file: {fname}")
     
-    try:
-        # Convert gooey_args to Config objects
-        configs = convert_gooey_args_to_configs(ops)
+#     try:
+#         # Convert gooey_args to Config objects
+#         configs = convert_gooey_args_to_configs(ops)
         
-        # Run acquisition with new signature
-        engine = ClosedLoopEngine(
-            hardware_config=configs["hardware"],
-            experiment_config=configs["experiment"],
-            algorithm_config=configs["algorithm"]
-        )
-        engine.run()
+#         # Run acquisition with new signature
+#         engine = ClosedLoopEngine(
+#             hardware_config=configs["hardware"],
+#             experiment_config=configs["experiment"],
+#             algorithm_config=configs["algorithm"]
+#         )
+#         engine.run()
         
-    except Exception as err:
-        logger.exception(f"Error running acquisition: {err}")
-        raise
-    finally:
-        logger.info("Session complete")
-        sys.exit()
+#     except Exception as err:
+#         logger.exception(f"Error running acquisition: {err}")
+#         raise
+#     finally:
+#         logger.info("Session complete")
+#         sys.exit()
 
 
-def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert legacy gooey_args dictionary to Config objects.
+# def convert_gooey_args_to_configs(gooey_args: Dict[str, Any]) -> Dict[str, Any]:
+#     """
+#     Convert legacy gooey_args dictionary to Config objects.
     
-    This function bridges the old flat dict format to the new structured Config objects.
+#     This function bridges the old flat dict format to the new structured Config objects.
     
-    Args:
-        gooey_args: Dictionary from Gooey GUI with flat key-value pairs
+#     Args:
+#         gooey_args: Dictionary from Gooey GUI with flat key-value pairs
         
-    Returns:
-        Dictionary with keys: "hardware", "experiment", "algorithm" containing Config objects
-    """
-    from config.config_manager import (
-        HardwareConfig,
-        ExperimentConfig,
-        AlgorithmConfig,
-        AcquisitionConfig,
-        SubjectMetadata,
-        TreatmentDetails,
-        Orientation,
-        DevOptions,
-        AlgorithmParameters,
-        StimulusParameters,
-    )
+#     Returns:
+#         Dictionary with keys: "hardware", "experiment", "algorithm" containing Config objects
+#     """
+#     from config.config_manager import (
+#         HardwareConfig,
+#         ExperimentConfig,
+#         AlgorithmConfig,
+#         AcquisitionConfig,
+#         SubjectMetadata,
+#         TreatmentDetails,
+#         Orientation,
+#         DevOptions,
+#         AlgorithmParameters,
+#         StimulusParameters,
+#     )
     
-    # Build HardwareConfig
-    hardware_config = HardwareConfig(
-        backend=gooey_args.get("acquisition_backend", "dummy"),
-        mm_config_path=gooey_args.get("mm_configuration_file"),
-        stim_interface=gooey_args.get("stim_interface", "dummy"),
-        microscope_name=gooey_args.get("microscope_name"),
-        strobe_acquisition=gooey_args.get("strobe_acquisition", False),
-        strobe_inter_frame_interval_ms=gooey_args.get("strobe_inter_frame_interval", 80),
-        use_static_stim_roi=gooey_args.get("use_static_stim_roi", False),
-    )
+#     # Build HardwareConfig
+#     hardware_config = HardwareConfig(
+#         backend=gooey_args.get("acquisition_backend", "dummy"),
+#         mm_config_path=gooey_args.get("mm_configuration_file"),
+#         stim_interface=gooey_args.get("stim_interface", "dummy"),
+#         microscope_name=gooey_args.get("microscope_name"),
+#         strobe_acquisition=gooey_args.get("strobe_acquisition", False),
+#         strobe_inter_frame_interval_ms=gooey_args.get("strobe_inter_frame_interval", 80),
+#         use_static_stim_roi=gooey_args.get("use_static_stim_roi", False),
+#     )
     
-    # Build ExperimentConfig
-    acquisition_config = AcquisitionConfig(
-        num_samples=gooey_args.get("total_frames", 100),
-        z_planes=gooey_args.get("zsize", 1),
-        z_step=gooey_args.get("z_step_size", 1.0),
-        baseline_samples=gooey_args.get("rec_baseline", 0),
-        save_structural_scan=gooey_args.get("save_structural_scan", "none"),
-    )
+#     # Build ExperimentConfig
+#     acquisition_config = AcquisitionConfig(
+#         num_samples=gooey_args.get("total_frames", 100),
+#         z_planes=gooey_args.get("zsize", 1),
+#         z_step=gooey_args.get("z_step_size", 1.0),
+#         baseline_samples=gooey_args.get("rec_baseline", 0),
+#         save_structural_scan=gooey_args.get("save_structural_scan", "none"),
+#     )
     
-    treatment_details = TreatmentDetails(
-        condition=gooey_args.get("subject_condition", ""),
-        atr_concentration_uM=gooey_args.get("atr_concentration"),
-    )
+#     treatment_details = TreatmentDetails(
+#         condition=gooey_args.get("subject_condition", ""),
+#         atr_concentration_uM=gooey_args.get("atr_concentration"),
+#     )
     
-    orientation = Orientation(
-        nose=gooey_args.get("nose_orientation"),
-        vnc=gooey_args.get("vnc_orientation"),
-    )
+#     orientation = Orientation(
+#         nose=gooey_args.get("nose_orientation"),
+#         vnc=gooey_args.get("vnc_orientation"),
+#     )
     
-    subject_metadata = SubjectMetadata(
-        genotype=gooey_args.get("subject_strain"),
-        treatment_details=treatment_details,
-        orientation=orientation,
-        num_eggs=gooey_args.get("num_eggs", 0),
-        notes=gooey_args.get("experimental_notes"),
-    )
+#     subject_metadata = SubjectMetadata(
+#         genotype=gooey_args.get("subject_strain"),
+#         treatment_details=treatment_details,
+#         orientation=orientation,
+#         num_eggs=gooey_args.get("num_eggs", 0),
+#         notes=gooey_args.get("experimental_notes"),
+#     )
     
-    dev_options = DevOptions(
-        prefill_wb_ops=gooey_args.get("prefill_wb_ops", False),
-        send_sms_on_completion=gooey_args.get("send_sms", False),
-    )
+#     dev_options = DevOptions(
+#         prefill_wb_ops=gooey_args.get("prefill_wb_ops", False),
+#         send_sms_on_completion=gooey_args.get("send_sms", False),
+#     )
     
-    experiment_config = ExperimentConfig(
-        experiment_name=gooey_args.get("experiment_name", "default_experiment"),
-        output_dir=gooey_args.get("output_folder", "./data"),
-        save_images=not gooey_args.get("no_save_images", False),
-        save_metadata=not gooey_args.get("no_save_metadata", False),
-        save_mip_video=gooey_args.get("save_mip", False),
-        acquisition=acquisition_config,
-        subject=subject_metadata,
-        z_step_size_um=gooey_args.get("z_step_size", 1.0),
-        input_recording_path=gooey_args.get("input_recording"),
-        dev_options=dev_options,
-    )
+#     experiment_config = ExperimentConfig(
+#         experiment_name=gooey_args.get("experiment_name", "default_experiment"),
+#         output_dir=gooey_args.get("output_folder", "./data"),
+#         save_images=not gooey_args.get("no_save_images", False),
+#         save_metadata=not gooey_args.get("no_save_metadata", False),
+#         save_sample_video=gooey_args.get("save_sample", False),
+#         acquisition=acquisition_config,
+#         subject=subject_metadata,
+#         z_step_size_um=gooey_args.get("z_step_size", 1.0),
+#         input_recording_path=gooey_args.get("input_recording"),
+#         dev_options=dev_options,
+#     )
     
-    # Build AlgorithmConfig
-    algorithm_params = AlgorithmParameters(
-        stim_threshold_pos=gooey_args.get("stim_threshold_pos", 0.06),
-        stim_threshold_neg=gooey_args.get("stim_threshold_neg", 0.06),
-        stim_cooldown_frames=gooey_args.get("stim_cooldown", 900),
-        skip_stimulation_probability=gooey_args.get("skip_stimulation_probability", 0.1),
-        delay_stimulation_probability=gooey_args.get("delay_stimulation_probability", 0.4),
-        stim_delay_frames_options=gooey_args.get("stim_delay_frames_options", [200, 400]),
-        stim_onset_list=gooey_args.get("stim_onset_list_options", []),
-        stimulus_diameter_pixels=gooey_args.get("stimulus_diameter", 10),
-    )
+#     # Build AlgorithmConfig
+#     algorithm_params = AlgorithmParameters(
+#         stim_threshold_pos=gooey_args.get("stim_threshold_pos", 0.06),
+#         stim_threshold_neg=gooey_args.get("stim_threshold_neg", 0.06),
+#         stim_cooldown_frames=gooey_args.get("stim_cooldown", 900),
+#         skip_stimulation_probability=gooey_args.get("skip_stimulation_probability", 0.1),
+#         delay_stimulation_probability=gooey_args.get("delay_stimulation_probability", 0.4),
+#         stim_delay_frames_options=gooey_args.get("stim_delay_frames_options", [200, 400]),
+#         stim_onset_list=gooey_args.get("stim_onset_list_options", []),
+#         stimulus_diameter_pixels=gooey_args.get("stimulus_diameter", 10),
+#     )
     
-    stimulus_params = StimulusParameters(
-        duration_frames_options=gooey_args.get("frames_to_stimulate_for_options", [48]),
-        intensity_percent_options=gooey_args.get("stim_intensity_options", [10]),
-    )
+#     stimulus_params = StimulusParameters(
+#         duration_frames_options=gooey_args.get("frames_to_stimulate_for_options", [48]),
+#         intensity_percent_options=gooey_args.get("stim_intensity_options", [10]),
+#     )
     
-    algorithm_config = AlgorithmConfig(
-        algorithm_type=gooey_args.get("trigger_algorithm", "dummy"),
-        gui_mode=gooey_args.get("GUI_mode", "neural_imaging"),
-        save_algorithm_plot=gooey_args.get("save_alg_model_plot", False),
-        algorithm_params=algorithm_params,
-        stimulus_params=stimulus_params,
-    )
+#     algorithm_config = AlgorithmConfig(
+#         algorithm_type=gooey_args.get("trigger_algorithm", "dummy"),
+#         gui_mode=gooey_args.get("GUI_mode", "neural_imaging"),
+#         save_algorithm_plot=gooey_args.get("save_alg_model_plot", False),
+#         algorithm_params=algorithm_params,
+#         stimulus_params=stimulus_params,
+#     )
     
-    return {
-        "hardware": hardware_config,
-        "experiment": experiment_config,
-        "algorithm": algorithm_config,
-    }
+#     return {
+#         "hardware": hardware_config,
+#         "experiment": experiment_config,
+#         "algorithm": algorithm_config,
+#     }
 
 
-def run_acquisition(args: dict[str, Any]):
-    """
-    Legacy wrapper for backwards compatibility.
+# def run_acquisition(args: dict[str, Any]):
+#     """
+#     Legacy wrapper for backwards compatibility.
     
-    Args:
-        args: Dictionary containing 'gooey_args' key with configuration
-    """
-    gooey_args = args.get("gooey_args", {})
-    configs = convert_gooey_args_to_configs(gooey_args)
-    engine = ClosedLoopEngine(
-        hardware_config=configs["hardware"],
-        experiment_config=configs["experiment"],
-        algorithm_config=configs["algorithm"]
-    )
-    engine.run()
+#     Args:
+#         args: Dictionary containing 'gooey_args' key with configuration
+#     """
+#     # gooey_args = args.get("gooey_args", {})
+#     # configs = convert_gooey_args_to_configs(gooey_args)
+#     engine = ClosedLoopEngine(
+#         hardware_config=configs["hardware"],
+#         experiment_config=configs["experiment"],
+#         algorithm_config=configs["algorithm"]
+#     )
+#     engine.run()
 
 
 def create_test_config() -> dict[str, Any]:
@@ -851,7 +851,7 @@ def create_test_config() -> dict[str, Any]:
     )
     
     dev_options = DevOptions(
-        prefill_wb_ops=False,
+        # prefill_wb_ops=False,
         send_sms_on_completion=False,
     )
     

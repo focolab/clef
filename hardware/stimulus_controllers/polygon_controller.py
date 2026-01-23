@@ -18,15 +18,14 @@ logger = logging.getLogger(__name__)
 class PolygonStimulusController(BaseStimulusController):
     """Controller for polygon-based LDI stimulus."""
     
-    def __init__(self, hardware_manager, config: Dict[str, Any]):
+    def __init__(self, hardware_manager):
         """
         Initialize polygon stimulus controller.
         
         Args:
             hardware_manager: HardwareManager instance
-            config: Configuration dictionary
         """
-        super().__init__(hardware_manager, config)
+        super().__init__(hardware_manager)
         
         # Polygon-specific attributes will be set by hardware backend
         self.calibration_points = {}

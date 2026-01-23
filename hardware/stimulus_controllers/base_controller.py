@@ -24,41 +24,40 @@ class BaseStimulusController(ABC):
     Hardware operations are delegated to HardwareManager.
     """
     
-    def __init__(self, hardware_manager, config: Dict[str, Any]):
+    def __init__(self, hardware_manager):
         """
         Initialize stimulus controller.
         
         Args:
             hardware_manager: HardwareManager instance for hardware operations
-            config: Configuration dictionary (typically from args)
         """
         self.hardware_manager = hardware_manager
-        self.config = config
+        # self.config = config
         
-        # Extract common config values
-        self.rec_id = config.get("id")
-        self.roi = config.get("roi")
-        self.savedir = config.get("saveroot")
+        # # Extract common config values
+        # self.rec_id = config.get("id")
+        # self.roi = config.get("roi")
+        # self.savedir = config.get("saveroot")
         
         # Gooey args
-        gooey_args = config.get("gooey_args", {})
-        self.zsize = gooey_args.get("zsize")
-        self.stim_interface = gooey_args.get("stim_interface")
-        self.acquisition_backend = gooey_args.get("acquisition_backend")
-        self.trigger_alg = gooey_args.get("trigger_algorithm")
-        self.microscope_name = gooey_args.get("microscope_name")
+        # gooey_args = config.get("gooey_args", {})
+        # self.zsize = gooey_args.get("zsize")
+        # self.stim_interface = gooey_args.get("stim_interface")
+        # self.acquisition_backend = gooey_args.get("acquisition_backend")
+        # self.trigger_alg = gooey_args.get("trigger_algorithm")
+        # self.microscope_name = gooey_args.get("microscope_name")
         
         # Timing tracking (from old StimBaseClass)
         self.stim_on_list = []
         self.stim_off_list = []
         self.stim_on_time_list = []
         self.stim_off_time_list = []
-        self.stim_intensity_list = []
+        # self.stim_intensity_list = []
         self.stim_param_list = []
         
         # Timers
-        self.submit_stim_params_time_list = []
-        self.process_stim_params_event_time_list = []
+        # self.submit_stim_params_time_list = []
+        # self.process_stim_params_event_time_list = []
     
     @abstractmethod
     def submit_stim_params(self, stim_params: Dict[str, Any], image_ndx: int) -> None:
@@ -123,7 +122,7 @@ class BaseStimulusController(ABC):
         """
         pass
     
-    def get_metadata(self, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_metadata(self) -> Dict[str, Any]:
         """
         Get stimulus metadata.
         
@@ -136,11 +135,11 @@ class BaseStimulusController(ABC):
         args = args or {}
         
         # Get stim onset relative to recording start
-        t0 = self.config.get("t0") or args.get("t0")
-        stim_onset_times_simple = self.get_stim_time_onsets(t0=t0)
+        # t0 = self.config.get("t0") or args.get("t0")
+        # stim_onset_times_simple = self.get_stim_time_onsets(t0=t0)
         
         metadata = {
-            "stim_onset_times_simple": stim_onset_times_simple,
+            # "stim_onset_times_simple": stim_onset_times_simple,
             "stim_on_list": self.stim_on_list,
             "stim_off_list": self.stim_off_list,
             "stim_on_time_list": self.stim_on_time_list,
