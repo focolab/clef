@@ -1,8 +1,0 @@
-{
-    "model_name": "head_curvature_and_xystage",
-    "model_class": "single_worm_tracker",
-    "model_description": "single worm tracker which estimates real-time head curvature and moves XY stage to keep worm centered",
-    "model_inference_instructions": "INPUT MODEL INFERENCE INSTRUCTIONS HERE",
-    "model": {},
-    "model_card": {}
-}
