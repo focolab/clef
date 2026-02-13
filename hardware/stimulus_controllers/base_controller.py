@@ -52,7 +52,7 @@ class BaseStimulusController(ABC):
         self.stim_off_list = []
         self.stim_on_time_list = []
         self.stim_off_time_list = []
-        # self.stim_intensity_list = []
+        self.stim_intensity_list = []
         self.stim_param_list = []
         
         # Timers
@@ -83,7 +83,7 @@ class BaseStimulusController(ABC):
             intensity = self.stim_intensity_list[idx] if idx < len(self.stim_intensity_list) else 1
             
             logger.info(
-                f"BaseStimulusController: activating {self.stim_interface} stim on frame {img_count}"
+                f"BaseStimulusController: activating stim on frame {img_count}"
             )
             
             # Delegate to hardware
@@ -93,7 +93,7 @@ class BaseStimulusController(ABC):
         # Deactivation check
         if img_count in self.stim_off_list:
             logger.info(
-                f"BaseStimulusController: deactivating {self.stim_interface} stim on frame {img_count}"
+                f"BaseStimulusController: deactivating stim on frame {img_count}"
             )
             
             # Delegate to hardware
@@ -122,13 +122,13 @@ class BaseStimulusController(ABC):
         """
         pass
     
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Get stimulus metadata.
-        
+
         Args:
             args: Optional arguments (e.g., t0 for relative timing)
-        
+
         Returns:
             Dictionary containing stimulus metadata
         """

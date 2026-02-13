@@ -13,8 +13,8 @@ from typing import Dict, Any, Tuple, Union, Optional
 
 from hardware.data_interface import DataInterface
 from hardware.camera_interface import CameraInterface
+import tifffile as tf
 from config.config_manager import ExperimentConfig
-from utils import MMSubroutines
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ class ImageDataInterface(DataInterface):
         if not filepath.endswith('.tiff'):
             filepath = filepath + '.tiff'
 
-        MMSubroutines.saveScanTiffs(fname=filepath, img_array=data)
+        tf.imwrite(filepath, data)
         logger.info(f"Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
     
     def configure_sampling(self, config: ExperimentConfig | None) -> None:
