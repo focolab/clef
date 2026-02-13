@@ -10,3 +10,4 @@ demo_output_hardware/
 # Claude
 CLAUDE.md
 .claude/
+.claudeignore

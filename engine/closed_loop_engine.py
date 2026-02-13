@@ -221,7 +221,7 @@ class ClosedLoopEngine:
         self.hardware = HardwareManager(self.hardware_config)
         
         # Initialize with input recording if provided
-        input_recording = self.experiment_config.input_recording_path
+        input_recording = getattr(self.experiment_config, 'input_recording_path', None)
         if input_recording:
             logger.info(f"Using input recording: {input_recording}")
             self.hardware.initialize(input_file=input_recording)
@@ -251,7 +251,7 @@ class ClosedLoopEngine:
         The factory handles all imports and provides helpful error messages if the
         algorithm type is not found.
         """
-        logger.info(f"Initializing algorithm: {self.trigger_alg}")
+        logger.info(f"Initializing algorithm: {self.algorithm_config.algorithm_type}")
         
         try:
 
@@ -394,7 +394,7 @@ class ClosedLoopEngine:
         
         # Start acquisition based on mode
         # TODO this should reall just be "continuous" vs "discrete"... 
-        if self.strobe_acquisition:
+        if self.hardware_config.strobe_acquisition:
             self.next_call = time.time()
             self.data_interface.sample_data()
         else:
@@ -458,14 +458,14 @@ class ClosedLoopEngine:
         - Stimulus controller
         - Acquisition settings
         """
-        if self.NO_SAVE_METADATA:
+        if not self.experiment_config.save_metadata:
             logger.info("Metadata saving disabled")
             return
-            
+
         logger.info("Saving metadata...")
-        
+
         # Build metadata dict
-        metadata = dict(self.args)
+        metadata = {}
         metadata["sample_time_list"] = self.data_interface.sample_time_list  # RENAMED
         metadata["t0"] = self.t0
         # metadata["xsize"] = self.data_interface.xsize
@@ -511,7 +511,7 @@ class ClosedLoopEngine:
         UPDATED: Delegates to data interface's save_data() method,
         which handles format-specific saving (TIFF, HDF5, NPY, etc.)
         """
-        if self.NO_SAVE_DATA:
+        if not self.experiment_config.save_images:
             logger.info("Data saving disabled")
             return
             
@@ -525,39 +525,6 @@ class ClosedLoopEngine:
         
         logger.info("Data saved")
         
-    def _save_visualizations(self, mip_fps: float | None = None):
-        """Save algorithm plots and MIP movies."""
-        if self.save_alg_model_plot and self.alg:
-            logger.info("Saving algorithm model plot...")
-            self.alg.plot_model(savefilename=self.saveroot + "_live_stim_fig.svg")
-            
-        if self.save_mip_movie:
-            logger.info("Generating MIP movie...")
-            exposure = self.hardware.camera.get_exposure() if self.hardware else mip_fps
-            wbliveUtils.generate_mip_movie(
-                savefilename=self.saveroot + "_movie",
-                samples=self.samples,
-                zsize=self.zsize,
-                exposure=exposure,
-                GUI_mode=self.gui_mode,
-            )
-            
-    def _post_acquisition_structural_scan(self):
-        """Run structural scan after acquisition if requested."""
-        if "NeuroPAL" in self.save_structural_scan:
-            logger.info("Running post-acquisition structural scan...")
-            try:
-                MMSubroutines.run_structural_scan(
-                    self.save_structural_scan,
-                    self.mmc,
-                    self.args,
-                    self.saveroot,
-                    self.session_id,
-                    self.zsize
-                )
-            except Exception as err:
-                logger.error(f"Error in post-acquisition structural scan: {err}")
-                
     def cleanup(self):
         """
         Clean up resources and close connections.
@@ -588,14 +555,6 @@ class ClosedLoopEngine:
                 self.hardware.close()
             except Exception as err:
                 logger.warning(f"Error closing hardware: {err}")
-                
-        # Send notification
-        if self.notify_sms_on_done:
-            try:
-                msg = f"Your wb-live recording {self.session_id} has completed."
-                wbliveUtils.notify(msg, interface="twilio-sms")
-            except Exception as err:
-                logger.warning(f"Error sending notification: {err}")
                 
         logger.info("Cleanup complete")
         
@@ -629,9 +588,7 @@ class ClosedLoopEngine:
             self.run_acquisition_loop()
             
             # Post-processing phase
-            self._post_acquisition_structural_scan()
             self._save_data()  # UPDATED: uses data interface
-            self._save_visualizations()
             self.save_metadata()
             
         except Exception as err:
@@ -829,32 +786,29 @@ def create_test_config() -> dict[str, Any]:
         AcquisitionConfig,
         SubjectMetadata,
         DevOptions,
-        AlgorithmParameters,
+        BackendConfiguration,
+        StimulusConfiguration,
+        SystemProperties,
+        AlgorithmConfiguration,
         StimulusParameters,
     )
-    
+
     hardware_config = HardwareConfig(
-        backend="dummy",
-        stim_interface="dummy",
-        microscope_name="test",
+        backend_configuration=BackendConfiguration(backend_name="dummy"),
+        stimulus_configuration=StimulusConfiguration(stim_interface="dummy"),
+        system_properties=SystemProperties(system_name="test"),
     )
-    
+
     acquisition_config = AcquisitionConfig(
         num_samples=100,
-        z_planes=10,
-        z_step=1.0,
     )
-    
+
     subject_metadata = SubjectMetadata(
-        genotype="test_strain",
         notes="Test run with dummy objects",
     )
-    
-    dev_options = DevOptions(
-        # prefill_wb_ops=False,
-        send_sms_on_completion=False,
-    )
-    
+
+    dev_options = DevOptions()
+
     experiment_config = ExperimentConfig(
         experiment_name="test_experiment",
         output_dir="./test_output",
@@ -864,20 +818,17 @@ def create_test_config() -> dict[str, Any]:
         subject=subject_metadata,
         dev_options=dev_options,
     )
-    
-    algorithm_params = AlgorithmParameters(
-        stimulus_diameter_pixels=10,
-    )
-    
+
     stimulus_params = StimulusParameters(
         enabled=False,
     )
-    
+
     algorithm_config = AlgorithmConfig(
         algorithm_type="dummy",
-        enable_gui=False,
-        algorithm_params=algorithm_params,
-        stimulus_params=stimulus_params,
+        algorithm_configuration=AlgorithmConfiguration(
+            enable_gui=False,
+            stimulus_params=stimulus_params,
+        ),
     )
     
     return {
