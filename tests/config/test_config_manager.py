@@ -110,7 +110,6 @@ def full_hardware_yaml(temp_config_dir):
                 }
             ]
         },
-        'polygon_calibration_path': '/path/to/calibration.json'
     }
     
     path = temp_config_dir / "hardware_full.yaml"
@@ -321,7 +320,6 @@ def test_load_experiment_config(temp_config_dir, experiment_yaml, default_config
     assert isinstance(config, ExperimentConfig)
     assert config.experiment_name == 'test_experiment'
     assert config.acquisition.num_samples == 200
-    assert config.acquisition.z_stack is True
     assert config.subject.subject_id == 'subject_001'
 
 
@@ -355,30 +353,6 @@ def test_acquisition_config_validation_negative_frames(temp_config_dir):
     
     assert "greater than 0" in str(exc_info.value)
 
-
-def test_z_stack_validation_invalid_range(temp_config_dir):
-    """Test z-stack validation rejects invalid z-range."""
-    invalid_config = {
-        'experiment_name': 'test',
-        'acquisition': {
-            'num_samples': 100,
-            'z_stack': True,
-            'z_start': 10.0,
-            'z_end': 5.0,  # end < start - invalid
-            'z_planes': 5
-        }
-    }
-    
-    path = temp_config_dir / "invalid_zstack.yaml"
-    with open(path, 'w') as f:
-        yaml.dump(invalid_config, f)
-    
-    cm = ConfigManager(package_root=temp_config_dir)
-    
-    with pytest.raises(ValidationError) as exc_info:
-        cm.load_experiment_config(path)
-    
-    assert "z_end must be greater than z_start" in str(exc_info.value)
 
 
 # ============================================================================

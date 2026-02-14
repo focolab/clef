@@ -394,7 +394,7 @@ class ClosedLoopEngine:
         
         # Start acquisition based on mode
         # TODO this should reall just be "continuous" vs "discrete"... 
-        if self.hardware_config.strobe_acquisition:
+        if getattr(self.hardware_config, 'strobe_acquisition', False):
             self.next_call = time.time()
             self.data_interface.sample_data()
         else:
@@ -559,7 +559,8 @@ class ClosedLoopEngine:
         # Send completion notification if configured
         try:
             dev_options = self.experiment_config.dev_options if self.experiment_config else None
-            if dev_options and getattr(dev_options, 'send_sms_on_completion', False):
+            sms = dev_options.get('send_sms_on_completion', False) if isinstance(dev_options, dict) else getattr(dev_options, 'send_sms_on_completion', False)
+            if dev_options and sms:
                 wbliveUtils.notify("Acquisition completed")
         except Exception as err:
             logger.warning(f"Error sending completion notification: {err}")
@@ -793,7 +794,6 @@ def create_test_config() -> dict[str, Any]:
         AlgorithmConfig,
         AcquisitionConfig,
         SubjectMetadata,
-        DevOptions,
         BackendConfiguration,
         StimulusConfiguration,
         SystemProperties,
@@ -815,8 +815,6 @@ def create_test_config() -> dict[str, Any]:
         notes="Test run with dummy objects",
     )
 
-    dev_options = DevOptions()
-
     experiment_config = ExperimentConfig(
         experiment_name="test_experiment",
         output_dir="./test_output",
@@ -824,7 +822,6 @@ def create_test_config() -> dict[str, Any]:
         save_metadata=False,
         acquisition=acquisition_config,
         subject=subject_metadata,
-        dev_options=dev_options,
     )
 
     stimulus_params = StimulusParameters(

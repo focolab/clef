@@ -40,7 +40,6 @@ from config.config_manager import (
     AlgorithmConfig,
     AcquisitionConfig,
     SubjectMetadata,
-    DevOptions,
     AlgorithmParameters,
     StimulusParameters,
 )
@@ -121,7 +120,6 @@ def minimal_configs(temp_output_dir):
         SubjectMetadata,
         SubjectDetails,
         TreatmentDetails,
-        DevOptions,
         BackendConfiguration,
         StimulusConfiguration,
         SystemProperties,
@@ -166,8 +164,6 @@ def minimal_configs(temp_output_dir):
         notes="Test run with dummy objects",
     )
     
-    dev_options = DevOptions()
-    
     experiment_config = ExperimentConfig(
         experiment_name="test_experiment",
         output_dir=temp_output_dir,
@@ -175,7 +171,6 @@ def minimal_configs(temp_output_dir):
         save_metadata=False,
         acquisition=acquisition_config,
         subject=subject_metadata,
-        dev_options=dev_options,
     )
     
     # Algorithm config
@@ -795,7 +790,7 @@ class TestCleanup:
     def test_cleanup_sends_sms_notification(self, minimal_configs):
         """Test that cleanup sends SMS notification when enabled."""
         configs = minimal_configs.copy()
-        configs["experiment"].dev_options.send_sms_on_completion = True
+        configs["experiment"].dev_options = {"send_sms_on_completion": True}
         
         engine = ClosedLoopEngine(
             hardware_config=configs["hardware"],
@@ -1083,14 +1078,7 @@ class TestErrorHandling:
         with pytest.raises(Exception):  # ValidationError
             AcquisitionConfig(num_samples=-10)
         
-        # Test invalid z_end (less than z_start when z_stack enabled)
-        with pytest.raises(Exception):  # ValidationError
-            AcquisitionConfig(
-                z_stack=True,
-                z_planes=10,
-                z_start=10.0,
-                z_end=0.0  # Invalid: end < start
-            )
+
 
 
 # ============================================================================
@@ -1216,7 +1204,6 @@ class TestConfigAccessPatterns:
         # New way: direct config access
         assert engine.hardware_config.backend == "dummy"
         assert engine.hardware_config.stim_interface == "dummy"
-        assert engine.hardware_config.strobe_acquisition is False
         
         # Old way still works through legacy args
         # assert engine.args["gooey_args"]["acquisition_backend"] == "dummy"
@@ -1266,10 +1253,8 @@ class TestConfigAccessPatterns:
         # Nested experiment config
         assert engine.experiment_config.acquisition.num_samples == 100
         assert engine.experiment_config.subject.genotype == "test_strain"
-        assert engine.experiment_config.dev_options.prefill_wb_ops is False
-        
+
         # Nested algorithm config
-        assert engine.algorithm_config.algorithm_params.stimulus_diameter_pixels == 10
         assert engine.algorithm_config.stimulus_params.enabled is False
 
 

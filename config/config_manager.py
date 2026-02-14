@@ -74,21 +74,8 @@ class SystemDevices(BaseModel):
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
     num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
-    z_stack: bool = Field(False, description="Enable z-stack acquisition")
-    z_start: Optional[float] = Field(None, description="Z-stack start position (um)")
-    z_end: Optional[float] = Field(None, description="Z-stack end position (um)")
-    z_planes: int = Field(1, gt=0, description="Number of z-planes")
-    save_structural_scan: str = Field("none", description="Save structural scan: none, pre, post")
-    baseline_frames: int = Field(0, ge=0, description="Number of baseline frames before stimulation")
     model_config = ConfigDict(extra="allow")
 
-    @model_validator(mode='after')
-    def validate_z_stack_range(self):
-        if self.z_stack and self.z_start is not None and self.z_end is not None:
-            if self.z_end <= self.z_start:
-                raise ValueError(f"z_end must be greater than z_start (got z_end={self.z_end}, z_start={self.z_start})")
-        return self
-    
 
 class TreatmentDetails(BaseModel):
     """Treatment/condition details."""
@@ -123,13 +110,6 @@ class SubjectMetadata(BaseModel):
         return self.subject_type
 
 
-class DevOptions(BaseModel):
-    """Development/testing options."""
-    prefill_wb_ops: bool = Field(False, description="Pre-fill whole-brain ops")
-    send_sms_on_completion: bool = Field(False, description="Send SMS notification on completion")
-    model_config = ConfigDict(extra="allow")
-
-
 class ExperimentConfig(BaseModel):
     """Experiment configuration (experiment.yaml)."""
     experiment_name: str = Field(..., description="Experiment name/identifier")
@@ -138,10 +118,10 @@ class ExperimentConfig(BaseModel):
     save_images: bool = Field(True, description="Save acquired images")
     save_metadata: bool = Field(True, description="Save metadata JSON")
     save_sample_video: bool = Field(False, description="Save sample/summary video")
-    
+
     acquisition: AcquisitionConfig = Field(default_factory=AcquisitionConfig)
     subject: SubjectMetadata = Field(default_factory=SubjectMetadata)
-    dev_options: Optional[DevOptions] = Field(None, description="Development options")
+    dev_options: Optional[Dict[str, Any]] = Field(None, description="Development options")
     
     model_config = ConfigDict(extra="allow")
 
@@ -166,7 +146,6 @@ class AlgorithmConfiguration(BaseModel):
     enable_gui: bool = Field(False, description="Enable algorithm GUI")
     gui_mode: str = Field("none", description="GUI mode")
     stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
-    stimulus_diameter_pixels: int = Field(10, description="Stimulus diameter in pixels")
 
     model_config = ConfigDict(extra="allow")
 
@@ -252,10 +231,6 @@ class HardwareConfig(BaseModel):
     )
     system_devices: SystemDevices = Field(default_factory=SystemDevices)
     system_properties: SystemProperties = Field(default_factory=SystemProperties)
-    devices: Optional[Dict[str, Any]] = Field(None, description="Per-device property overrides")
-    polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
-    strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
-    strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
     
     model_config = ConfigDict(extra="allow")
     

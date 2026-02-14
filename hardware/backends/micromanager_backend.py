@@ -486,7 +486,7 @@ class MicroManagerStimulus(StimulusInterface):
             logger.warning(f"Could not initialize polygon: {e}")
         
         # Load calibration points
-        calibration_path = config.get("calibration_path") or self.hardware_config.polygon_calibration_path
+        calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None)
         if calibration_path:
             self.calibration_points = self._load_polygon_calibration(calibration_path)
         else:
@@ -1011,7 +1011,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         Sets properties using mmc.setProperty() for each device configured
         in HardwareConfig.devices.
         """
-        if not self.config.devices:
+        if not getattr(self.config, 'devices', None):
             return
         
         for device_key, device_config in self.config.devices.items():
@@ -1040,7 +1040,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         Sets Micro-Manager config group presets using mmc.setConfig() for each
         device configured in HardwareConfig.devices.
         """
-        if not self.config.devices:
+        if not getattr(self.config, 'devices', None):
             return
         
         for device_key, device_config in self.config.devices.items():
