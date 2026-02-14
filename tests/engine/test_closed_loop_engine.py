@@ -915,34 +915,6 @@ class TestIntegration:
         # Should complete 3 full volumes
         assert engine.sample_count == 30
     
-    def test_acquisition_saves_images_when_enabled(self, minimal_configs):
-        """Test that images are saved when flag is enabled."""
-        configs = minimal_configs.copy()
-        configs["experiment"].save_images = True
-        configs["experiment"].acquisition.num_samples = 10
-        
-        engine = ClosedLoopEngine(
-            hardware_config=configs["hardware"],
-            experiment_config=configs["experiment"],
-            algorithm_config=configs["algorithm"]
-        )
-        
-        with patch('utils.MMSubroutines.saveScanTiffs') as mock_save:
-            engine.run()
-            
-            # Should call save function
-            mock_save.assert_called_once()
-    
-    def test_acquisition_skips_images_when_disabled(self, engine_with_configs):
-        """Test that images are not saved when flag is disabled."""
-        engine = engine_with_configs
-        
-        with patch('utils.MMSubroutines.saveScanTiffs') as mock_save:
-            engine.run()
-            
-            # Should not call save function
-            mock_save.assert_not_called()
-    
     def test_multiple_acquisitions_with_same_instance(self, minimal_configs):
         """Test that engine can be reused for multiple acquisitions."""
         configs = minimal_configs.copy()

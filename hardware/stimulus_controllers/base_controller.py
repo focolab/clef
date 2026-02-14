@@ -138,8 +138,11 @@ class BaseStimulusController(ABC):
         # t0 = self.config.get("t0") or args.get("t0")
         # stim_onset_times_simple = self.get_stim_time_onsets(t0=t0)
         
+        t0 = args.get("t0")
+        stim_onset_times_simple = self.get_stim_time_onsets(t0=t0)
+
         metadata = {
-            # "stim_onset_times_simple": stim_onset_times_simple,
+            "stim_onset_times_simple": stim_onset_times_simple,
             "stim_on_list": self.stim_on_list,
             "stim_off_list": self.stim_off_list,
             "stim_on_time_list": self.stim_on_time_list,

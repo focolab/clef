@@ -12,7 +12,7 @@ import yaml
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError, ConfigDict
 from copy import deepcopy
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,20 @@ class SystemDevices(BaseModel):
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
     num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
+    z_stack: bool = Field(False, description="Enable z-stack acquisition")
+    z_start: Optional[float] = Field(None, description="Z-stack start position (um)")
+    z_end: Optional[float] = Field(None, description="Z-stack end position (um)")
+    z_planes: int = Field(1, gt=0, description="Number of z-planes")
+    save_structural_scan: str = Field("none", description="Save structural scan: none, pre, post")
+    baseline_frames: int = Field(0, ge=0, description="Number of baseline frames before stimulation")
     model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode='after')
+    def validate_z_stack_range(self):
+        if self.z_stack and self.z_start is not None and self.z_end is not None:
+            if self.z_end <= self.z_start:
+                raise ValueError(f"z_end must be greater than z_start (got z_end={self.z_end}, z_start={self.z_start})")
+        return self
     
 
 class TreatmentDetails(BaseModel):
@@ -104,9 +117,16 @@ class SubjectMetadata(BaseModel):
     notes: Optional[str] = Field(None, description="Additional notes")
     model_config = ConfigDict(extra="allow")
 
+    @property
+    def genotype(self) -> Optional[str]:
+        """Alias for subject_type."""
+        return self.subject_type
+
 
 class DevOptions(BaseModel):
     """Development/testing options."""
+    prefill_wb_ops: bool = Field(False, description="Pre-fill whole-brain ops")
+    send_sms_on_completion: bool = Field(False, description="Send SMS notification on completion")
     model_config = ConfigDict(extra="allow")
 
 
@@ -146,7 +166,8 @@ class AlgorithmConfiguration(BaseModel):
     enable_gui: bool = Field(False, description="Enable algorithm GUI")
     gui_mode: str = Field("none", description="GUI mode")
     stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
-    
+    stimulus_diameter_pixels: int = Field(10, description="Stimulus diameter in pixels")
+
     model_config = ConfigDict(extra="allow")
 
 
@@ -155,8 +176,40 @@ class AlgorithmConfig(BaseModel):
     algorithm_type: str = Field("dummy", description="Algorithm class name")
     save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
     algorithm_configuration: AlgorithmConfiguration = Field(default_factory=AlgorithmConfiguration)
-    
+
     model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode='before')
+    @classmethod
+    def promote_flat_algorithm_kwargs(cls, data):
+        """Promote flat gui_mode/enable_gui into algorithm_configuration."""
+        if isinstance(data, dict):
+            flat_keys = ('gui_mode', 'enable_gui')
+            to_promote = {k: data[k] for k in flat_keys if k in data and 'algorithm_configuration' not in data}
+            if to_promote:
+                data = dict(data)
+                existing = dict(data.get('algorithm_configuration', {}))
+                existing.update(to_promote)
+                data['algorithm_configuration'] = existing
+                for k in to_promote:
+                    data.pop(k, None)
+        return data
+
+    @property
+    def enable_gui(self) -> bool:
+        return self.algorithm_configuration.enable_gui
+
+    @property
+    def gui_mode(self) -> str:
+        return self.algorithm_configuration.gui_mode
+
+    @property
+    def stimulus_params(self) -> StimulusParameters:
+        return self.algorithm_configuration.stimulus_params
+
+    @property
+    def algorithm_params(self):
+        return self.algorithm_configuration
 
 
 class StimulusDeviceConfig(BaseModel):
@@ -199,6 +252,7 @@ class HardwareConfig(BaseModel):
     )
     system_devices: SystemDevices = Field(default_factory=SystemDevices)
     system_properties: SystemProperties = Field(default_factory=SystemProperties)
+    devices: Optional[Dict[str, Any]] = Field(None, description="Per-device property overrides")
     polygon_calibration_path: Optional[str] = Field(None, description="Path to polygon calibration JSON")
     strobe_acquisition: bool = Field(False, description="Enable strobe illumination")
     strobe_inter_frame_interval_ms: int = Field(80, description="Strobe inter-frame interval (ms)")
@@ -223,7 +277,49 @@ class HardwareConfig(BaseModel):
     def system_name(self) -> Optional[str]:
         """Alias for system_name for backward compatibility."""
         return self.system_properties.system_name
+
+    @property
+    def microscope_name(self) -> Optional[str]:
+        """Alias for system_name (legacy name)."""
+        return self.system_properties.system_name
+
+    @microscope_name.setter
+    def microscope_name(self, value: Optional[str]) -> None:
+        self.system_properties.system_name = value
     
+    @model_validator(mode='before')
+    @classmethod
+    def promote_flat_kwargs(cls, data):
+        """Promote flat 'backend' and 'stim_interface' kwargs into nested config objects."""
+        if isinstance(data, dict):
+            if 'backend' in data:
+                data = dict(data)
+                backend_val = data.pop('backend')
+                existing = data.get('backend_configuration', {})
+                if isinstance(existing, dict):
+                    existing = dict(existing)
+                    existing['backend_name'] = backend_val
+                    data['backend_configuration'] = existing
+                else:
+                    data['backend_configuration'] = {'backend_name': backend_val}
+            if 'stim_interface' in data and 'stimulus_configuration' not in data:
+                data = dict(data)
+                data['stimulus_configuration'] = {'stim_interface': data.pop('stim_interface')}
+            elif 'stim_interface' in data and 'stimulus_configuration' in data:
+                data = dict(data)
+                data.pop('stim_interface')  # already nested
+            if 'microscope_name' in data:
+                data = dict(data)
+                name_val = data.pop('microscope_name')
+                existing = data.get('system_properties', {})
+                if isinstance(existing, dict):
+                    existing = dict(existing)
+                else:
+                    existing = {}
+                existing['system_name'] = name_val
+                data['system_properties'] = existing
+        return data
+
     @field_validator('backend_configuration')
     @classmethod
     def validate_backend(cls, v):

@@ -32,47 +32,40 @@ class DummyAlg:
         algorithm_config: Optional[AlgorithmConfig] = None,
         experiment_config: Optional[ExperimentConfig] = None,
         hardware_manager: Optional[HardwareManager] = None,
-        # local_handles: Optional[Dict[str, Any]] = None,
-        # args: Optional[Dict[str, Any]] = None
+        local_handles: Optional[Dict[str, Any]] = None,
+        args: Optional[Dict[str, Any]] = None,
         ):
         """
         Initialize dummy algorithm.
-        
+
         Args:
             algorithm_config: Algorithm configuration (type, params, etc.)
             experiment_config: Experiment configuration (for building args)
-            hardware_config: Hardware configuration (for building args)
+            hardware_manager: Hardware manager instance
             local_handles: Dictionary of local handles (e.g., {'mmc': mmc_instance})
             args: Legacy args dictionary (optional, for compatibility)
         """
-        # if args is None:
-        #     args = {}
-        # if local_handles is None:
-        #     local_handles = {}
-            
-        # self.args = args
-        # self.local_handles = local_handles
-        
-        # Extract commonly used parameters with safe defaults
-        # gooey_args = self.args.get("gooey_args", {})
-        # self.samples_to_grab = gooey_args.get("total_frames", 100)
-        # self.samples_to_grab = experiment_config.acquisition.num_samples
+        if args is None:
+            args = {}
+        if local_handles is None:
+            local_handles = {}
 
-        # try to get zsize (from configuration, not backend)
-        # try: 
-        #     self.zsize = hardware_manager.config.stage.ZStage.num_z_planes
-        # except Exception as err:
-        #     logger.warning('ZSize not detected in hardware configuration, defaulting to 1')
-        #     self.zsize = 1
-        
+        self.args = args
+        self.local_handles = local_handles
+
+        # Extract commonly used parameters with safe defaults
+        gooey_args = self.args.get("gooey_args", {})
+        self.samples_to_grab = gooey_args.get("total_frames", 100)
+        self.zsize = gooey_args.get("zsize", 1)
+
         # Get ROI info if available
-        # self.roi = self.args.get("roi", [0, 0, 512, 512])
-        # self.xsize = self.roi[2]
-        # self.ysize = self.roi[3]
-        
+        self.roi = self.args.get("roi", [0, 0, 512, 512])
+        self.xsize = self.roi[2]
+        self.ysize = self.roi[3]
+
         # State
         self.sample_count = 0
-        # self.volume_count = 0
+        self.volume_count = 0
         
         logger.info("DummyAlg initialized (no-op algorithm)")
     
@@ -96,13 +89,13 @@ class DummyAlg:
             zndx: Z-plane index
         """
         self.sample_count = self.sample_count + 1
-        
+
         # Check if we completed a volume
-        # zndx = sample_ndx % self.zsize
-        # if zndx == (self.zsize - 1):
-        #     logging.debug(f'Finished volume with zndx: {zndx}, self.zsize: {self.zsize}, sample_ndx: {sample_ndx}')
-        #     self.process_volume()
-            
+        zndx = sample_ndx % self.zsize
+        if zndx == (self.zsize - 1):
+            logger.debug(f'Finished volume with zndx: {zndx}, self.zsize: {self.zsize}, sample_ndx: {sample_ndx}')
+            self.process_volume()
+
         # Log periodically
         if self.sample_count % 500 == 0:
             logger.debug(
@@ -110,6 +103,10 @@ class DummyAlg:
                 f"({self.volume_count} volumes)"
             )
     
+    def process_volume(self):
+        """Increment volume counter (called when a full z-stack completes)."""
+        self.volume_count += 1
+
     def check_stim(self, image_ndx, cooldown_counter=0):
         """
         Check if stimulus should be triggered.

@@ -86,12 +86,12 @@ class Brainalyzer:
         self.rec_id = experiment_config.experiment_name
         self.saveroot = experiment_config.output_dir
         self.frames_to_grab = experiment_config.acquisition.num_samples
-        # self.zsize = experiment_config.acquisition.z_planes
-
-        # try to get zsize (from configuration, not backend)
-        try: 
-            self.zsize = hardware_manager.config.stage.ZStage.num_z_planes
-        except Exception as err:
+        # try to get zsize from experiment config, fall back to 1
+        try:
+            self.zsize = experiment_config.acquisition.z_planes
+            if not self.zsize:
+                self.zsize = 1
+        except Exception:
             logger.warning('ZSize not detected in hardware configuration, defaulting to 1')
             self.zsize = 1
         

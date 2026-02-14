@@ -195,6 +195,7 @@ class TestBrainalyzerProcessing:
             output_dir="./test",
             acquisition=AcquisitionConfig(
                 num_samples=100,
+                z_planes=10,
             ),
         )
         

@@ -239,7 +239,7 @@ class ClosedLoopEngine:
         
         # For legacy components that still need mmc directly
         # This will be removed as components are refactored
-        # self.mmc = self.hardware.get_mmc()
+        self.mmc = self.hardware.get_mmc()
         
         logger.info(f"Hardware initialized with shape/dtype: {self.sample_shape}/{self.sample_dtype}")
         
@@ -556,6 +556,14 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.warning(f"Error closing hardware: {err}")
                 
+        # Send completion notification if configured
+        try:
+            dev_options = self.experiment_config.dev_options if self.experiment_config else None
+            if dev_options and getattr(dev_options, 'send_sms_on_completion', False):
+                wbliveUtils.notify("Acquisition completed")
+        except Exception as err:
+            logger.warning(f"Error sending completion notification: {err}")
+
         logger.info("Cleanup complete")
         
     def run(self):

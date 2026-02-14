@@ -336,6 +336,14 @@ class MicroManagerStage(StageInterface):
             self._focus_device = self.mmc.getFocusDevice()
         return self._focus_device
 
+    def get_focus_device_name(self) -> str:
+        """Alias for get_device_name."""
+        return self.get_device_name()
+
+    def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+        """Alias for configure_z_stack."""
+        self.configure_z_stack(z_start=z_start, z_end=z_end, z_step=z_step, num_planes=num_planes)
+
 
 class MicroManagerStimulus(StimulusInterface):
     """
