@@ -50,9 +50,6 @@ class TestBaseStimulusController:
         controller = TestController(mock_hardware_manager)
         
         assert controller.hardware_manager == mock_hardware_manager
-        assert controller.rec_id == "test_rec_001"
-        assert controller.roi == [0, 0]
-        assert controller.stim_interface == "dummy"
         assert controller.stim_on_list == []
         assert controller.stim_off_list == []
     

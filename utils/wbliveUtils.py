@@ -48,53 +48,8 @@ def save_metadata(savefilename, metadata):
 
 
 def generate_mip_movie(savefilename, frames, zsize, exposure, quality=6, bitrate="10M", GUI_mode='neural_imaging'):
-
-    logging.debug("Saving MIP movie...")
-
-    # convert to mip movie
-    try:
-
-        import imageio
-
-        # grab bounds
-        vols_to_grab = frames.shape[0] // zsize
-        ysize = frames.shape[1]
-        xsize = frames.shape[2]
-
-        # recast array for mip
-        tosave = frames.reshape((vols_to_grab, zsize, ysize, xsize)).max(axis=1)
-
-        # grab a frame somewhat in
-        # f0 = tosave.flatten()
-        # f0.sort()
-        # take avg of top % pixelsf0
-        # mymax = np.median(f0[-int(xsize * ysize * 0.01) :])
-        # mymin = np.amin(f0)
-
-        mymax = np.amax(tosave)
-        mymin = np.amin(tosave)
-
-        # compress to MIP, scale to min/max
-        tosave[tosave > mymax] = mymax
-        # tosave[tosave < mymin] = mymin
-        # tosave = (tosave - mymin) / (mymax - mymin) * 255 # how to make this uint16? 
-        # tosave = tosave - mymin
-        # tosave = (tosave * 255)  // (mymax - mymin) 
-        tosave = (tosave * 255) // mymax
-
-        # save Zx speedup (cause that's a nice round number?)
-        multiplier = 2
-        imageio.mimwrite(
-            savefilename + "_{}x.mp4".format(multiplier * zsize),
-            tosave.astype(np.uint8),
-            fps=multiplier * 1000 // int(exposure),
-            # quality=6,
-            codec='h264_nvenc',
-            output_params=['-b:v', bitrate],
-        )
-
-    except Exception as err:
-        logging.exception("Exception during MIP movie generation: {}".format(err))
+    """Stub: MIP movie generation removed."""
+    logging.debug("generate_mip_movie: stub, no-op")
 
 
 # def prefill_wb_ops(
@@ -193,35 +148,8 @@ def lazy_serialize(res, to_str=True):
 
 
 def notify(msg, interface=None, ops={}):
-
-    logging.debug(
-        "Notifying wb-live via interface: {}, message: {}".format(interface, msg)
-    )
-
-    if interface == "twilio-sms":
-
-        try:
-
-            from twilio.rest import Client
-
-            # Your Account SID from twilio.com/console
-            account_sid = ops.get("twilio-sid", "REMOVED")
-
-            # Your Auth Token from twilio.com/console
-            auth_token = ops.get("twilio-auth", "REMOVED")
-            client = Client(account_sid, auth_token)
-
-            # Numbers
-            to_num = ops.get("twilio-to", "+REMOVED")
-            from_num = ops.get("twilio-from", "+REMOVED")
-
-            message = client.messages.create(to=to_num, from_=from_num, body=msg)
-
-            logging.debug("Notify response: {}".format(message.sid))
-
-        except Exception as err:
-
-            logging.error("Error during wbliveUtils::notify, {}".format(err))
+    """Stub: SMS notification removed."""
+    logging.debug("notify: stub, no-op (msg={})".format(msg))
 
 
 def play_wblive_sound(sound_name="laser"):

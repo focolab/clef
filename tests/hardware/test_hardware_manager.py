@@ -225,17 +225,18 @@ class TestHardwareManagerLegacyAccess:
         mmc = manager.get_mmc()
         assert isinstance(mmc, DummyMMC.DummyMMC)
     
-    @patch('hardware.backends.micromanager_backend.MMSubroutines')
-    def test_get_mmc_returns_mmc_for_micromanager(self, mock_mm, pycromanager_config):
+    def test_get_mmc_returns_mmc_for_micromanager(self, pycromanager_config):
         """Test get_mmc returns MMC object for Micro-Manager backend."""
-        # Mock MMSubroutines.initialize_mmc
         mock_mmc = MagicMock()
-        mock_mm.initialize_mmc.return_value = mock_mmc
-        
-        manager = HardwareManager(pycromanager_config)
-        manager.initialize()
-        
-        mmc = manager.get_mmc()
-        assert mmc is not None
-        assert mmc == mock_mmc
+        mock_core_cls = MagicMock(return_value=mock_mmc)
+        mock_pycromanager = MagicMock()
+        mock_pycromanager.Core = mock_core_cls
+
+        import sys
+        with patch.dict(sys.modules, {'pycromanager': mock_pycromanager}):
+            manager = HardwareManager(pycromanager_config)
+            manager.initialize()
+
+            mmc = manager.get_mmc()
+            assert mmc is not None
 

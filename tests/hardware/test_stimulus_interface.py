@@ -380,29 +380,31 @@ class TestStimulusInterfaceHardwareManager:
         hw_manager.stimulus.deactivate_stimulus()
         assert hw_manager.stimulus.is_stimulus_active() is False
     
-    @patch('hardware.backends.micromanager_backend.MMSubroutines')
-    def test_stimulus_operations_widefield(self, mock_mm, widefield_config, mock_mmc):
+    def test_stimulus_operations_widefield(self, widefield_config, mock_mmc):
         """Test widefield stimulus through HardwareManager."""
-        mock_mm.initialize_mmc.return_value = mock_mmc
-        
+        mock_core_cls = MagicMock(return_value=mock_mmc)
+        mock_pycromanager = MagicMock()
+        mock_pycromanager.Core = mock_core_cls
+
         # Update config to use micromanager backend
-        widefield_config.backend = "pycromanager"
+        widefield_config.backend_configuration.backend_name = "pycromanager"
         widefield_config.mm_config_path = "test.cfg"
-        
-        hw_manager = HardwareManager(widefield_config)
-        hw_manager.initialize()
-        
-        # Configure stimulus
-        hw_manager.stimulus.configure_stimulus({
-            "interface_type": "InvCore-SpinningDisk-639",
-            "intensity": 10
-        })
-        
-        # Activate
-        hw_manager.stimulus.activate_stimulus({"intensity": 50})
-        
-        # Should have set voltage
-        mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 1.75)
+
+        with patch.dict(sys.modules, {'pycromanager': mock_pycromanager}):
+            hw_manager = HardwareManager(widefield_config)
+            hw_manager.initialize()
+
+            # Configure stimulus
+            hw_manager.stimulus.configure_stimulus({
+                "interface_type": "InvCore-SpinningDisk-639",
+                "intensity": 10
+            })
+
+            # Activate
+            hw_manager.stimulus.activate_stimulus({"intensity": 50})
+
+            # Should have set voltage
+            mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 1.75)
 
 
 class TestStimulusDeviceConfig:

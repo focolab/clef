@@ -170,7 +170,7 @@ def create_algorithm(
     algorithm_config: 'AlgorithmConfig',
     experiment_config: 'ExperimentConfig',
     hardware_manager: 'HardwareManager',
-    # local_handles: Dict[str, Any] = None
+    local_handles: Dict[str, Any] = None
 ) -> Any:
     """
     Create an algorithm instance from configuration objects.
@@ -202,9 +202,9 @@ def create_algorithm(
         ...     local_handles={"mmc": mmc}
         ... )
     """
-    # if local_handles is None:
-    #     local_handles = {}
-    
+    if local_handles is None:
+        local_handles = {}
+
     alg_type = algorithm_config.algorithm_type
     logger.info(f"Creating algorithm: {alg_type}")
     
@@ -224,7 +224,7 @@ def create_algorithm(
         # - Most take: (args, local_handles={})
         # - Some take: (args) only
         # alg_instance = alg_class(args, local_handles=local_handles)
-        alg_instance = alg_class(algorithm_config=algorithm_config, experiment_config=experiment_config, hardware_manager=hardware_manager)
+        alg_instance = alg_class(algorithm_config=algorithm_config, experiment_config=experiment_config, hardware_manager=hardware_manager, local_handles=local_handles)
         
         logger.info(f"Successfully created algorithm: {alg_type}")
         return alg_instance

@@ -941,23 +941,9 @@ def initialize_mmc(
 #     return np.array(imglist)
 
 
-# def saveScanTiffs(fname, img_array):
-#     """Save a numpy array as tiffs."""
-#     # convert images to saved video
-
-#     try:
-#         logging.info(
-#             "Saving scan of fname: {}, shape: {}".format(fname, img_array.shape)
-#         )
-
-#         # write
-#         tf.imwrite(fname, img_array)
-
-#     except Exception as err:
-
-#         logging.critical("Exception during saving images: {}".format(err))
-#         dt = datetime.today().strftime("%Y%m%d-%H-%M-%S")
-#         savefilename = "C:\\SALVAGED_RECORDING_{}.tiff".format(dt)
+def saveScanTiffs(fname, img_array):
+    """Stub: TIFF saving removed."""
+    logging.debug("saveScanTiffs: stub, no-op")
 
 #         logging.critical(
 #             "Trying to salvage recording! Writing to {}".format(savefilename)
