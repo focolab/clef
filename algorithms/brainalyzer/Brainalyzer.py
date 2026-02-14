@@ -88,7 +88,8 @@ class Brainalyzer:
         self.frames_to_grab = experiment_config.acquisition.num_samples
         # try to get zsize from experiment config, fall back to 1
         try:
-            self.zsize = experiment_config.acquisition.z_planes
+            # self.zsize = experiment_config.acquisition.z_planes 
+            self.zsize = hardware_manager.config.system_devices.stage.num_z_planes # todo this comes from hardware now, is this overly clunky?
             if not self.zsize:
                 self.zsize = 1
         except Exception:
@@ -96,9 +97,7 @@ class Brainalyzer:
             self.zsize = 1
         
         # Extract algorithm params
-        self.GUI_mode = algorithm_config.gui_mode
-        # self.stim_intensity_ops = algorithm_config.stimulus_params.intensity_percent_options
-        # self.stim_intensity = self.stim_intensity_ops[0]
+        self.GUI_mode = algorithm_config.gui_mode # todo this may be read incorrectly, is not initialized correctly in brainalyzerworker
         self.stim_intensity=0
         
         # Hardware params (with safe defaults)

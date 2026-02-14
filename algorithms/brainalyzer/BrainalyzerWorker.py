@@ -26,6 +26,8 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # pyqtgraph speedup
 # pg.setConfigOption('useNumba', True)
 
+logger = logging.getLogger(__name__)
+
 # Pathing to other resources
 ROOTDIR = Path(__file__).resolve().parents[2]
 CSS_PATH = ROOTDIR  / "style" / "css" / "Ubuntu.qss"
@@ -326,7 +328,8 @@ class BrainalyzerWorker(Process):
             if model_fname.endswith('.json'):
                 full_fname = os.path.join(self.model_dir, model_fname)
                 try:
-                    mod = BrainalyzerModel.BrainalyzerModel.from_json(full_fname, self)
+                    # mod = BrainalyzerModel.BrainalyzerModel.from_json(full_fname, self)
+                    mod = BrainalyzerModel.from_json(full_fname, self)
                     self.model_list.append(mod)
                     self.model_combobox.addItem(mod.get_model_name(), index=model_index_counter)
                     model_index_counter += 1
@@ -335,15 +338,19 @@ class BrainalyzerWorker(Process):
                     continue
 
     def get_model_panel_localization_params(self):
+        logger.info(f'Retrieving Brainalyzer model panel localization parameters for {self.GUI_mode}')
+
+        # todo: reading gui mode from config needs to be double checked
+
         rowspan = 1
-        if self.GUI_mode == 'neural_imaging':
-            col = (self.zsize+1) // 2
-            colspan = int(np.ceil((self.zsize+1) / 2))
-            row = 2
-        elif self.GUI_mode == 'behavior':
+        if self.GUI_mode == 'behavior':
             col = 2
             colspan = self.zsize + 1
             row = 1
+        else:
+            col = (self.zsize+1) // 2
+            colspan = int(np.ceil((self.zsize+1) / 2))
+            row = 2
 
         return row, col, rowspan, colspan
                     
