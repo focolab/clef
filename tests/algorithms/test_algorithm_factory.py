@@ -37,7 +37,6 @@ def mock_configs():
     algorithm_config.algorithm_params.delay_stimulation_probability = 0.4
     algorithm_config.algorithm_params.stim_delay_frames_options = [200, 400]
     algorithm_config.algorithm_params.stim_onset_list = []
-    algorithm_config.algorithm_params.stimulus_diameter_pixels = 10
     algorithm_config.stimulus_params = Mock()
     algorithm_config.stimulus_params.duration_frames_options = [48]
     algorithm_config.stimulus_params.intensity_percent_options = [10]
@@ -78,8 +77,6 @@ def mock_configs():
     hardware_config.stim_interface = "dummy"
     hardware_config.microscope_name = "test"
     hardware_config.use_static_stim_roi = False
-    hardware_config.strobe_acquisition = False
-    hardware_config.strobe_inter_frame_interval_ms = 80
     
     return {
         "algorithm": algorithm_config,

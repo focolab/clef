@@ -245,7 +245,6 @@ class TestDummyAlgIntegration:
         algorithm_config.algorithm_params.delay_stimulation_probability = 0.0
         algorithm_config.algorithm_params.stim_delay_frames_options = []
         algorithm_config.algorithm_params.stim_onset_list = []
-        algorithm_config.algorithm_params.stimulus_diameter_pixels = 10
         algorithm_config.stimulus_params = Mock()
         algorithm_config.stimulus_params.duration_frames_options = [48]
         algorithm_config.stimulus_params.intensity_percent_options = [10]

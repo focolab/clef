@@ -22,8 +22,6 @@ from config.config_manager import (
     AlgorithmConfig,
     AcquisitionConfig,
     SubjectMetadata,
-    DevOptions,
-    AlgorithmParameters,
     StimulusParameters,
     TreatmentDetails,
     Orientation,
@@ -59,19 +57,11 @@ def minimal_experiment_config(test_output_dir):
         save_metadata=True,
         save_sample_video=False,
         acquisition=AcquisitionConfig(
-            num_frames=10,  # Small for fast testing
-            z_planes=2,
-            z_step=1.0,
-            baseline_frames=0,
+            num_samples=10,
         ),
         subject=SubjectMetadata(
-            genotype="test_strain",
+            subject_type="test_strain",
             treatment_details=TreatmentDetails(),
-            orientation=Orientation(),
-        ),
-        dev_options=DevOptions(
-            # prefill_wb_ops=False,
-            send_sms_on_completion=False,
         ),
     )
 
@@ -83,10 +73,6 @@ def minimal_algorithm_config():
         algorithm_type="dummy",
         gui_mode="neural_imaging",
         save_algorithm_plot=False,
-        algorithm_params=AlgorithmParameters(
-            stimulus_diameter_pixels=10,
-            stim_cooldown_frames=5,
-        ),
         stimulus_params=StimulusParameters(
             duration_frames_options=[2],
             intensity_percent_options=[10],
