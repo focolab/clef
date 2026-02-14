@@ -8,10 +8,10 @@ save_sample_video: false
 
 # Acquisition parameters
 acquisition:
-  num_samples: 800  # ~80 seconds at 10fps
-  z_planes: 12
+  num_samples: 800 
+  # z_planes: 12
   
-  # THIS SHOULD BE IN HARDWARE or removed
+  # THIS SHOULD BE IN HARDWARE or removed?
   # z_stack: true # compute from if z-planes > 1
   # frame_rate: null
   # z_start: -10.5

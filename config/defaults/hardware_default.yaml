@@ -35,7 +35,7 @@ system_devices:
   # The system may be able to actuate the sample with a stage
   stage: null
 
-  # Illumination channels
+  # Illumination channels 
   illumination_channels:
     - name: "dummy"
       device: "dummy"

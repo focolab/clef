@@ -39,7 +39,8 @@ import logging
 from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+parent_dir = str(Path(__file__).parent.parent)
+sys.path.insert(0, parent_dir)
 
 from config.config_manager import ConfigManager
 from engine.closed_loop_engine import ClosedLoopEngine
@@ -68,12 +69,14 @@ def verify_hardware_prerequisites() -> bool:
     checks = []
     
     # Check 1: Calibration file exists
-    calib_path = Path("./res/peripherals/Mightex Polygon P1000/calibrations.json")
+    calib_path = Path(f"{parent_dir}/hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json")
+    # cwd = os.getcwd()
     if calib_path.exists():
         logger.info(f"✓ Polygon calibration file found: {calib_path}")
         checks.append(True)
     else:
         logger.error(f"✗ Polygon calibration file not found: {calib_path}")
+        logger.error(f"Is the pathing correct? Current working directory: f{parent_dir}")
         logger.error("  Please ensure calibration file is present before running demo")
         checks.append(False)
     
@@ -88,11 +91,11 @@ def verify_hardware_prerequisites() -> bool:
         checks.append(False)
     
     # Check 3: Config files exist
-    config_dir = Path("./config/demo")
+    config_dir = Path(f"{parent_dir}/config/demo")
     required_configs = [
-        "hardware_brainalyzer_innovation_core.yaml",
-        "experiment_brainalyzer_hardware.yaml",
-        "algorithm_brainalyzer_hardware.yaml"
+        "hardware_physical_experiment.yaml",
+        "hardware_physical_algorithm.yaml",
+        "hardware_physical_hardware.yaml"
     ]
     
     for config_file in required_configs:
@@ -128,7 +131,7 @@ def print_hardware_instructions():
     logger.info("3. Set z-stack range to cover desired volume")
     logger.info("4. Verify laser alignment and intensity")
     logger.info("5. Check that polygon calibration matches current objective")
-    logger.info("6. Ensure Micro-Manager is not already running")
+    # logger.info("6. Ensure Micro-Manager is not already running") # todo we need to make sure these instructions are actually correct
     logger.info("=" * 60)
     logger.info("")
     
@@ -187,11 +190,11 @@ def run_hardware_demo():
         logger.info("Loading configuration files...")
         config_manager = ConfigManager()
         
-        config_dir = Path("./config/demo")
+        config_dir = Path(f"{parent_dir}/config/demo")
         config_manager.load_all_configs(
-            hardware_path=config_dir / "hardware_brainalyzer_innovation_core.yaml",
-            experiment_path=config_dir / "experiment_brainalyzer_hardware.yaml",
-            algorithm_path=config_dir / "algorithm_brainalyzer_hardware.yaml"
+            hardware_path=config_dir / "hardware_physical_hardware.yaml",
+            experiment_path=config_dir / "hardware_physical_experiment.yaml",
+            algorithm_path=config_dir /  "hardware_physical_algorithm.yaml",
         )
         
         # Validate configurations
@@ -276,7 +279,7 @@ def run_hardware_demo():
         logger.info("=" * 60)
         
         engine._save_data()
-        engine._save_visualizations()
+        engine._save_visualizations() # todo we stubbed this out, should remove?
         engine.save_metadata()
         
         logger.info("")

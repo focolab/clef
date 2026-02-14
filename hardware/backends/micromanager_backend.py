@@ -211,7 +211,7 @@ class MicroManagerStage(StageInterface):
             self.mmc.setPosition(focus_dev, float(position[0]))
         logger.debug(f"Micro-Manager: Moved stage to {position}")
     
-    def configure_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+    def configure_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int, ttl_device: str, ttl_state: int) -> None:
         """
         Configure Z-stack sequence.
         
@@ -224,9 +224,13 @@ class MicroManagerStage(StageInterface):
             "z_end": z_end,
             "z_step": z_step,
             "pad_z": 0,
+            "ttl_device": ttl_device,
+            "ttl_state": ttl_state,
         }
+        
+        # todo: remove micro-manager text... make this log more informative
+        logger.info(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}, {num_planes} planes")
         self.configure_stage(config)
-        logger.debug(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}, {num_planes} planes")
     
     def configure_stage(self, config: Dict[str, Any]) -> None:
         """
@@ -259,6 +263,7 @@ class MicroManagerStage(StageInterface):
         
         # Quick semantic check for case of 1Z plane imaging + structural scan
         # spec loop will hang unless zStepSize is set to some value > 0
+        # todo this check should be done better
         if z_step == 0:
             z_step = 1
             logger.warning("z_step was 0, setting to 1 to avoid hanging")
@@ -486,12 +491,13 @@ class MicroManagerStimulus(StimulusInterface):
             logger.warning(f"Could not initialize polygon: {e}")
         
         # Load calibration points
-        calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None)
+        # todo this needs to pull from config correctly, NO HARDCODED PATHS ANYWHERE
+        calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None) 
         if calibration_path:
             self.calibration_points = self._load_polygon_calibration(calibration_path)
         else:
             # Try default path
-            default_path = "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+            default_path = "C:/Users/Leica/code/clef/hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
             logger.warning(f'No polygon calibration path provided, falling back on default at {default_path}')
             self.calibration_points = self._load_polygon_calibration(default_path)
             if self.calibration_points is None:
@@ -921,9 +927,29 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._apply_system_properties()
 
         # Apply initial component configuration -- could happen here?
-        # self._camera.configure_camera()
+        # self._camera.configure_camera() # todo this might need to happen later?
         # self._stage.configure_stage()
         # self._stimulus.configure_stimulus()
+
+        # Based on config, we may want to initiate other configurations as well
+        # todo more resilient value checking than a try block
+        # also this ttl device/state logic seems fragile
+        try: 
+            if self.config.system_devices.stage.num_z_planes > 1:
+                num_planes = self.config.system_devices.stage.num_z_planes
+                z_step = self.config.system_devices.stage.z_step_size_um
+                ttl_state = self.config.system_devices.stage.ttl_state
+                ttl_device = self.config.system_devices.stage.ttl_device
+
+                # todo quick maths to split z appropriately, this should be broken into separate function
+                # here we're also assuming we start at 0 and split z planes above and below
+                # but that may not be the case so the start point should be read from hardware 
+                z_start = -(num_planes//2) * z_step
+                z_end = num_planes//2 * z_step
+                self._stage.configure_z_stack(z_start=z_start, z_end=z_end, z_step=z_step, num_planes=num_planes, ttl_device=ttl_device, ttl_state=ttl_state)
+        except Exception as err:
+            logger.error(f'Error while configuring z-stack: {err}')
+            raise(err)
         
         self._initialized = True
         logger.info("Micro-Manager backend initialized")
@@ -955,6 +981,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._initialized = False
         logger.info("Micro-Manager backend closed")
     
+    # TODO get metadata can't have hardcoded values, it should instead grab every property available in micromanager
     def get_metadata(self) -> Dict[str, Any]:
         """Get hardware metadata."""
         if not self._initialized or not self.mmc:
