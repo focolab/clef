@@ -28,7 +28,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 # Pathing to other resources
 ROOTDIR = Path(__file__).resolve().parents[2]
-CSS_PATH = ROOTDIR  / "media" / "css" / "Ubuntu.qss"
+CSS_PATH = ROOTDIR  / "style" / "css" / "Ubuntu.qss"
 MODELS_DIR = ROOTDIR / "algorithms" / "models"
 
 class BrainalyzerWorker(Process):
