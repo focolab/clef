@@ -676,7 +676,7 @@ def initialize_mmc(
 #     if scope == "torstoscope spinning disk":
 #         stage_port = "COM6"
 #     elif scope == "innovation core spinning disk":
-#         stage_port = "todo"
+#         stage_port = None  # innovation core stage port unknown
 
 #     # grab zsize
 #     zsize = int(args["gooey_args"]["zsize"])
@@ -687,7 +687,7 @@ def initialize_mmc(
 #     elif my_program == "z = 36 x 1um":
 #         program_fname = "C:/DATA/RLD/piezo_z_36x1um.txt"
 #     elif my_program == "z = 48 x 0.75um":
-#         lol = "todo"
+#         pass  # 48x0.75um program not yet implemented
 #     else:
 #         the_problem = "ASI stage program {} not recognized. This could lead to undefined behavior. Does the asi console save file exist?".format(
 #             my_program

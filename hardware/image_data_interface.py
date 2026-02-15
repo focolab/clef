@@ -193,12 +193,6 @@ class ImageDataInterface(DataInterface):
                    - roi: region of interest as (x, y, width, height)
                    - Other camera-specific settings
         """
-        # pass settings to camera
-        # TODO camera takes dict argument... configure_sampling should really be taking dict argument too
-        # This should be done elsewhere -- this call changes hardware options, whereas below
-        # we're just initiating data buffer
-        # self.camera.configure_camera(config)
-
         # initiate internal buffer
         sample_shape = tuple([config.acquisition.num_samples]) + self.get_sample_shape()
         logging.info(f'Initializing sample buffer of shape {sample_shape}')

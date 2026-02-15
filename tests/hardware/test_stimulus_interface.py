@@ -59,6 +59,7 @@ def polygon_config():
     return HardwareConfig(
         backend="dummy",
         stim_interface="InvCore-LDI-Polygon-640",
+        polygon_calibration_path="./test_calibrations.json",
         stimulus_devices={
             "InvCore-LDI-Polygon-640": StimulusDeviceConfig(
                 type="polygon",
@@ -69,6 +70,14 @@ def polygon_config():
             )
         }
     )
+
+
+_mock_calib = {
+    "pcx": np.array([250, 500, 750]),
+    "pcy": np.array([200, 500, 800]),
+    "icx": np.array([880, 1722, 2578]),
+    "icy": np.array([981, 1494, 1998]),
+}
 
 
 @pytest.fixture
@@ -235,7 +244,13 @@ class TestMicroManagerStimulusWidefieldLaser:
 
 class TestMicroManagerStimulusPolygon:
     """Test MicroManagerStimulus with polygon configuration."""
-    
+
+    @pytest.fixture(autouse=True)
+    def patch_calibration(self):
+        """Patch _load_polygon_calibration so tests don't need real calibration files."""
+        with patch.object(MicroManagerStimulus, '_load_polygon_calibration', return_value=_mock_calib):
+            yield
+
     def test_polygon_initialization(self, mock_mmc, polygon_config):
         """Test MicroManagerStimulus initializes with polygon config."""
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_config)
@@ -301,45 +316,24 @@ class TestMicroManagerStimulusPolygon:
         dims = stimulus.get_polygon_dimensions()
         assert dims == (1920, 1080)
     
-    @patch('hardware.backends.micromanager_backend.json.load')
-    @patch('builtins.open', create=True)
-    def test_polygon_load_calibration(self, mock_open, mock_json_load, mock_mmc, polygon_config):
+    def test_polygon_load_calibration(self, mock_mmc, polygon_config):
         """Test loading polygon calibration points."""
-        # Mock calibration data
-        mock_json_load.return_value = {
-            "calibrations": [
-                {
-                    "objective": "20x",
-                    "binning": "1",
-                    "datetime": "2024-01-01",
-                    "pcx": [1, 2, 3],
-                    "pcy": [4, 5, 6],
-                    "icx": [7, 8, 9],
-                    "icy": [10, 11, 12]
-                }
-            ]
+        custom_calib = {
+            "pcx": np.array([1, 2, 3]),
+            "pcy": np.array([4, 5, 6]),
+            "icx": np.array([7, 8, 9]),
+            "icy": np.array([10, 11, 12]),
         }
-        
-        # Mock MMC methods
-        mock_mmc.getProperty.side_effect = lambda dev, prop: {
-            ("ObjectiveTurret", "Label"): "20x",
-            ("Camera", "Binning"): "1"
-        }.get((dev, prop))
-        mock_mmc.getCameraDevice.return_value = "Camera"
-        
-        stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_config)
-        
-        config = {
-            "interface_type": "InvCore-LDI-Polygon-640",
-            "calibration_path": "test_calibration.json"
-        }
-        stimulus.configure_stimulus(config)
-        
-        # Should have loaded calibration
+        with patch.object(MicroManagerStimulus, '_load_polygon_calibration', return_value=custom_calib):
+            stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_config)
+            stimulus.configure_stimulus({
+                "interface_type": "InvCore-LDI-Polygon-640",
+                "calibration_path": "test_calibration.json"
+            })
+
         assert stimulus.calibration_points is not None
-        calib = stimulus.calibration_points
-        assert np.array_equal(calib['pcx'], np.array([1, 2, 3]))
-        assert np.array_equal(calib['pcy'], np.array([4, 5, 6]))
+        assert np.array_equal(stimulus.calibration_points['pcx'], np.array([1, 2, 3]))
+        assert np.array_equal(stimulus.calibration_points['pcy'], np.array([4, 5, 6]))
 
 
 class TestStimulusInterfaceHardwareManager:

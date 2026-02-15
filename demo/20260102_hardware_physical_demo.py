@@ -131,7 +131,6 @@ def print_hardware_instructions():
     logger.info("3. Set z-stack range to cover desired volume")
     logger.info("4. Verify laser alignment and intensity")
     logger.info("5. Check that polygon calibration matches current objective")
-    # logger.info("6. Ensure Micro-Manager is not already running") # todo we need to make sure these instructions are actually correct
     logger.info("=" * 60)
     logger.info("")
     
@@ -279,7 +278,6 @@ def run_hardware_demo():
         logger.info("=" * 60)
         
         engine._save_data()
-        engine._save_visualizations() # todo we stubbed this out, should remove?
         engine.save_metadata()
         
         logger.info("")
