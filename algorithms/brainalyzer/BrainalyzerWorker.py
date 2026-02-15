@@ -340,8 +340,6 @@ class BrainalyzerWorker(Process):
     def get_model_panel_localization_params(self):
         logger.info(f'Retrieving Brainalyzer model panel localization parameters for {self.GUI_mode}')
 
-        # todo: reading gui mode from config needs to be double checked
-
         rowspan = 1
         if self.GUI_mode == 'behavior':
             col = 2

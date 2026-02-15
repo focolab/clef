@@ -209,13 +209,19 @@ class TestMicroManagerProjector:
 class TestMicroManagerStimulusPolygonIntegration:
     """Test polygon-specific functionality in MicroManagerStimulus."""
     
-    def test_polygon_configure_creates_slm_interface(self, mock_mmc, polygon_hardware_config):
+    def test_polygon_configure_creates_slm_interface(self, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test configuring polygon stimulus sets up SLM."""
+        mock_mmc.getProperty.side_effect = lambda dev, prop: {
+            ("ObjectiveTurret", "Label"): "20x",
+            ("Camera", "Binning"): "1x1"
+        }.get((dev, prop))
+        mock_mmc.getCameraDevice.return_value = "Camera"
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-        
+
         config = {"interface_type": "InvCore-LDI-Polygon-640"}
-        stimulus.configure_stimulus(config)
-        
+        with patch('builtins.open', mock_open(read_data=json.dumps(mock_calibration_data))):
+            stimulus.configure_stimulus(config)
+
         assert stimulus._configured is True
         assert stimulus.slm_device == "Polygon-SLM"
         assert stimulus.polygon_dims == (1920, 1080)
@@ -226,11 +232,17 @@ class TestMicroManagerStimulusPolygonIntegration:
         mock_mmc.setProperty.assert_any_call("89 North Laser Diode Illuminator", "640 Intensity", 0)
         mock_mmc.setShutterOpen.assert_called_with("89 North Laser Diode Illuminator", True)
     
-    def test_polygon_get_dimensions(self, mock_mmc, polygon_hardware_config):
+    def test_polygon_get_dimensions(self, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test get_polygon_dimensions returns correct dimensions."""
+        mock_mmc.getProperty.side_effect = lambda dev, prop: {
+            ("ObjectiveTurret", "Label"): "20x",
+            ("Camera", "Binning"): "1x1"
+        }.get((dev, prop))
+        mock_mmc.getCameraDevice.return_value = "Camera"
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-        stimulus.configure_stimulus({"interface_type": "InvCore-LDI-Polygon-640"})
-        
+        with patch('builtins.open', mock_open(read_data=json.dumps(mock_calibration_data))):
+            stimulus.configure_stimulus({"interface_type": "InvCore-LDI-Polygon-640"})
+
         dims = stimulus.get_polygon_dimensions()
         assert dims == (1920, 1080)
     
@@ -272,7 +284,7 @@ class TestMicroManagerStimulusPolygonIntegration:
     
 
     def test_polygon_load_calibration_no_match(self, mock_mmc, polygon_hardware_config):
-        """Test loading calibration with no matching objective/binning."""
+        """Test loading calibration with no matching objective/binning raises RuntimeError."""
         calib_data = {
             "calibrations": [
                 {
@@ -286,37 +298,34 @@ class TestMicroManagerStimulusPolygonIntegration:
                 }
             ]
         }
-        
+
         with patch('builtins.open', mock_open(read_data=json.dumps(calib_data))):
             mock_mmc.getProperty.side_effect = lambda dev, prop: {
                 ("ObjectiveTurret", "Label"): "20x",  # Looking for 20x
                 ("Camera", "Binning"): "1x1"
             }.get((dev, prop))
             mock_mmc.getCameraDevice.return_value = "Camera"
-            
+
             stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-            
+
             config = {
                 "interface_type": "InvCore-LDI-Polygon-640",
                 "calibration_path": "./test_calibrations.json"
             }
-            stimulus.configure_stimulus(config)
-            
-            # Should not have loaded calibration
-            assert stimulus.calibration_points is None
+            with pytest.raises(RuntimeError, match="Polygon calibration could not be loaded"):
+                stimulus.configure_stimulus(config)
     
     def test_polygon_load_calibration_file_not_found(self, mock_mmc, polygon_hardware_config):
-        """Test loading calibration handles missing file gracefully."""
+        """Test loading calibration raises RuntimeError when file is missing."""
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-        
+
         config = {
             "interface_type": "InvCore-LDI-Polygon-640",
             "calibration_path": "./nonexistent.json"
         }
-        
-        # Should not raise - error should be caught and logged
-        stimulus.configure_stimulus(config)
-        assert stimulus.calibration_points is None
+
+        with pytest.raises(RuntimeError, match="Polygon calibration could not be loaded"):
+            stimulus.configure_stimulus(config)
     
     def test_polygon_get_calibration_points(self, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test get_calibration_points returns loaded calibration."""
@@ -445,12 +454,18 @@ class TestMicroManagerStimulusPolygonIntegration:
             # Should have set all pixels to 255
             mock_mmc.setSLMPixelsTo.assert_called_with("Polygon-SLM", 255)
     
-    def test_polygon_update_mask_no_calibration(self, mock_mmc, polygon_hardware_config):
+    def test_polygon_update_mask_no_calibration(self, mock_mmc, polygon_hardware_config, mock_calibration_data):
         """Test update_polygon_mask fails gracefully without calibration."""
+        mock_mmc.getProperty.side_effect = lambda dev, prop: {
+            ("ObjectiveTurret", "Label"): "20x",
+            ("Camera", "Binning"): "1x1"
+        }.get((dev, prop))
+        mock_mmc.getCameraDevice.return_value = "Camera"
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-        stimulus.configure_stimulus({"interface_type": "InvCore-LDI-Polygon-640"})
-        
-        # Force calibration to None
+        with patch('builtins.open', mock_open(read_data=json.dumps(mock_calibration_data))):
+            stimulus.configure_stimulus({"interface_type": "InvCore-LDI-Polygon-640"})
+
+        # Force calibration to None to test graceful failure in update_polygon_mask
         stimulus.calibration_points = None
         
         stim_params = {
@@ -848,21 +863,19 @@ class TestPolygonErrorHandling:
     #     assert stimulus._active is True
     
     def test_polygon_calibration_load_malformed_json(self, mock_mmc, polygon_hardware_config):
-        """Test loading malformed calibration file."""
+        """Test loading malformed calibration file raises RuntimeError."""
         bad_json = "{invalid json"
-        
+
         with patch('builtins.open', mock_open(read_data=bad_json)):
             stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_hardware_config)
-            
+
             config = {
                 "interface_type": "InvCore-LDI-Polygon-640",
                 "calibration_path": "./bad_calibrations.json"
             }
-            
-            # Should not raise - error should be caught
-            stimulus.configure_stimulus(config)
-            
-            assert stimulus.calibration_points is None
+
+            with pytest.raises(RuntimeError, match="Polygon calibration could not be loaded"):
+                stimulus.configure_stimulus(config)
 
 
 if __name__ == "__main__":

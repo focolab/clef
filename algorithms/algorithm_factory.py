@@ -12,7 +12,6 @@ from typing import Dict, Type, Any
 logger = logging.getLogger(__name__)
 
 # Import classes at module level, for patching during testing
-# TODO clean this
 try:
     from algorithms.dummy import DummyAlg
 except ImportError:

@@ -22,6 +22,8 @@ from config.config_manager import (
     SubjectMetadata,
     AlgorithmParameters,
     StimulusParameters,
+    SystemDevices,
+    DeviceConfig,
 )
 from hardware.hardware_manager import HardwareManager
 
@@ -66,8 +68,11 @@ class TestBrainalyzerInitialization:
             backend="dummy",
             stim_interface="dummy",
             microscope_name="test_microscope",
+            system_devices=SystemDevices(
+                stage=DeviceConfig(device_name="test_stage", device_type="stage", num_z_planes=10),
+            ),
         )
-    
+
     @pytest.fixture
     def hardware_manager(self, hardware_config):
         """Create and initialize test hardware manager."""
@@ -170,12 +175,15 @@ class TestBrainalyzerProcessing:
             backend="dummy",
             stim_interface="dummy",
             microscope_name="test_microscope",
+            system_devices=SystemDevices(
+                stage=DeviceConfig(device_name="test_stage", device_type="stage", num_z_planes=10),
+            ),
         )
         hw_manager = HardwareManager(hardware_config)
         hw_manager.initialize()
         yield hw_manager
         hw_manager.close()
-    
+
     @pytest.fixture
     def brainalyzer(self, hardware_manager):
         """Create Brainalyzer instance for testing."""
@@ -313,12 +321,15 @@ class TestBrainalyzerMetadata:
             backend="dummy",
             stim_interface="dummy",
             microscope_name="test_scope",
+            system_devices=SystemDevices(
+                stage=DeviceConfig(device_name="test_stage", device_type="stage", num_z_planes=10),
+            ),
         )
         hw_manager = HardwareManager(hardware_config)
         hw_manager.initialize()
         yield hw_manager
         hw_manager.close()
-    
+
     def test_get_metadata(self, hardware_manager):
         """Test metadata collection."""
         from algorithms.brainalyzer.Brainalyzer import Brainalyzer
