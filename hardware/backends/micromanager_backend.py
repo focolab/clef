@@ -1001,6 +1001,40 @@ class MicroManagerBackend(BaseHardwareBackend):
         metadata.update(more_metadata)
 
         metadata['backend'] = self.config.backend
+
+        # Collect all device properties
+        device_properties = {}
+        try:
+            loaded_devices = self.mmc.getLoadedDevices()
+            for device_label in loaded_devices:
+                props = {}
+                try:
+                    prop_names = self.mmc.getDevicePropertyNames(device_label)
+                    for prop_name in prop_names:
+                        try:
+                            props[prop_name] = self.mmc.getProperty(device_label, prop_name)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                device_properties[device_label] = props
+        except Exception as e:
+            logger.warning(f"Could not collect device properties: {e}")
+        metadata['device_properties'] = device_properties
+
+        # Collect config group current presets
+        config_groups = {}
+        try:
+            groups = self.mmc.getAvailableConfigGroups()
+            for group_name in groups:
+                try:
+                    config_groups[group_name] = self.mmc.getCurrentConfig(group_name)
+                except Exception:
+                    config_groups[group_name] = None
+        except Exception as e:
+            logger.warning(f"Could not collect config groups: {e}")
+        metadata['config_groups'] = config_groups
+
         return metadata
     
     def get_mmc(self):
