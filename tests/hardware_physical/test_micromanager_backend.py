@@ -303,6 +303,57 @@ class TestDataInterface:
         camera_connected.clear_buffer()
 
 
+class TestMetadata:
+    """Test that get_metadata returns correct device and config group data."""
+
+    def test_metadata_has_device_properties(self, hardware_manager_connected):
+        """device_properties should be a non-empty dict of dicts."""
+        metadata = hardware_manager_connected.get_backend().get_metadata()
+        assert 'device_properties' in metadata
+        dp = metadata['device_properties']
+        assert isinstance(dp, dict)
+        assert len(dp) > 0, "Expected at least one loaded device"
+        for device_label, props in dp.items():
+            assert isinstance(device_label, str)
+            assert isinstance(props, dict)
+        logger.info(f"✓ device_properties: {list(dp.keys())}")
+
+    def test_metadata_device_properties_have_values(self, hardware_manager_connected):
+        """Each device entry should contain string property values."""
+        metadata = hardware_manager_connected.get_backend().get_metadata()
+        dp = metadata['device_properties']
+        # Find at least one device with at least one property
+        found = False
+        for device_label, props in dp.items():
+            if props:
+                for prop_name, prop_value in props.items():
+                    assert isinstance(prop_name, str)
+                    assert isinstance(prop_value, str)
+                    found = True
+                    break
+            if found:
+                break
+        assert found, "Expected at least one device with at least one property"
+        logger.info("✓ device_properties contain string values")
+
+    def test_metadata_has_config_groups(self, hardware_manager_connected):
+        """config_groups should be a dict keyed by group name."""
+        metadata = hardware_manager_connected.get_backend().get_metadata()
+        assert 'config_groups' in metadata
+        cg = metadata['config_groups']
+        assert isinstance(cg, dict)
+        logger.info(f"✓ config_groups: {list(cg.keys())}")
+
+    def test_metadata_config_groups_values_are_strings(self, hardware_manager_connected):
+        """Config group current preset values should be strings (or None on error)."""
+        metadata = hardware_manager_connected.get_backend().get_metadata()
+        cg = metadata['config_groups']
+        for group_name, preset in cg.items():
+            assert isinstance(group_name, str)
+            assert preset is None or isinstance(preset, str)
+        logger.info("✓ config_groups values are strings or None")
+
+
 class TestIntegratedAcquisition:
     """Test integrated acquisition with all hardware components."""
     
