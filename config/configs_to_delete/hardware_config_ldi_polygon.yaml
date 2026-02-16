@@ -74,4 +74,4 @@ illumination_channels:
     exposure_ms: 10.0
 
 # Calibration files
-polygon_calibration_path: "./res/peripherals/Mightex Polygon P1000/calibrations.json"
+polygon_calibration_path: "./res/peripherals/MightexPolygon1000/calibrations.json"

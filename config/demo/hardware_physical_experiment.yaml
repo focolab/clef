@@ -8,15 +8,7 @@ save_sample_video: false
 
 # Acquisition parameters
 acquisition:
-  num_samples: 800 
-  # z_planes: 12
-  
-  # THIS SHOULD BE IN HARDWARE or removed?
-  # z_stack: true # compute from if z-planes > 1
-  # frame_rate: null
-  # z_start: -10.5
-  # z_end: 10.5
-  # z_step: 3.0
+  num_samples: 975 
 
   # this should be in algorithm or removed
   baseline_samples: 0 
@@ -37,13 +29,12 @@ subject:
   orientation:
     nose: null
     vnc: null
-  num_eggs: 0
   notes: "Hardware validation demo with LDI Polygon stimulus"
 
 # THIS SHOULD BE ELSEWHERE
-# z_step_size_um: 3.0
 input_recording_path: null
 
-dev_options:
+dev_options: null
   # prefill_wb_ops: false
-  send_sms_on_completion: false
+  # send_sms_on_completion: false
+

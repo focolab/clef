@@ -59,55 +59,6 @@ def temp_output_dir():
         shutil.rmtree(temp_dir)
 
 
-# @pytest.fixture
-# def legacy_gooey_args(temp_output_dir):
-#     """Provide legacy gooey_args dict for backward compatibility testing."""
-#     return {
-#         # Acquisition controls
-#         "output_folder": temp_output_dir,
-#         "total_frames": 100,
-#         "mm_configuration_file": "MMConfig_demo.cfg",
-#         "zsize": 10,
-#         "save_mip": False,
-#         "strobe_acquisition": False,
-#         "strobe_inter_frame_interval": 80,
-#         "save_structural_scan": "none",
-        
-#         # Experimental metadata
-#         "subject_strain": "test_strain",
-#         "subject_condition": "",
-#         "atr_concentration": 0.0,
-#         # "z_step_size": 3.0,
-#         "nose_orientation": "left",
-#         "vnc_orientation": "up",
-#         "num_eggs": 0,
-#         "microscope_name": "test",
-#         "experimental_notes": "Test run with dummy objects",
-        
-#         # Closed-loop controls
-#         "trigger_algorithm": "dummy",
-#         "GUI_mode": "neural_imaging",
-#         "rec_baseline": 0,
-#         "save_alg_model_plot": False,
-        
-#         # Stimulus settings
-#         "stim_interface": "dummy",
-#         "use_static_stim_roi": False,
-#         "frames_to_stimulate_for_options": [48],
-#         "stim_intensity_options": [10],
-#         "stimulus_diameter": 10,
-        
-#         # Dev ops
-#         "input_recording": None,
-#         "acquisition_backend": "dummy",
-#         "no_save_images": True,
-#         "no_save_metadata": True,
-#         "save_gooey_defaults": False,
-#         "prefill_wb_ops": False,
-#         "send_sms": False,
-#     }
-
-
 @pytest.fixture
 def minimal_configs(temp_output_dir):
     """Provide minimal valid Config objects for testing."""

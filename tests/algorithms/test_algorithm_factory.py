@@ -58,7 +58,7 @@ def mock_configs():
     
     experiment_config.subject = Mock()
     experiment_config.subject.genotype = "test_strain"
-    experiment_config.subject.num_eggs = 0
+    # experiment_config.subject.num_eggs = 0
     experiment_config.subject.notes = ""
     experiment_config.subject.treatment_details = Mock()
     experiment_config.subject.treatment_details.condition = ""

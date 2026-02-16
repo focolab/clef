@@ -17,7 +17,8 @@ stimulus_devices:
     slm_device: null  # Will query from MMC
     
     # Calibration of DMD
-    polygon_calibration_path: "./hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
+    # polygon_calibration_path: "./hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json"
+    polygon_calibration_path: "C:/Users/Leica/code/clef/hardware/stimulus_controllers/stimulus_resources/MightexPolygon1000/calibrations.json"
 
   InvCore-SpinningDisk-639:
     type: "widefield_laser"
@@ -64,17 +65,17 @@ system_devices:
 
       # Strobe settings
       strobe_illumination: false
-      strobe_inter_frame_interval_ms: 160 # not used if strobe_acquisition is false
+      strobe_inter_frame_interval_ms: 80 # not used if strobe_acquisition is false
 
 # System properties
 system_properties:
 
   # Microscope name (temporary, backward compatibility)
   system_name: 'InnovationCoreSpinningDisk'
-  auto_shutter: true
+  auto_shutter: false
   circular_buffer_mb: 10000
-  configs:
-    Channel: "488"
+  # configs:
+  #   Channel: "488"
   shutters:
     - device_name: "89 North Laser Diode Illuminator"
       state: true

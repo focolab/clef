@@ -47,7 +47,7 @@ from engine.closed_loop_engine import ClosedLoopEngine
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('./demo_output_hardware/brainalyzer_hardware_demo.log'),
@@ -69,7 +69,7 @@ def verify_hardware_prerequisites() -> bool:
     checks = []
     
     # Check 1: Calibration file exists
-    calib_path = Path(f"{parent_dir}/hardware/stimulus_controllers/stimulus_resources/Mightex Polygon P1000/calibrations.json")
+    calib_path = Path(f"{parent_dir}/hardware/stimulus_controllers/stimulus_resources/MightexPolygon1000/calibrations.json")
     # cwd = os.getcwd()
     if calib_path.exists():
         logger.info(f"✓ Polygon calibration file found: {calib_path}")
