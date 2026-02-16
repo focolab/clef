@@ -46,6 +46,9 @@ class ImageDataInterface(DataInterface):
         self.strobe_acquisition = False # TODO untested
         self.next_call: float = 0. # Next discrete sample
         self.false_grab_count: int = 0 # Errors thrown while trying to get images from buffer
+
+        # Pointer to sample index
+        self.sample_ndx = 0
         
         # Data buffer for temporary storage
         self.storage_shape = self.get_sample_shape()
@@ -101,11 +104,19 @@ class ImageDataInterface(DataInterface):
             except Exception as err:
                 false_grab_count += 1
                 logger.debug(f"False grab #{false_grab_count}: {err}")
+
+        # append sample to sample vec
+        self.store_sample(img)
             
         # Fall back to single frame acquisition
-        # return self.camera.acquire_frame()
         self.sample_time_list.append(time.time())
         return img
+    
+    def store_sample(self, frame):
+
+        # Note at initialization sample shape is xy, after configure_sampling it becomes tyx
+        self.samples[self.sample_ndx,:] = frame
+        self.sample_ndx += 1
     
     def start_sampling(self, buffer_size: int = 0) -> None:
         """

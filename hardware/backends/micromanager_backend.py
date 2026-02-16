@@ -405,11 +405,11 @@ class MicroManagerStimulus(StimulusInterface):
         
         # Type-specific configuration
         if stim_type == "widefield_laser":
-            self._configure_widefield_laser(config)
+            self._configure_widefield_laser()
         elif stim_type == "polygon":
-            self._configure_polygon(config)
+            self._configure_polygon()
         elif stim_type == "led":
-            self._configure_led(config)
+            self._configure_led()
         elif stim_type == "dummy":
             logger.info("Dummy stimulus configured (no hardware operations)")
         else:
@@ -419,7 +419,7 @@ class MicroManagerStimulus(StimulusInterface):
         self._configured = True
         logger.info(f"Stimulus configured for {interface_type}")
     
-    def _configure_widefield_laser(self, config: Dict[str, Any]) -> None:
+    def _configure_widefield_laser(self) -> None:
         """Configure widefield laser stimulus."""
         dev = self._device_config
         
@@ -440,7 +440,7 @@ class MicroManagerStimulus(StimulusInterface):
             except Exception as e:
                 logger.warning(f"Could not initialize voltage: {e}")
     
-    def _configure_polygon(self, config: Dict[str, Any]) -> None:
+    def _configure_polygon(self) -> None:
         """Configure polygon/LDI stimulus."""
         dev = self._device_config
         logger.debug(f'Configuring polygon device with config {dev}')
@@ -481,23 +481,28 @@ class MicroManagerStimulus(StimulusInterface):
             
             if dev.shutter_device:
                 self.mmc.setShutterOpen(dev.shutter_device, True)
+
+            # store camera roi for coordinate transform
+            roi_j = self.mmc.getROI()
+            self.camera_roi = [roi_j.getX(), roi_j.getY(), roi_j.getWidth(), roi_j.getHeight()]
             
             logger.debug("Initialized polygon: intensity=0, shutter open, SLM blank")
         except Exception as e:
             logger.warning(f"Could not initialize polygon: {e}")
         
         # Load calibration points
-        calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None)
+        # calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None)
+        calibration_path = getattr(self._device_config, 'polygon_calibration_path', None)
         if calibration_path:
             self.calibration_points = self._load_polygon_calibration(calibration_path)
             if self.calibration_points is None:
                 logger.error(f'Failed to load polygon calibration from {calibration_path}')
                 raise RuntimeError(f'Polygon calibration could not be loaded from {calibration_path}')
         else:
-            logger.error('No polygon calibration path provided in config (hardware_config.polygon_calibration_path)')
+            logger.error(f'No polygon calibration path provided in stim interface config: {self._device_config}')
             raise RuntimeError('Polygon calibration path must be set in config')
     
-    def _configure_led(self, config: Dict[str, Any]) -> None:
+    def _configure_led(self) -> None:
         """Configure LED stimulus."""
         dev = self._device_config
         
@@ -673,8 +678,7 @@ class MicroManagerStimulus(StimulusInterface):
         icx = self.calibration_points['icx']
         icy = self.calibration_points['icy']
         
-        # Get ROI from config or params
-        roi = stim_params.get('roi', [0, 0])
+        # get polygon dimensions
         width, height = self.polygon_dims
         
         # Generate mask based on event type
@@ -685,7 +689,7 @@ class MicroManagerStimulus(StimulusInterface):
             
             mask = numba_utils.generate_pg_ellipse_mask(
                 cx, cy, pcx, pcy, icx, icy,
-                diameter, roi[0], roi[1], width, height
+                diameter, self.camera_roi[0], self.camera_roi[1], width, height
             )
         
         elif event_type in ['pulse-rect-roi-list', 'stream-rect-roi-list']:
@@ -698,7 +702,7 @@ class MicroManagerStimulus(StimulusInterface):
             mask = numba_utils.generate_pg_multi_rectangle_mask(
                 x_list, y_list, width_list, height_list,
                 pcx, pcy, icx, icy,
-                roi[0], roi[1], width, height
+                self.camera_roi[0], self.camera_roi[1], width, height
             )
         
         elif event_type == 'full-field-button':
@@ -986,30 +990,32 @@ class MicroManagerBackend(BaseHardwareBackend):
             "exposure": self.mmc.getExposure(),
         }
 
-        intensity_405 = self.mmc.getProperty("DAC405", "Volts")
-        intensity_488 = self.mmc.getProperty("DAC488", "Volts")
-        intensity_561 = self.mmc.getProperty("DAC561", "Volts")
-        intensity_639 = self.mmc.getProperty("DAC639", "Volts")
-        more_metadata = {
-            "camera_mode": self.mmc.getCurrentConfig("Camera Mode"),
-            "objective": self.mmc.getCurrentConfig("Objective"),
-            "intensity_488": intensity_488,
-            "intensity_561": intensity_561,
-            "intensity_405": intensity_405,
-            "intensity_639": intensity_639,
-        }
-        metadata.update(more_metadata)
+        # intensity_405 = self.mmc.getProperty("DAC405", "Volts")
+        # intensity_488 = self.mmc.getProperty("DAC488", "Volts")
+        # intensity_561 = self.mmc.getProperty("DAC561", "Volts")
+        # intensity_639 = self.mmc.getProperty("DAC639", "Volts")
+        # more_metadata = {
+        #     "camera_mode": self.mmc.getCurrentConfig("Camera Mode"),
+        #     "objective": self.mmc.getCurrentConfig("Objective"),
+        #     "intensity_488": intensity_488,
+        #     "intensity_561": intensity_561,
+        #     "intensity_405": intensity_405,
+        #     "intensity_639": intensity_639,
+        # }
+        # metadata.update(more_metadata)
 
-        metadata['backend'] = self.config.backend
+        metadata['backend_name'] = self.config.backend
 
         # Collect all device properties
         device_properties = {}
         try:
-            loaded_devices = self.mmc.getLoadedDevices()
+            loaded_devices_j = self.mmc.getLoadedDevices()
+            loaded_devices = [loaded_devices_j.get(i) for i in range(loaded_devices_j.size())] # cast to list
             for device_label in loaded_devices:
                 props = {}
                 try:
-                    prop_names = self.mmc.getDevicePropertyNames(device_label)
+                    prop_names_j = self.mmc.getDevicePropertyNames(device_label)
+                    prop_names = [prop_names_j.get(i) for i in range(prop_names_j.size())]
                     for prop_name in prop_names:
                         try:
                             props[prop_name] = self.mmc.getProperty(device_label, prop_name)
@@ -1025,7 +1031,8 @@ class MicroManagerBackend(BaseHardwareBackend):
         # Collect config group current presets
         config_groups = {}
         try:
-            groups = self.mmc.getAvailableConfigGroups()
+            groups_j = self.mmc.getAvailableConfigGroups()
+            groups = [groups_j.get(i) for i in range(groups_j.size())]
             for group_name in groups:
                 try:
                     config_groups[group_name] = self.mmc.getCurrentConfig(group_name)

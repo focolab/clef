@@ -9,14 +9,23 @@ algorithm_params:
   stim_delay_frames_options: [20, 40]
   stim_onset_list: []
   stimulus_diameter_pixels: 30
+  gui_mode: "neural_imaging"
+
+
+  # Stimulus parameters to initialize algorithm
+  stimulus_params:
+    enabled: true
+    randomize: false
+    duration_frames_options: [24, 48]  # 3-6 volumes
+    intensity_percent_options: [10, 20, 30]
+    duration_frames: 24
+    intensity_percent: 10
+
+algorithm_configuration:
   gui_mode: "neural_imaging"  # For multimodal algs e.g. neural_imaging, behavior
 
+# TODO: demo_hardware_physical test, demo_ring_attractor configuration files, and the default configuration files are mixed on structure for algorithm parameters.
+# we need to centralize on one standard schema, and make sure the files reading these properties are accessing them correctly 
+# "algorithm_configuration" is redundant, so it should be three high level properties: algorithm_params, stimulus_params, and gui_params
+# these need to be checked by pydantic
 
-# Stimulus parameters
-stimulus_params:
-  enabled: true
-  randomize: false
-  duration_frames_options: [24, 48]  # 3-6 volumes
-  intensity_percent_options: [10, 20, 30]
-  duration_frames: 24
-  intensity_percent: 10

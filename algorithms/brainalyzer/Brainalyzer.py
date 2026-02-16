@@ -97,7 +97,10 @@ class Brainalyzer:
             self.zsize = 1
         
         # Extract algorithm params
-        self.GUI_mode = algorithm_config.gui_mode
+        try:
+            self.GUI_mode = algorithm_config.algorithm_params.gui_mode
+        except Exception as err:
+            logger.critical('No GUI mode provided in algorithm_config {}')
         self.stim_intensity=0
         
         # Hardware params (with safe defaults)
@@ -313,19 +316,12 @@ class Brainalyzer:
         """
         metadata = {
             "stim_param_list": self.stim_param_list,
-            "algorithm_config": self.algorithm_config.model_dump(mode='json'),
-            "experiment_config": self.experiment_config.model_dump(mode='json'),
+            # "algorithm_config": self.algorithm_config.model_dump(mode='json'),
+            # "experiment_config": self.experiment_config.model_dump(mode='json'),
         }
         
-        if self.hardware:
-            metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
-
-        # Optional metadata
-        if (self.GUI_mode == "behavior" and
-            
-            # TODO remove scope ref, this should get pulled when migrating to stage
-            self.microscope_name == "innovation core thunderscope"):
-            metadata["xy_stage_position_list"] = self.xy_stage_position_list
+        # if self.hardware:
+        #     metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
 
         return metadata
 
