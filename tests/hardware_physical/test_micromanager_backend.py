@@ -201,20 +201,20 @@ class TestStimulusOperations:
         
         config = {
             "interface_type": innovation_core_config.stim_interface,
-            "calibration_path": innovation_core_config.polygon_calibration_path
+            "calibration_path": innovation_core_config.get_stimulus_device_config().polygon_calibration_path
         }
-        
+
         stimulus_connected.configure_stimulus(config)
         logger.info("✓ Stimulus configured")
-    
+
     def test_activate_deactivate_stimulus(self, stimulus_connected, innovation_core_config):
         """Test activating and deactivating stimulus."""
         logger.info("Testing stimulus activation...")
-        
+
         # Configure first
         config = {
             "interface_type": innovation_core_config.stim_interface,
-            "calibration_path": innovation_core_config.polygon_calibration_path
+            "calibration_path": innovation_core_config.get_stimulus_device_config().polygon_calibration_path
         }
         stimulus_connected.configure_stimulus(config)
         
@@ -241,10 +241,10 @@ class TestStimulusOperations:
         # Configure
         config = {
             "interface_type": innovation_core_config.stim_interface,
-            "calibration_path": innovation_core_config.polygon_calibration_path
+            "calibration_path": innovation_core_config.get_stimulus_device_config().polygon_calibration_path
         }
         stimulus_connected.configure_stimulus(config)
-        
+
         # Create stimulus params with ROI event
         stim_params = {
             "event": {
