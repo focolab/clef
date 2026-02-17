@@ -5,25 +5,49 @@ Closed-Loop Experimental Framework for real-time microscopy and stimulus control
 ## Installation
 
 ```bash
-# Base install (core engine only)
-pip install clef
+# Create a virtual environment
+conda create -n clef python
+conda activate clef
 
-# With GUI demos
-pip install clef[demos]
-
-# Full environment (microscope + imaging + dev tools)
-pip install clef[all]
+# Install with demo dependencies (while in clef directory)
+pip install -e .[demos]
 ```
 
 ## Usage
 
+### Ring attractor demo
+
+Illustrates CLEF on a synthetic dynamical system:
+
 ```bash
-# Run with config files
 clef --hardware config/demo/demo_ring_attractor_hardware.yaml \
      --experiment config/demo/demo_ring_attractor_experiment.yaml \
      --algorithm config/demo/demo_ring_attractor_algorithm.yaml
+```
 
-# Validate configs
+### Brainalyzer demo
+
+Illustrates CLEF on a microscopy recording:
+
+```bash
+clef --hardware config/demo/demo_brainalyzer_hardware.yaml \
+     --experiment config/demo/demo_brainalyzer_experiment.yaml \
+     --algorithm config/demo/demo_brainalyzer_algorithm.yaml
+```
+
+### Alternatively, run demos with scripts
+
+```bash
+python demo/demo_ring_attractor.py
+```
+
+```bash
+python demo/demo_brainalyzer.py
+```
+
+### Validate configs without running
+
+```bash
 clef --validate-config --hardware config/demo/demo_ring_attractor_hardware.yaml
 ```
 
