@@ -1,0 +1,30 @@
+# Experiment configuration for Brainalyzer demo
+experiment_name: "brainalyzer_demo"
+experimenter: "CLEF_Demo"
+output_dir: "./demo_output"
+save_images: true
+save_metadata: true
+save_sample_video: false
+
+# Acquisition parameters
+acquisition:
+  num_samples: 800
+
+# Subject metadata
+subject:
+  subject_id: "demo_subject"
+  subject_type: "demo_strain"
+  genotype: "demo_strain"
+  treatment: null
+  treatment_details:
+    condition: "demo"
+  orientation:
+    nose: null
+    vnc: null
+  notes: "Brainalyzer demo with interactive GUI"
+
+# Input TIFF file for dummy backend
+# Users should update this path to their own TIFF file
+input_recording_path: 'C:/Users/rldun/Desktop/temp_render/example_data/20221106-21-47-31/20221106-21-47-1_minified_8z_100t.tif'
+
+dev_options: null
