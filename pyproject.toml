@@ -8,15 +8,14 @@ version = "0.1.0"
 description = "Closed-Loop Experimental Framework for real-time microscopy and stimulus control"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Raymond Dunn", email = "ray.l.dunn@gmail.com"}
 ]
 keywords = ["neuroscience", "microscopy", "closed-loop", "calcium-imaging", "real-time"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -57,12 +56,16 @@ all = [
 clef = "cli.clef_cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/clef"
-Repository = "https://github.com/yourusername/clef"
-Issues = "https://github.com/yourusername/clef/issues"
+Homepage = "https://github.com/focolab/clef"
+Repository = "https://github.com/focolab/clef"
+Issues = "https://github.com/focolab/clef/issues"
 
 [tool.setuptools]
-packages = ["algorithms", "cli", "config", "demo", "engine", "hardware", "utils", "lib", "style"]
+# Use find to discover all packages automatically
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["algorithms*", "cli*", "config*", "demo*", "engine*", "hardware*", "utils*", "style*"]
+exclude = ["tests*", "build*", "dist*", "*.egg-info"]
 
 [tool.setuptools.package-data]
 config = ["**/*.yaml", "**/*.yml"]
