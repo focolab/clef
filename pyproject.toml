@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clef"
+version = "0.1.0"
+description = "Closed-Loop Experimental Framework for real-time microscopy and stimulus control"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["neuroscience", "microscopy", "closed-loop", "calcium-imaging", "real-time"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+
+# Core dependencies - absolutely required
+dependencies = [
+    "numpy>=1.24",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# GUI demos (Lorenz, RingAttractor, DisplayRGB)
+demos = [
+    "scipy>=1.11",
+    "tifffile>=2023.7.0",
+    "pyqtgraph>=0.13",
+    "pyside6>=6.5",
+    "pyopengl>=3.1",
+    "matplotlib>=3.7",
+]
+
+# Everything: microscope support + image processing + performance + dev tools
+all = [
+    "clef[demos]",
+    "pycromanager>=0.45",
+    "opencv-python>=4.8",
+    "scikit-image>=0.21",
+    "scikit-learn>=1.3",
+    "numba>=0.57",
+    "pytest>=7.0",
+]
+
+[project.scripts]
+clef = "cli.clef_cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/clef"
+Repository = "https://github.com/yourusername/clef"
+Issues = "https://github.com/yourusername/clef/issues"
+
+[tool.setuptools]
+packages = ["algorithms", "cli", "config", "demo", "engine", "hardware", "utils", "lib", "style"]
+
+[tool.setuptools.package-data]
+config = ["**/*.yaml", "**/*.yml"]
+style = ["**/*.qss"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--ignore=tests/hardware_physical -v"
+
+# Custom markers for optional dependency testing
+markers = [
+    "demos: tests requiring demo dependencies (scipy, tifffile, matplotlib, GUI libs)",
+    "microscope: tests requiring real microscope hardware and pycromanager",
+    "imaging: tests requiring opencv, scikit-image, scikit-learn",
+    "performance: tests requiring numba or other performance libs",
+    "physical: tests requiring physical hardware (microscope connected)",
+]
+
+# Skip tests marked with these markers if dependencies not available
+# Users can run: pytest -m "not demos" to skip demo tests

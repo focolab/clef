@@ -13,7 +13,7 @@ from typing import Dict, Any, Tuple, Union, Optional
 
 from hardware.data_interface import DataInterface
 from hardware.camera_interface import CameraInterface
-import tifffile as tf
+# tifffile imported lazily when needed
 from config.config_manager import ExperimentConfig
 
 logger = logging.getLogger(__name__)
@@ -192,6 +192,7 @@ class ImageDataInterface(DataInterface):
         if not filepath.endswith('.tiff'):
             filepath = filepath + '.tiff'
 
+        import tifffile as tf
         tf.imwrite(filepath, data)
         logger.info(f"Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
     
