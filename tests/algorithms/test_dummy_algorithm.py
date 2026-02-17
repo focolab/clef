@@ -237,8 +237,9 @@ class TestDummyAlgIntegration:
         # Create mock configs
         algorithm_config = Mock()
         algorithm_config.algorithm_type = "dummy"
-        algorithm_config.gui_mode = "neural_imaging"
-        algorithm_config.save_algorithm_plot = False
+        algorithm_config.gui_params = Mock()
+        algorithm_config.gui_params.gui_mode = "neural_imaging"
+        algorithm_config.gui_params.save_algorithm_plot = False
         algorithm_config.algorithm_params = Mock()
         algorithm_config.algorithm_params.stim_cooldown_frames = 900
         algorithm_config.algorithm_params.skip_stimulation_probability = 0.0

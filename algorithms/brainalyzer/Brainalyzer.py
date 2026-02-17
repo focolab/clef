@@ -96,9 +96,9 @@ class Brainalyzer:
             logger.warning('ZSize not detected in hardware configuration, defaulting to 1')
             self.zsize = 1
         
-        # Extract algorithm params
+        # Extract GUI params
         try:
-            self.GUI_mode = algorithm_config.algorithm_params.gui_mode
+            self.GUI_mode = algorithm_config.gui_params.gui_mode
         except Exception as err:
             logger.critical('No GUI mode provided in algorithm_config {}')
         self.stim_intensity=0
@@ -316,8 +316,9 @@ class Brainalyzer:
         """
         metadata = {
             "stim_param_list": self.stim_param_list,
-            # "algorithm_config": self.algorithm_config.model_dump(mode='json'),
-            # "experiment_config": self.experiment_config.model_dump(mode='json'),
+            "algorithm_config": self.algorithm_config.model_dump(mode='json'),
+            "experiment_config": self.experiment_config.model_dump(mode='json'),
+            "hardware_config": self.hardware.config.model_dump(mode='json') if self.hardware else None,
         }
         
         # if self.hardware:

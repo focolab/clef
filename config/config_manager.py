@@ -126,69 +126,35 @@ class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class AlgorithmParameters(BaseModel):
-    """Algorithm-specific parameters."""
+class GUIParameters(BaseModel):
+    """GUI-specific parameters."""
     enable_gui: bool = Field(False, description="Enable algorithm GUI")
     gui_mode: str = Field("none", description="GUI mode (neural_imaging/behavior/none)")
-    
+    save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
+
     model_config = ConfigDict(extra="allow")
 
 
 class StimulusParameters(BaseModel):
     """Stimulus-specific parameters."""
     enabled: bool = Field(False, description="Enable stimulus delivery")
-    
+
     model_config = ConfigDict(extra="allow")
 
 
-class AlgorithmConfiguration(BaseModel):
-    """Algorithm configuration container."""
-    enable_gui: bool = Field(False, description="Enable algorithm GUI")
-    gui_mode: str = Field("none", description="GUI mode")
-    stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
-
+class AlgorithmParameters(BaseModel):
+    """Algorithm-specific parameters."""
     model_config = ConfigDict(extra="allow")
 
 
 class AlgorithmConfig(BaseModel):
     """Algorithm configuration (algorithm.yaml)."""
     algorithm_type: str = Field("dummy", description="Algorithm class name")
-    save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
-    algorithm_configuration: AlgorithmConfiguration = Field(default_factory=AlgorithmConfiguration)
+    algorithm_params: AlgorithmParameters = Field(default_factory=AlgorithmParameters)
+    stimulus_params: StimulusParameters = Field(default_factory=StimulusParameters)
+    gui_params: GUIParameters = Field(default_factory=GUIParameters)
 
     model_config = ConfigDict(extra="allow")
-
-    @model_validator(mode='before')
-    @classmethod
-    def promote_flat_algorithm_kwargs(cls, data):
-        """Promote flat gui_mode/enable_gui into algorithm_configuration."""
-        if isinstance(data, dict):
-            flat_keys = ('gui_mode', 'enable_gui')
-            to_promote = {k: data[k] for k in flat_keys if k in data and 'algorithm_configuration' not in data}
-            if to_promote:
-                data = dict(data)
-                existing = dict(data.get('algorithm_configuration', {}))
-                existing.update(to_promote)
-                data['algorithm_configuration'] = existing
-                for k in to_promote:
-                    data.pop(k, None)
-        return data
-
-    @property
-    def enable_gui(self) -> bool:
-        return self.algorithm_configuration.enable_gui
-
-    @property
-    def gui_mode(self) -> str:
-        return self.algorithm_configuration.gui_mode
-
-    @property
-    def stimulus_params(self) -> StimulusParameters:
-        return self.algorithm_configuration.stimulus_params
-
-    @property
-    def algorithm_params(self):
-        return self.algorithm_configuration
 
 
 class StimulusDeviceConfig(BaseModel):
@@ -446,7 +412,7 @@ class ConfigManager:
         #         return False
         
         # Check stimulus parameters consistency
-        if self.algorithm_config.algorithm_configuration.stimulus_params.enabled:
+        if self.algorithm_config.stimulus_params.enabled:
             logger.info("Stimulus enabled in algorithm configuration")
         
         logger.info("Configuration validation passed")

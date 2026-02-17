@@ -3,24 +3,18 @@
 
 algorithm_type: "LorenzDemo"
 
-# GUI disabled for this demo (could add 3D visualization later)
-enable_gui: false
-gui_mode: "neural_imaging"
-save_algorithm_plot: true
-
-# Core algorithm parameters
+# Algorithm-specific parameters
 algorithm_params:
-
   # Real-time visualization flag
   visualize_real_time: true
-  
+
   # Cooldown after stimulation (frames)
   stim_cooldown_frames: 100
-  
+
   # No probabilistic modulation for this demo
   skip_stimulation_probability: 0.0
   delay_stimulation_probability: 0.0
-  
+
   # Trigger volume in phase space (3D box)
   # Default: upper-right wing of attractor (x>0, y>0, z>25)
   trigger_x_min: -2
@@ -29,11 +23,10 @@ algorithm_params:
   trigger_y_max: 2
   trigger_z_min: 15
   trigger_z_max: 25
-    
+
   # Stimulus perturbation vector [dx, dy, dz]
-  # perturbation: [0.1, 0.1, 0.1]
   perturbation: [2.0, 2.0, 2.0]
-  
+
   # Not used for this algorithm
   stimulus_diameter_pixels: 10
 
@@ -41,11 +34,13 @@ algorithm_params:
 stimulus_params:
   enabled: true
   randomize: false
-  
-  # Duration of state perturbation effect
   duration_frames_options: [20]
   duration_frames: 20
-  
-  # Intensity scales the perturbation magnitude
   intensity_percent_options: [1]
   intensity_percent: 1
+
+# GUI settings
+gui_params:
+  enable_gui: false
+  gui_mode: "neural_imaging"
+  save_algorithm_plot: true

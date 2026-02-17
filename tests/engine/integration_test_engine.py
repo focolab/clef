@@ -69,13 +69,19 @@ def minimal_experiment_config(test_output_dir):
 @pytest.fixture
 def minimal_algorithm_config():
     """Create minimal algorithm config for testing."""
+    from config.config_manager import AlgorithmParameters, GUIParameters
+
     return AlgorithmConfig(
         algorithm_type="dummy",
-        gui_mode="neural_imaging",
-        save_algorithm_plot=False,
+        algorithm_params=AlgorithmParameters(),
         stimulus_params=StimulusParameters(
             duration_frames_options=[2],
             intensity_percent_options=[10],
+        ),
+        gui_params=GUIParameters(
+            enable_gui=False,
+            gui_mode="neural_imaging",
+            save_algorithm_plot=False,
         ),
     )
 

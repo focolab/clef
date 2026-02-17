@@ -74,8 +74,9 @@ def minimal_configs(temp_output_dir):
         BackendConfiguration,
         StimulusConfiguration,
         SystemProperties,
-        AlgorithmConfiguration,
+        AlgorithmParameters,
         StimulusParameters,
+        GUIParameters,
     )
     
     # Hardware config
@@ -125,20 +126,23 @@ def minimal_configs(temp_output_dir):
     )
     
     # Algorithm config
+    algorithm_params = AlgorithmParameters()
+
     stimulus_params = StimulusParameters(
         enabled=False,
     )
-    
-    algorithm_configuration = AlgorithmConfiguration(
+
+    gui_params = GUIParameters(
         enable_gui=False,
         gui_mode='none',
-        stimulus_params=stimulus_params,
+        save_algorithm_plot=False,
     )
-    
+
     algorithm_config = AlgorithmConfig(
         algorithm_type="dummy",
-        save_algorithm_plot=False,
-        algorithm_configuration=algorithm_configuration,
+        algorithm_params=algorithm_params,
+        stimulus_params=stimulus_params,
+        gui_params=gui_params,
     )
     
     return {
@@ -1187,9 +1191,9 @@ class TestConfigAccessPatterns:
         
         # New way
         assert engine.algorithm_config.algorithm_type == "dummy"
-        assert engine.algorithm_config.enable_gui is False
+        assert engine.algorithm_config.gui_params.enable_gui is False
         # assert engine.algorithm_config.algorithm_params.stimulus_diameter_pixels == 10
-        
+
         # Old way
         # assert engine.args["gooey_args"]["trigger_algorithm"] == "dummy"
     
