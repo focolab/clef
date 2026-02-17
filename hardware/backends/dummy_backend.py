@@ -149,8 +149,10 @@ class DummyCamera(CameraInterface):
     
     def configure_camera(self, config: Dict[str, Any]) -> None:
         """Configure camera settings."""
-        # Update exposure if provided
-        if "exposure" in config:
+        # Update exposure if provided (handles both "exposure" and "Exposure")
+        if "Exposure" in config:
+            self.set_exposure(config["Exposure"])
+        elif "exposure" in config:
             self.set_exposure(config["exposure"])
         # Other config options can be added as needed
         logger.debug(f"Dummy camera: Configured with {config}")
@@ -293,24 +295,32 @@ class DummyHardwareBackend(BaseHardwareBackend):
     def initialize(self, input_file: Optional[str] = None) -> None:
         """
         Initialize dummy hardware.
-        
+
         Args:
             input_file: Optional path to TIFF file for simulated acquisition
         """
         logger.info("Initializing dummy hardware backend...")
-        
+
         # Create dummy camera
         self._camera = DummyCamera(input_file=input_file or self.input_file)
-        
+
         # Create dummy stage
         self._stage = DummyStage()
-        
+
         # Create dummy stimulus
         self._stimulus = DummyStimulus()
 
         # Dummy micromanager object
         self.mmc = DummyMMC.DummyMMC()
-        
+
+        # Apply camera properties from config if available
+        if hasattr(self.config, 'system_devices') and self.config.system_devices:
+            if hasattr(self.config.system_devices, 'camera') and self.config.system_devices.camera:
+                camera_config = self.config.system_devices.camera
+                if hasattr(camera_config, 'properties') and camera_config.properties:
+                    self._camera.configure_camera(camera_config.properties.model_dump())
+                    logger.debug(f"Applied camera properties: {camera_config.properties.model_dump()}")
+
         self._initialized = True
         logger.info("Dummy hardware backend initialized")
     
