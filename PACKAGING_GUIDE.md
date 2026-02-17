@@ -13,8 +13,8 @@ pip install clef
 ```bash
 pip install clef[demos]
 ```
-**Adds:** `scipy`, `tifffile`, `pyqtgraph`, `pyside6`, `pyopengl`, `matplotlib`
-**Use for:** Running Lorenz/RingAttractor/DisplayRGB demos with GUI
+**Adds:** `scipy`, `tifffile`, `pyqtgraph`, `pyside6`, `pyopengl`, `pyopengl-accelerate`, `matplotlib`
+**Use for:** Running RingAttractor/Brainalyzer/DisplayRGB demos with GUI
 
 ### Everything (microscope + image processing + dev tools)
 ```bash
@@ -63,7 +63,7 @@ def dummy_tiff_file(temp_output_dir):
 ### Test-level:
 ```python
 @pytest.mark.demos
-def test_lorenz_algorithm():
+def test_ring_attractor_algorithm():
     from scipy import ndimage  # Will fail gracefully if scipy missing
     # ... test code
 ```
@@ -71,7 +71,7 @@ def test_lorenz_algorithm():
 ### Class-level:
 ```python
 @pytest.mark.demos
-class TestLorenzAlgorithm:
+class TestRingAttractorAlgorithm:
     def test_initialization(self):
         ...
     def test_processing(self):
@@ -83,7 +83,6 @@ class TestLorenzAlgorithm:
 ## Files That Need scipy/tifffile
 
 **scipy (demos only):**
-- `algorithms/demo/lorenz_algorithm.py` - ndimage
 - `algorithms/demo/ring_attractor_algorithm.py` - ndimage
 - `algorithms/models/HeadCurvatureAndXYStageModel.py` - scipy.io (commented out)
 
@@ -100,9 +99,9 @@ class TestLorenzAlgorithm:
 
 ---
 
-## Patching Tests (TODO)
+## Patching Tests
 
-Add to affected test files:
+Tests have been patched with `pytest.importorskip` and `@pytest.mark.demos` across the 3 affected test files. Example patterns used:
 
 ```python
 # At top of file
@@ -111,14 +110,14 @@ import pytest
 # For fixtures that import tifffile
 @pytest.fixture
 def dummy_tiff_file(temp_output_dir):
-    pytest.importorskip("tifffile")  # <-- ADD THIS
+    pytest.importorskip("tifffile")  # <-- ADDED
     import tifffile as tf
     # ... rest unchanged
 ```
 
 Or mark entire test functions:
 ```python
-@pytest.mark.demos  # <-- ADD THIS
+@pytest.mark.demos  # <-- ADDED
 def test_that_needs_scipy_or_tifffile():
     ...
 ```
