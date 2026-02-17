@@ -57,9 +57,9 @@ class LorenzDemoAlgorithm:
         self.hardware_manager = hardware_manager
         
         # Extract config parameters
-        gooey_args = self.args.get("gooey_args", {})
-        self.frames_to_grab = gooey_args.get("total_frames", 500)
-        self.zsize = gooey_args.get("zsize", 1)
+        # gooey_args = self.args.get("gooey_args", {})
+        # self.frames_to_grab = gooey_args.get("total_frames", 500)
+        # self.zsize = gooey_args.get("zsize", 1)
         
         # Get algorithm-specific parameters
         if algorithm_config:

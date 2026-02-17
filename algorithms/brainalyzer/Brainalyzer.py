@@ -86,12 +86,22 @@ class Brainalyzer:
         self.rec_id = experiment_config.experiment_name
         self.saveroot = experiment_config.output_dir
         self.frames_to_grab = experiment_config.acquisition.num_samples
-        self.zsize = experiment_config.acquisition.z_planes
+        # try to get zsize from experiment config, fall back to 1
+        try:
+            # self.zsize = experiment_config.acquisition.z_planes 
+            self.zsize = hardware_manager.config.system_devices.stage.num_z_planes
+            if not self.zsize:
+                self.zsize = 1
+        except Exception:
+            logger.warning('ZSize not detected in hardware configuration, defaulting to 1')
+            self.zsize = 1
         
         # Extract algorithm params
-        self.GUI_mode = algorithm_config.gui_mode
-        self.stim_intensity_ops = algorithm_config.stimulus_params.intensity_percent_options
-        self.stim_intensity = self.stim_intensity_ops[0]
+        try:
+            self.GUI_mode = algorithm_config.algorithm_params.gui_mode
+        except Exception as err:
+            logger.critical('No GUI mode provided in algorithm_config {}')
+        self.stim_intensity=0
         
         # Hardware params (with safe defaults)
         self.microscope_name = (
@@ -101,7 +111,7 @@ class Brainalyzer:
         # Data params - will be set by closed_loop_engine after hardware init
         self.roi = (0, 0, 200, 200)  # Default, will be updated
         try:
-            self.roi = self.hardware.camera.roi
+            self.roi = self.hardware.camera.get_roi()
         except Exception as err:
             logger.warning(f'No hardware detected by brainalyzer, defaulting to image roi: {self.roi}')
         self.xsize = self.roi[2]
@@ -306,19 +316,12 @@ class Brainalyzer:
         """
         metadata = {
             "stim_param_list": self.stim_param_list,
-            "algorithm_config": self.algorithm_config.model_dump(mode='json'),
-            "experiment_config": self.experiment_config.model_dump(mode='json'),
+            # "algorithm_config": self.algorithm_config.model_dump(mode='json'),
+            # "experiment_config": self.experiment_config.model_dump(mode='json'),
         }
         
-        if self.hardware:
-            metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
-
-        # Optional metadata
-        if (self.GUI_mode == "behavior" and
-            
-            # TODO remove scope ref, this should get pulled when migrating to stage
-            self.microscope_name == "innovation core thunderscope"):
-            metadata["xy_stage_position_list"] = self.xy_stage_position_list
+        # if self.hardware:
+        #     metadata["hardware_config"] = self.hardware.config.model_dump(mode='json')
 
         return metadata
 
@@ -455,45 +458,45 @@ class Brainalyzer:
         """Store frame in shared memory buffer."""
         self.shared_ndarray_list[zndx][:] = img[:]
 
-def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
-    """
-    Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
+# def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
+#     """
+#     Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
     
-    This function allows existing code to continue using the old args format
-    while the new code uses Config objects internally.
+#     This function allows existing code to continue using the old args format
+#     while the new code uses Config objects internally.
     
-    Args:
-        args: Legacy args dictionary with gooey_args structure
-        local_handles: Optional dictionary of local handles (mmc, etc.)
+#     Args:
+#         args: Legacy args dictionary with gooey_args structure
+#         local_handles: Optional dictionary of local handles (mmc, etc.)
         
-    Returns:
-        Brainalyzer instance
+#     Returns:
+#         Brainalyzer instance
         
-    Example:
-        >>> # Old way (still works)
-        >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
-        >>> 
-        >>> # New way (preferred)
-        >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
-    """
-    from engine.closed_loop_engine import convert_gooey_args_to_configs
-    from hardware.hardware_manager import HardwareManager
+#     Example:
+#         >>> # Old way (still works)
+#         >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
+#         >>> 
+#         >>> # New way (preferred)
+#         >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
+#     """
+#     from engine.closed_loop_engine import convert_gooey_args_to_configs
+#     from hardware.hardware_manager import HardwareManager
     
-    # Convert legacy args to configs
-    gooey_args = args.get("gooey_args", args)
-    configs = convert_gooey_args_to_configs(gooey_args)
-    hm = HardwareManager(configs['hardware'])
+#     # Convert legacy args to configs
+#     gooey_args = args.get("gooey_args", args)
+#     configs = convert_gooey_args_to_configs(gooey_args)
+#     hm = HardwareManager(configs['hardware'])
     
-    # Create Brainalyzer with configs
-    alg = Brainalyzer(
-        algorithm_config=configs["algorithm"],
-        experiment_config=configs["experiment"],
-        hardware_manager=hm,
-        local_handles=local_handles
-    )
+#     # Create Brainalyzer with configs
+#     alg = Brainalyzer(
+#         algorithm_config=configs["algorithm"],
+#         experiment_config=configs["experiment"],
+#         hardware_manager=hm,
+#         local_handles=local_handles
+#     )
     
-    # Extract ROI from args if present (for backward compatibility)
-    if "roi" in args:
-        alg.set_roi(args["roi"])
+#     # Extract ROI from args if present (for backward compatibility)
+#     if "roi" in args:
+#         alg.set_roi(args["roi"])
     
-    return alg
+#     return alg

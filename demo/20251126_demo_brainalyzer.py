@@ -39,7 +39,7 @@ from config.config_manager import (
     AlgorithmConfig,
     AcquisitionConfig,
     SubjectMetadata,
-    AlgorithmParameters,
+    AlgorithmConfiguration,
     StimulusParameters,
 )
 from engine.closed_loop_engine import ClosedLoopEngine
@@ -68,65 +68,47 @@ def create_demo_configs(input_tiff_path: str) -> dict:
         backend="dummy",
         stim_interface="dummy",
         microscope_name="demo_microscope",
-        strobe_acquisition=False,
     )
-    
+
     # Acquisition Config
     acquisition_config = AcquisitionConfig(
-        num_frames=800,  # Will read from TIFF
-        z_planes=8,
-        z_step=3,
-        baseline_frames=0,
-        save_structural_scan="none",
+        num_samples=800,
     )
-    
+
     # Subject Metadata
     subject_metadata = SubjectMetadata(
-        genotype="demo_strain",
+        subject_type="demo_strain",
         notes="Brainalyzer demo with interactive GUI",
     )
-    
+
     # Experiment Config
     experiment_config = ExperimentConfig(
         experiment_name="brainalyzer_demo",
         output_dir="./demo_output",
         save_images=True,
         save_metadata=True,
-        save_mip_video=False,
+        save_sample_video=False,
         acquisition=acquisition_config,
         subject=subject_metadata,
-        input_recording_path=input_tiff_path,  # Key for dummy backend
-        dev_options={
-            "prefill_wb_ops": False,
-            "send_sms_on_completion": False,
-        }
+        input_recording_path=input_tiff_path,
     )
-    
-    # Algorithm Parameters
-    algorithm_params = AlgorithmParameters(
-        stim_cooldown_frames=50,  # Short cooldown for demo
-        skip_stimulation_probability=0.0,
-        delay_stimulation_probability=0.0,
-        stimulus_diameter_pixels=30,
-    )
-    
-    # Stimulus Parameters
-    stimulus_params = StimulusParameters(
-        enabled=True,
-        duration_frames_options=[20, 40],  # 2-4 volumes
-        intensity_percent_options=[10, 20, 30],
-        duration_frames=20,
-        intensity_percent=10,
-    )
-    
+
     # Algorithm Config - Enable GUI for interactive demo
     algorithm_config = AlgorithmConfig(
         algorithm_type="Brainalyzer",
-        enable_gui=True,
-        gui_mode="neural_imaging",
         save_algorithm_plot=True,
-        algorithm_params=algorithm_params,
-        stimulus_params=stimulus_params,
+        algorithm_configuration=AlgorithmConfiguration(
+            enable_gui=True,
+            gui_mode="neural_imaging",
+            stim_cooldown_frames=50,
+            skip_stimulation_probability=0.0,
+            delay_stimulation_probability=0.0,
+            stimulus_params=StimulusParameters(
+                enabled=True,
+                duration_frames_options=[20, 40],
+                intensity_percent_options=[10, 20, 30],
+            ),
+        ),
     )
     
     return {

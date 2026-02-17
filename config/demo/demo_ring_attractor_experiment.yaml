@@ -5,40 +5,14 @@ experimenter: "CLEF_Demo"
 output_dir: "./demo_output/ring_attractor"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false
 
 # Acquisition parameters
 acquisition:
   num_samples: 2000
-  frame_rate: null  # As fast as possible
-  z_stack: false
-  z_planes: 1
-  z_start: 0.0
-  z_end: 0.0
-  z_step: 1.0
-  baseline_frames: 0
-  save_structural_scan: "none"
 
 # Subject metadata
 subject:
   subject_id: "ring_system"
   subject_type: "dynamical_system"
-  genotype: "dual_ring_attractor"
-  treatment: null
-  treatment_details:
-    condition: "stable_orbit"
-    atr_concentration_uM: null
-  orientation:
-    nose: null
-    vnc: null
-  num_eggs: 0
   notes: "Dual ring attractor with manual and auto stimulus control. Demonstrates ring transitions and angular perturbations."
-
-# Development options
-dev_options:
-  prefill_wb_ops: false
-  send_sms_on_completion: false
-
-# Not used for ring demo
-input_recording_path: null
-z_step_size_um: 1.0

@@ -15,7 +15,7 @@ from hardware.stage_interface import StageInterface
 from hardware.stimulus_interface import StimulusInterface
 from hardware.projector_interface import ProjectorInterface
 from config.config_manager import HardwareConfig
-
+from hardware.backends.lib import DummyMMC
         
 # Import utilities for mask generation
 from utils import wbliveUtils
@@ -24,7 +24,7 @@ from utils import numba_utils
 logger = logging.getLogger(__name__)
 
 # Import MMSubroutines to use existing initialization logic
-from utils import MMSubroutines
+# from utils import MMSubroutines
 
 # Import JavaObject for pycromanager ASI stage buffer
 try:
@@ -72,7 +72,9 @@ class MicroManagerCamera(CameraInterface):
     
     def start_acquisition(self, buffer_size: int = 0) -> None:
         """Start continuous sequence acquisition."""
-        self.mmc.setCircularBufferMemoryFootprint(buffer_size if buffer_size > 0 else 10000)
+        if buffer_size != 0:
+            logger.warning('Attempting to set camera buffer with {}, but overwriting!')
+        self.mmc.setCircularBufferMemoryFootprint(10000)
         self.mmc.startContinuousSequenceAcquisition(0)
         logger.debug("Micro-Manager: Started continuous acquisition")
     
@@ -147,8 +149,6 @@ class MicroManagerCamera(CameraInterface):
                    (e.g., exposure, binning, properties)
         """
 
-        # TODO config will be an ExperimentConfig...
-        
         # Set exposure if provided
         if "exposure" in config:
             self.set_exposure(config["exposure"])
@@ -189,7 +189,7 @@ class MicroManagerStage(StageInterface):
     def get_position(self, axis: Optional[str] = None) -> Union[float, Tuple[float, ...]]:
         """Get stage position."""
         if axis == 'Z' or axis is None:
-            focus_dev = self.get_focus_device_name()
+            focus_dev = self.get_device_name()
             pos = self.mmc.getPosition(focus_dev)
             if axis == 'Z':
                 return pos
@@ -197,19 +197,19 @@ class MicroManagerStage(StageInterface):
         else:
             # For X/Y stages, would need to get XYStage device
             # For now, just return Z position
-            focus_dev = self.get_focus_device_name()
+            focus_dev = self.get_device_name()
             return (self.mmc.getPosition(focus_dev),)
     
     def move_to_position(self, position: Union[float, Tuple[float, ...]], axis: Optional[str] = None) -> None:
         """Move stage to position."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         if isinstance(position, (int, float)):
             self.mmc.setPosition(focus_dev, float(position))
         elif isinstance(position, (tuple, list)) and len(position) > 0:
             self.mmc.setPosition(focus_dev, float(position[0]))
         logger.debug(f"Micro-Manager: Moved stage to {position}")
     
-    def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+    def configure_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int, ttl_device: str = None, ttl_state: int = None) -> None:
         """
         Configure Z-stack sequence.
         
@@ -222,9 +222,12 @@ class MicroManagerStage(StageInterface):
             "z_end": z_end,
             "z_step": z_step,
             "pad_z": 0,
+            "ttl_device": ttl_device,
+            "ttl_state": ttl_state,
         }
+        
+        logger.info(f"Z-stack: {num_planes} planes from {z_start} to {z_end} um, step {z_step} um")
         self.configure_stage(config)
-        logger.debug(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}, {num_planes} planes")
     
     def configure_stage(self, config: Dict[str, Any]) -> None:
         """
@@ -246,14 +249,14 @@ class MicroManagerStage(StageInterface):
         z_end = config.get("z_end")
         z_step = config.get("z_step")
         pad_z = config.get("pad_z", 0)
-        ttl_device = config.get("ttl_device", "TTL1-8")
-        ttl_state = config.get("ttl_state", "18")
-        
+
+        logger.info(f"Micro-Manager: Z-stack from {z_start} to {z_end}, step {z_step}")
+
         if z_start is None or z_end is None or z_step is None:
             raise ValueError("z_start, z_end, and z_step are required for stage configuration")
         
         # Get focus device
-        stage = self.get_focus_device_name()
+        stage = self.get_device_name()
         
         # Quick semantic check for case of 1Z plane imaging + structural scan
         # spec loop will hang unless zStepSize is set to some value > 0
@@ -265,6 +268,10 @@ class MicroManagerStage(StageInterface):
         if self.backend == "pycromanager":
             if JavaObject is None:
                 raise ImportError("pycromanager.JavaObject required for ASI stage buffer configuration")
+            
+            # position buffer is sent as ttl property sequence by MM
+            ttl_device = config.get("ttl_device")
+            ttl_state = config.get("ttl_state")
             
             # Create Java objects for stage sequence
             dv = JavaObject("mmcorej.DoubleVector")
@@ -315,20 +322,28 @@ class MicroManagerStage(StageInterface):
     
     def stop_sequence(self) -> None:
         """Stop stage sequence."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         self.mmc.stopStageSequence(focus_dev)
         logger.debug("Micro-Manager: Stopped stage sequence")
     
     def wait_for_device(self, timeout_ms: Optional[int] = None) -> None:
         """Wait for stage movement."""
-        focus_dev = self.get_focus_device_name()
+        focus_dev = self.get_device_name()
         self.mmc.waitForDevice(focus_dev)
     
-    def get_focus_device_name(self) -> str:
+    def get_device_name(self) -> str:
         """Get focus device name."""
         if self._focus_device is None:
             self._focus_device = self.mmc.getFocusDevice()
         return self._focus_device
+
+    def get_focus_device_name(self) -> str:
+        """Alias for get_device_name."""
+        return self.get_device_name()
+
+    def run_z_stack(self, z_start: float, z_end: float, z_step: float, num_planes: int) -> None:
+        """Alias for configure_z_stack."""
+        self.configure_z_stack(z_start=z_start, z_end=z_end, z_step=z_step, num_planes=num_planes)
 
 
 class MicroManagerStimulus(StimulusInterface):
@@ -341,7 +356,7 @@ class MicroManagerStimulus(StimulusInterface):
     - LED (e.g., InvCore-ThunderscopeLED3)
     """
     
-    def __init__(self, mmc, backend: str, hardware_config):
+    def __init__(self, mmc, backend: str, hardware_config: Optional[HardwareConfig]):
         """
         Initialize Micro-Manager stimulus interface.
         
@@ -390,11 +405,11 @@ class MicroManagerStimulus(StimulusInterface):
         
         # Type-specific configuration
         if stim_type == "widefield_laser":
-            self._configure_widefield_laser(config)
+            self._configure_widefield_laser()
         elif stim_type == "polygon":
-            self._configure_polygon(config)
+            self._configure_polygon()
         elif stim_type == "led":
-            self._configure_led(config)
+            self._configure_led()
         elif stim_type == "dummy":
             logger.info("Dummy stimulus configured (no hardware operations)")
         else:
@@ -404,7 +419,7 @@ class MicroManagerStimulus(StimulusInterface):
         self._configured = True
         logger.info(f"Stimulus configured for {interface_type}")
     
-    def _configure_widefield_laser(self, config: Dict[str, Any]) -> None:
+    def _configure_widefield_laser(self) -> None:
         """Configure widefield laser stimulus."""
         dev = self._device_config
         
@@ -425,9 +440,10 @@ class MicroManagerStimulus(StimulusInterface):
             except Exception as e:
                 logger.warning(f"Could not initialize voltage: {e}")
     
-    def _configure_polygon(self, config: Dict[str, Any]) -> None:
+    def _configure_polygon(self) -> None:
         """Configure polygon/LDI stimulus."""
         dev = self._device_config
+        logger.debug(f'Configuring polygon device with config {dev}')
         
         # Get SLM device
         try:
@@ -448,12 +464,12 @@ class MicroManagerStimulus(StimulusInterface):
             logger.error(f"Could not configure SLM device: {e}")
             return
         
-        # Set config group for simultaneous imaging (if using pymmcore)
-        if self.backend == "pymmcore":
-            try:
-                self.mmc.setConfig("Mightex-Setup", "640-SP")
-            except Exception as e:
-                logger.warning(f"Could not set Mightex config: {e}")
+        # # Set config group for simultaneous imaging (if using pymmcore)
+        # if self.backend == "pymmcore":
+        #     try:
+        #         self.mmc.setConfig("Mightex-Setup", "640-SP")
+        #     except Exception as e:
+        #         logger.warning(f"Could not set Mightex config: {e}")
         
         # Initialize LDI off but open shutter
         try:
@@ -465,21 +481,28 @@ class MicroManagerStimulus(StimulusInterface):
             
             if dev.shutter_device:
                 self.mmc.setShutterOpen(dev.shutter_device, True)
+
+            # store camera roi for coordinate transform
+            roi_j = self.mmc.getROI()
+            self.camera_roi = [roi_j.getX(), roi_j.getY(), roi_j.getWidth(), roi_j.getHeight()]
             
             logger.debug("Initialized polygon: intensity=0, shutter open, SLM blank")
         except Exception as e:
             logger.warning(f"Could not initialize polygon: {e}")
         
         # Load calibration points
-        calibration_path = config.get("calibration_path") or self.hardware_config.polygon_calibration_path
+        # calibration_path = config.get("calibration_path") or getattr(self.hardware_config, 'polygon_calibration_path', None)
+        calibration_path = getattr(self._device_config, 'polygon_calibration_path', None)
         if calibration_path:
             self.calibration_points = self._load_polygon_calibration(calibration_path)
+            if self.calibration_points is None:
+                logger.error(f'Failed to load polygon calibration from {calibration_path}')
+                raise RuntimeError(f'Polygon calibration could not be loaded from {calibration_path}')
         else:
-            # Try default path
-            default_path = "./res/peripherals/Mightex Polygon P1000/calibrations.json"
-            self.calibration_points = self._load_polygon_calibration(default_path)
+            logger.error(f'No polygon calibration path provided in stim interface config: {self._device_config}')
+            raise RuntimeError('Polygon calibration path must be set in config')
     
-    def _configure_led(self, config: Dict[str, Any]) -> None:
+    def _configure_led(self) -> None:
         """Configure LED stimulus."""
         dev = self._device_config
         
@@ -506,7 +529,7 @@ class MicroManagerStimulus(StimulusInterface):
                    - diameter: optional diameter for polygon
         """
         if not self._configured or self._device_config is None:
-            logger.warning("Stimulus not configured, activation may be undefined")
+            logger.warning(f"Stimulus not configured: {self._configured}, or device config not set: {self._device_config}, activation may be undefined.")
         
         self._active = True
         self._current_params = params
@@ -524,8 +547,6 @@ class MicroManagerStimulus(StimulusInterface):
             logger.debug(f"Dummy stimulus activated: intensity={intensity}")
         else:
             logger.warning("No valid stim type found for activation.")
-        
-        
     
     def _activate_widefield_laser(self, intensity: float) -> None:
         """Activate widefield laser."""
@@ -657,8 +678,7 @@ class MicroManagerStimulus(StimulusInterface):
         icx = self.calibration_points['icx']
         icy = self.calibration_points['icy']
         
-        # Get ROI from config or params
-        roi = stim_params.get('roi', [0, 0])
+        # get polygon dimensions
         width, height = self.polygon_dims
         
         # Generate mask based on event type
@@ -669,7 +689,7 @@ class MicroManagerStimulus(StimulusInterface):
             
             mask = numba_utils.generate_pg_ellipse_mask(
                 cx, cy, pcx, pcy, icx, icy,
-                diameter, roi[0], roi[1], width, height
+                diameter, self.camera_roi[0], self.camera_roi[1], width, height
             )
         
         elif event_type in ['pulse-rect-roi-list', 'stream-rect-roi-list']:
@@ -682,7 +702,7 @@ class MicroManagerStimulus(StimulusInterface):
             mask = numba_utils.generate_pg_multi_rectangle_mask(
                 x_list, y_list, width_list, height_list,
                 pcx, pcy, icx, icy,
-                roi[0], roi[1], width, height
+                self.camera_roi[0], self.camera_roi[1], width, height
             )
         
         elif event_type == 'full-field-button':
@@ -841,7 +861,6 @@ class MicroManagerBackend(BaseHardwareBackend):
         self.mmc = None
         self._projector: Optional[ProjectorInterface] = None
 
-    
     def initialize(self, input_recording: Optional[str] = None) -> None:
         """
         Initialize Micro-Manager hardware.
@@ -853,20 +872,32 @@ class MicroManagerBackend(BaseHardwareBackend):
 
         # Build args dict for MMSubroutines (temporary bridge)
         # This will be removed when MMSubroutines is fully refactored
-        args = {
-            "gooey_args": {
-                "acquisition_backend": self.config.backend,
-                "microscope_name": self.config.microscope_name or "unknown",
-                "input_recording": input_recording,
-            }
-        }
+        # args = {
+        #     "gooey_args": {
+        #         "acquisition_backend": self.config.backend,
+        #         "microscope_name": self.config.microscope_name or "unknown",
+        #         "input_recording": input_recording,
+        #     }
+        # }
+        acquisition_backend = self.config.backend_configuration.backend_name
+        # microscope_name = self.config.microscope_name or "unknown"
         
         # Use config file from HardwareConfig
-        config_file = self.config.mm_config_path
+        # config_file = self.config.mm_config_path
         
         # Initialize MMC using existing function
-        self.mmc = MMSubroutines.initialize_mmc(args, config_file=config_file)
+        if acquisition_backend == 'test' or acquisition_backend == 'dummy':
+            self.mmc = DummyMMC.DummyMMC()
+
+        elif acquisition_backend == "pycromanager":
+
+            # simple single image acquisition example with snap
+            from pycromanager import Core, JavaObject
+            self.mmc = Core(convert_camel_case=False)
         
+        else:
+            raise Exception(f'Attempting to initialize mmc object with unrecognized backend {acquisition_backend}')
+            
         # Get ROI
         roi_obj = self.mmc.getROI()
         if self.config.backend == "pycromanager":
@@ -892,6 +923,23 @@ class MicroManagerBackend(BaseHardwareBackend):
         self._apply_device_properties()
         self._apply_device_configs()
         self._apply_system_properties()
+
+        # Based on config, initiate z-stack configuration if multi-plane
+        try:
+            stage_cfg = self.config.system_devices.stage if self.config.system_devices else None
+            if stage_cfg and getattr(stage_cfg, 'num_z_planes', None) and stage_cfg.num_z_planes > 1:
+                num_planes = self.config.system_devices.stage.num_z_planes
+                z_step = self.config.system_devices.stage.z_step_size_um
+                ttl_state = self.config.system_devices.stage.ttl_state
+                ttl_device = self.config.system_devices.stage.ttl_device
+
+                # Split z planes symmetrically around 0; assumes current position is center
+                z_start = -(num_planes//2) * z_step
+                z_end = num_planes//2 * z_step
+                self._stage.configure_z_stack(z_start=z_start, z_end=z_end, z_step=z_step, num_planes=num_planes, ttl_device=ttl_device, ttl_state=ttl_state)
+        except Exception as err:
+            logger.error(f'Error while configuring z-stack: {err}')
+            raise(err)
         
         self._initialized = True
         logger.info("Micro-Manager backend initialized")
@@ -903,15 +951,22 @@ class MicroManagerBackend(BaseHardwareBackend):
         if self._camera:
             self._camera.stop_acquisition()
         
-        # Use MMSubroutines.close for cleanup
         if self.mmc:
+
             # Build minimal args for close function
-            args = {
-                "gooey_args": {
-                    "microscope_name": self.config.microscope_name or "unknown",
-                }
-            }
-            MMSubroutines.close(self.mmc, args)
+            # hardcoded
+            try: 
+                laserTTLs = "TTL1-8"
+                stage = self.mmc.getFocusDevice()
+                self.mmc.stopStageSequence(stage)
+                self.mmc.waitForDevice(stage)
+                self.mmc.setPosition(stage, 0)
+                self.mmc.waitForDevice(stage)
+                self.mmc.stopPropertySequence(laserTTLs, "State")
+
+            # fail clunkily :)
+            except Exception as err:
+                logging.warning("Error during MMSubroutines.close(): {}".format(err))
         
         self._initialized = False
         logger.info("Micro-Manager backend closed")
@@ -922,13 +977,71 @@ class MicroManagerBackend(BaseHardwareBackend):
             return {}
         
         # Use MMSubroutines.get_metadata
-        args = {
-            "gooey_args": {
-                "microscope_name": self.config.microscope_name or "unknown",
-            }
+        # args = {
+        #     "gooey_args": {
+        #         "microscope_name": self.config.microscope_name or "unknown",
+        #     }
+        # }
+        cam = self.mmc.getCameraDevice()
+        binning = self.mmc.getProperty(cam, "Binning")
+
+        metadata = {
+            "binning": binning,
+            "exposure": self.mmc.getExposure(),
         }
-        metadata = MMSubroutines.get_metadata(args, self.mmc)
-        metadata['backend'] = self.config.backend
+
+        # intensity_405 = self.mmc.getProperty("DAC405", "Volts")
+        # intensity_488 = self.mmc.getProperty("DAC488", "Volts")
+        # intensity_561 = self.mmc.getProperty("DAC561", "Volts")
+        # intensity_639 = self.mmc.getProperty("DAC639", "Volts")
+        # more_metadata = {
+        #     "camera_mode": self.mmc.getCurrentConfig("Camera Mode"),
+        #     "objective": self.mmc.getCurrentConfig("Objective"),
+        #     "intensity_488": intensity_488,
+        #     "intensity_561": intensity_561,
+        #     "intensity_405": intensity_405,
+        #     "intensity_639": intensity_639,
+        # }
+        # metadata.update(more_metadata)
+
+        metadata['backend_name'] = self.config.backend
+
+        # Collect all device properties
+        device_properties = {}
+        try:
+            loaded_devices_j = self.mmc.getLoadedDevices()
+            loaded_devices = [loaded_devices_j.get(i) for i in range(loaded_devices_j.size())] # cast to list
+            for device_label in loaded_devices:
+                props = {}
+                try:
+                    prop_names_j = self.mmc.getDevicePropertyNames(device_label)
+                    prop_names = [prop_names_j.get(i) for i in range(prop_names_j.size())]
+                    for prop_name in prop_names:
+                        try:
+                            props[prop_name] = self.mmc.getProperty(device_label, prop_name)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                device_properties[device_label] = props
+        except Exception as e:
+            logger.warning(f"Could not collect device properties: {e}")
+        metadata['device_properties'] = device_properties
+
+        # Collect config group current presets
+        config_groups = {}
+        try:
+            groups_j = self.mmc.getAvailableConfigGroups()
+            groups = [groups_j.get(i) for i in range(groups_j.size())]
+            for group_name in groups:
+                try:
+                    config_groups[group_name] = self.mmc.getCurrentConfig(group_name)
+                except Exception:
+                    config_groups[group_name] = None
+        except Exception as e:
+            logger.warning(f"Could not collect config groups: {e}")
+        metadata['config_groups'] = config_groups
+
         return metadata
     
     def get_mmc(self):
@@ -951,7 +1064,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         Sets properties using mmc.setProperty() for each device configured
         in HardwareConfig.devices.
         """
-        if not self.config.devices:
+        if not getattr(self.config, 'devices', None):
             return
         
         for device_key, device_config in self.config.devices.items():
@@ -980,7 +1093,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         Sets Micro-Manager config group presets using mmc.setConfig() for each
         device configured in HardwareConfig.devices.
         """
-        if not self.config.devices:
+        if not getattr(self.config, 'devices', None):
             return
         
         for device_key, device_config in self.config.devices.items():
@@ -1021,7 +1134,8 @@ class MicroManagerBackend(BaseHardwareBackend):
                 # Note: setCircularBufferMemoryFootprint unit may vary by Micro-Manager version
                 # Existing code uses values like 10000 directly. We pass MB value as-is to match
                 # existing behavior. If your Micro-Manager version expects bytes, multiply by 1024*1024.
-                self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                # self.mmc.setCircularBufferMemoryFootprint(sys_props.circular_buffer_mb)
+                self.mmc.setCircularBufferMemoryFootprint(10000)
                 logger.debug(f"Set circular_buffer_memory_footprint = {sys_props.circular_buffer_mb}")
             except Exception as e:
                 logger.warning(f"Could not set circular_buffer_memory_footprint: {e}")

@@ -5,3 +5,9 @@
 demo/demo_output/
 test_output/
 demo_output/
+demo_output_hardware/
+
+# Claude
+CLAUDE.md
+.claude/
+.claudeignore
