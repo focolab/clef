@@ -186,8 +186,8 @@ class TestHardwareManagerMetadata:
         
         metadata = manager.get_metadata()
         assert isinstance(metadata, dict)
-        assert 'backend' in metadata
-        assert metadata['backend'] == 'dummy'
+        assert 'backend_metadata' in metadata
+        assert metadata['backend_metadata']['backend'] == 'dummy'
     
     def test_get_metadata_before_initialization(self, minimal_hardware_config):
         """Test get_metadata returns empty dict before initialization."""

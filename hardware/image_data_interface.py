@@ -105,8 +105,9 @@ class ImageDataInterface(DataInterface):
                 false_grab_count += 1
                 logger.debug(f"False grab #{false_grab_count}: {err}")
 
-        # append sample to sample vec
-        self.store_sample(img)
+        # append sample to sample vec (only if buffer is configured)
+        if self.sample_ndx < self.samples.shape[0] and len(self.samples.shape) == 3:
+            self.store_sample(img)
             
         # Fall back to single frame acquisition
         self.sample_time_list.append(time.time())
