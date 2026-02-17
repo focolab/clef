@@ -24,10 +24,9 @@ class InputStimulusController(BaseStimulusController):
     def __init__(self, hardware_manager):
         """
         Initialize input stimulus controller.
-        
+
         Args:
             hardware_manager: HardwareManager instance
-            config: Configuration dictionary
         """
         super().__init__(hardware_manager)
         
@@ -47,18 +46,7 @@ class InputStimulusController(BaseStimulusController):
             logger.error("pynput not available - input stimulus disabled")
             self.keyboard = None
             self.mouse = None
-        
-        # Parse config for default input sequences
-        # gooey_args = config.get("gooey_args", {})
-        
-        # Default keyboard sequence (can be overridden per stimulus)
-        # self.default_keys = self._parse_key_sequence(
-        #     gooey_args.get("default_key_sequence", ["space"])
-        # )
 
-        # Default mouse action
-        # self.default_mouse_action = gooey_args.get("default_mouse_action", "click")
-        # self.default_mouse_button = gooey_args.get("default_mouse_button", "left")
         self.default_keys = ['space']
         self.default_mouse_action = 'click'
         self.default_mouse_button = 'left'

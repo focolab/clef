@@ -76,17 +76,6 @@ class AlgorithmRegistry:
             return
         
         logger.info("Initializing algorithm registry...")
-        
-        # Import and register algorithms
-        # Register DummyAlg if available
-        # if DummyAlg is not None:
-        #     self.register("dummy", DummyAlg)
-        #     self.register("Dummy algorithm (does nothing)", DummyAlg)
-        
-        # # Register Brainalyzer if available
-        # if Brainalyzer is not None:
-        #     self.register("Brainalyzer", Brainalyzer)
-        #     self.register("brainalyzer", Brainalyzer)
 
         try:
             # from algorithms.brainalyzer import Brainalyzer
@@ -125,37 +114,6 @@ class AlgorithmRegistry:
             logger.info("Registered RingAttractorAlgorithm")
         except ImportError as e:
             logger.warning(f"Could not import RingAttractorAlgorithm: {e}")
-
-        # try:
-        #     from lib import DynamicRangeDeriv
-        #     self.register("Dynamic range deriv", DynamicRangeDeriv.DynamicRangeDeriv)
-        # except ImportError as e:
-        #     logger.warning(f"Could not import DynamicRangeDeriv: {e}")
-        
-        # try:
-        #     from lib import RoiDeriv
-        #     self.register("RoiDeriv", RoiDeriv.RoiDeriv)
-        # except ImportError as e:
-        #     logger.warning(f"Could not import RoiDeriv: {e}")
-        
-        # try:
-        #     from lib import StimOnsetFromList
-        #     self.register("StimOnsetFromList", StimOnsetFromList.StimOnsetFromList)
-        # except ImportError as e:
-        #     logger.warning(f"Could not import StimOnsetFromList: {e}")
-        
-        # try:
-        #     from lib import PointAndClick
-        #     self.register("PointAndClick", PointAndClick.PointAndClick)
-        # except ImportError as e:
-        #     logger.warning(f"Could not import PointAndClick: {e}")
-        
-        # try:
-        #     from lib import HammerOfDawn
-        #     self.register("HammerOfDawn", HammerOfDawn.HammerOfDawn)
-        # except ImportError as e:
-        #     logger.warning(f"Could not import HammerOfDawn: {e}")
-        
 
         self._initialized = True
         logger.info(f"Algorithm registry initialized with {len(self._registry)} algorithms")

@@ -64,21 +64,6 @@ class PolygonStimulusController(BaseStimulusController):
             icx = np.array(calib['icx'])
             icy = np.array(calib['icy'])
             logger.info(f'Spooling Polygon')
-            
-            # Spool based on trigger algorithm
-            # if self.trigger_alg in ["PointAndClick", "HammerOfDawn"]:
-            # stim_diameter = 20  # default
-            # trash = numba_utils.generate_pg_ellipse_mask(
-            #     DSI_IMGWIDTH // 2,
-            #     DSI_IMGHEIGHT // 2,
-            #     pcx, pcy, icx, icy,
-            #     stim_diameter,
-            #     self.roi[0], self.roi[1],
-            #     DSI_IMGWIDTH, DSI_IMGHEIGHT,
-            # )
-
-            # todo we need to read the appropriate algorithm selected from config here
-            # if self.trigger_alg == 'Brainalyzer':
             # Spool multi-rectangle mask generation
             ix_arr = np.array([600, 700, 800, 900])
             iy_arr = np.array([100, 200, 300, 400])
