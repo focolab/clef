@@ -1,7 +1,42 @@
-<<<<<<< HEAD
-# Closed-Loop Control of Action Selection (CLEF)
-A real-time closed-loop system for whole-brain volumetric calcium imaging and stimulus control.
-=======
-# clef
-Closed-Loop Experimental Framework (CLEF): A platform for enabling closed-loop experimental design.  
->>>>>>> 8a4a3a330f682cce63a7e0989a5d71c2d9cc7cdc
+# CLEF
+
+Closed-Loop Experimental Framework for real-time microscopy and stimulus control.
+
+## Installation
+
+```bash
+# Base install (core engine only)
+pip install clef
+
+# With GUI demos
+pip install clef[demos]
+
+# Full environment (microscope + imaging + dev tools)
+pip install clef[all]
+```
+
+## Usage
+
+```bash
+# Run with config files
+clef --hardware config/demo/demo_lorenz_hardware.yaml \
+     --experiment config/demo/demo_lorenz_experiment.yaml \
+     --algorithm config/demo/demo_lorenz_algorithm.yaml
+
+# Validate configs
+clef --validate-config --hardware config/demo/demo_lorenz_hardware.yaml
+```
+
+## Development
+
+```bash
+# Install editable with all dependencies
+pip install -e .[all]
+
+# Run tests
+pytest tests/ --ignore=tests/hardware_physical -v
+```
+
+## License
+
+MIT

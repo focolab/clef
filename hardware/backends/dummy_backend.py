@@ -7,7 +7,7 @@ for testing without real hardware.
 
 import logging
 import numpy as np
-import tifffile as tf
+# tifffile imported lazily when needed
 import time
 from typing import Dict, Any, Optional, Tuple, Union
 
@@ -45,6 +45,7 @@ class DummyCamera(CameraInterface):
         self.input_data = None
         if input_file:
             try:
+                import tifffile as tf
                 self.input_data = tf.imread(input_file)
                 if len(self.input_data.shape) == 4: # TZYX
                     self.height = self.input_data.shape[2]
