@@ -16,7 +16,7 @@ system_devices:
     device_name: "DummyCamera"
     device_type: "camera"
     properties:
-      Exposure: 100.0
+      Exposure: 50.0
       Binning: "1x1"
 
   stage:
@@ -25,7 +25,7 @@ system_devices:
     configs: {}
     properties: {}
     z_step_size_um: 2.5
-    num_z_planes: 12
+    num_z_planes: 8
 
   # Illumination channels
   illumination_channels:
