@@ -5,12 +5,28 @@ Closed-Loop Experimental Framework for real-time microscopy and stimulus control
 ## Installation
 
 ```bash
-# Create a virtual environment
-conda create -n clef python
+# Clone the repository
+git clone https://github.com/focolab/clef.git
+cd clef
+
+# Create and activate a virtual environment (choose one):
+# Using conda:
+conda create -n clef python>=3.10
 conda activate clef
 
-# Install with demo dependencies (while in clef directory)
+# Using venv:
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install with package manager of choice:
+# pip:
 pip install -e .[demos]
+
+# uv:
+uv pip install -e ".[demos]"
+
+# poetry:
+poetry install --extras demos
 ```
 
 ## Usage

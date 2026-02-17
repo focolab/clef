@@ -32,21 +32,7 @@ class BaseStimulusController(ABC):
             hardware_manager: HardwareManager instance for hardware operations
         """
         self.hardware_manager = hardware_manager
-        # self.config = config
-        
-        # # Extract common config values
-        # self.rec_id = config.get("id")
-        # self.roi = config.get("roi")
-        # self.savedir = config.get("saveroot")
-        
-        # Gooey args
-        # gooey_args = config.get("gooey_args", {})
-        # self.zsize = gooey_args.get("zsize")
-        # self.stim_interface = gooey_args.get("stim_interface")
-        # self.acquisition_backend = gooey_args.get("acquisition_backend")
-        # self.trigger_alg = gooey_args.get("trigger_algorithm")
-        # self.microscope_name = gooey_args.get("microscope_name")
-        
+
         # Timing tracking (from old StimBaseClass)
         self.stim_on_list = []
         self.stim_off_list = []
@@ -54,10 +40,6 @@ class BaseStimulusController(ABC):
         self.stim_off_time_list = []
         self.stim_intensity_list = []
         self.stim_param_list = []
-        
-        # Timers
-        # self.submit_stim_params_time_list = []
-        # self.process_stim_params_event_time_list = []
     
     @abstractmethod
     def submit_stim_params(self, stim_params: Dict[str, Any], image_ndx: int) -> None:

@@ -63,11 +63,11 @@ class Brainalyzer:
     ):
         """
         Initialize Brainalyzer algorithm with Config objects.
-        
+
         Args:
             algorithm_config: Algorithm configuration (GUI mode, params, stimulus)
             experiment_config: Experiment configuration (acquisition, subject, output)
-            hardware_config: Hardware configuration (optional, for behavior mode)
+            hardware_manager: Optional HardwareManager instance (for behavior mode)
             local_handles: Dictionary with optional handles (e.g., {'mmc': mmc_instance})
             args: slated for deprecation
         """

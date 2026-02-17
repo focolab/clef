@@ -1,15 +1,10 @@
 import numpy as np
-
-# import napari
 import json
 import logging
-# import scipy.io
 import pickle
 import platform
 from os import path
 import codecs
-# import numba
-# from numba import jit
 
 # conditional import, necessary for standalone testing
 try:
@@ -50,72 +45,6 @@ def save_metadata(savefilename, metadata):
 def generate_mip_movie(savefilename, frames, zsize, exposure, quality=6, bitrate="10M", GUI_mode='neural_imaging'):
     """Stub: MIP movie generation removed."""
     logging.debug("generate_mip_movie: stub, no-op")
-
-
-# def prefill_wb_ops(
-#     savefileroot,
-#     metadata,
-#     meta_template_fname="res/meta_template.mat",
-#     wboptions_template_fname="res/wboptions_template.mat",
-# ):
-    
-#     import scipy.io
-
-#     # load
-#     try:
-#         meta = scipy.io.loadmat(meta_template_fname)
-#         wbops = scipy.io.loadmat(wboptions_template_fname)
-#     except FileNotFoundError as err:
-#         logging.exception(
-#             "Error while trying to load wb-matlab template param files: {}".format(err)
-#         )
-#         return
-
-#     try:
-#         # grab fields from metadata
-#         num_frames = metadata["gooey_args"]["total_frames"]
-#         zsize = metadata["gooey_args"]["zsize"]
-#         total_time = metadata["frame_time_list"][-1]
-#         rec_id = metadata["id"]
-
-#         # prefill form fields eww gross
-#         meta["totalTime"][0][0] = total_time
-
-#         meta["fileInfoOverride"][0][0][0][0] = np.array([num_frames // zsize])
-#         meta["fileInfoOverride"][0][0][1][0] = np.array([zsize])
-#         meta["fileInfoOverride"][0][0][2][0] = np.array([1])
-
-#         if "stim_metadata" in metadata:
-#             ons = metadata["stim_metadata"]["stim_onset_times_simple"]
-#             meta["stimulus"][0][0][2] = np.array(ons)
-
-#         meta["fileInfo"][0][0][1][0][0] = np.array(rec_id + ".tiff")
-
-#         # x
-#         meta["fileInfo"][0][0][2][0][0] = metadata["xsize"]
-#         meta["fileInfo"][0][0][6][0][0] = metadata["xsize"]
-
-#         # y
-#         meta["fileInfo"][0][0][3][0][0] = metadata["ysize"]
-#         meta["fileInfo"][0][0][7][0][0] = metadata["ysize"]
-
-#         # total frames
-#         meta["fileInfo"][0][0][4][0][0] = num_frames
-#         meta["fileInfo"][0][0][5][0][0] = num_frames
-
-#     except Exception as err:
-#         logging.exception(
-#             "Error while setting prefilled wb-matlab form fields: {}".format(err)
-#         )
-#         return
-
-#     # write
-#     try:
-
-#         meta_savefilename = savefileroot + "/meta.mat"
-#         wbops_savefilename = savefileroot + "/wboptions.mat"
-#         scipy.io.savemat(meta_savefilename, meta)
-#         scipy.io.savemat(wbops_savefilename, wbops)
 
 #     except Exception as err:
 #         logging.exception(

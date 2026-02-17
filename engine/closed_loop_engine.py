@@ -18,7 +18,6 @@ import numpy as np
 
 # Custom libraries and utils
 from utils import wbliveUtils
-# from utils import MMSubroutines  # Legacy - unused
 
 # Import config models
 from config.config_manager import (
@@ -156,8 +155,7 @@ class ClosedLoopEngine:
             self.alg = create_algorithm(
                 algorithm_config=self.algorithm_config,
                 experiment_config=self.experiment_config,
-                hardware_manager=self.hardware, 
-                # local_handles={"mmc": self.mmc} # now optionally in hardware_manager
+                hardware_manager=self.hardware,
             )
             
             # Initialize the algorithm's internal model
@@ -197,7 +195,6 @@ class ClosedLoopEngine:
             self.stim_controller = create_stimulus_controller(
                 stim_interface=stim_interface,
                 hardware_manager=self.hardware,
-                # config=self.args  # Still passing args for backward compatibility
             )
 
             # Spool controller

@@ -233,86 +233,11 @@ class ImageDataInterface(DataInterface):
         """Clear camera circular buffer."""
         self.camera.clear_buffer()
         logger.debug("Cleared image buffer")
-    
-    # def get_sampling_rate(self) -> Optional[float]:
-    #     """
-    #     Calculate approximate sampling rate from exposure time.
-        
-    #     Returns:
-    #         Approximate frame rate in Hz based on exposure time
-    #     """
-    #     exposure_ms = self.camera.get_exposure()
-    #     if exposure_ms > 0:
-    #         # This is approximate - actual rate may be lower due to readout time
-    #         return 1000.0 / exposure_ms
-    #     return None
-    
-    # def set_sampling_rate(self, rate_hz: float) -> None:
-    #     """
-    #     Set frame rate by adjusting exposure time.
-        
-    #     Note: This sets an upper bound. Actual rate may be limited by
-    #     camera readout time and other factors.
-        
-    #     Args:
-    #         rate_hz: Target frame rate in Hz
-    #     """
-    #     if rate_hz <= 0:
-    #         raise ValueError(f"Sampling rate must be positive, got {rate_hz}")
-        
-    #     exposure_ms = 1000.0 / rate_hz
-    #     self.camera.set_exposure(exposure_ms)
-    #     logger.debug(f"Set target sampling rate to {rate_hz} Hz (exposure={exposure_ms} ms)")
-    
+
     @property
     def data_type_name(self) -> str:
         """Get data type name."""
         return "microscopy_image"
-    
-    # Legacy camera access for backward compatibility
-    # This allows existing code to access camera methods directly
-    
-    # def get_camera(self) -> CameraInterface:
-    #     """
-    #     Get underlying camera interface.
-        
-    #     This is provided for backward compatibility with code that
-    #     directly accesses camera methods.
-        
-    #     Returns:
-    #         CameraInterface instance
-    #     """
-    #     return self.camera
-    
-    # def snap_image(self) -> None:
-    #     """
-    #     Trigger single image snap (for strobe acquisition).
-        
-    #     Delegates to camera's snap_image() method.
-    #     """
-    #     self.camera.snap_image()
-    
-    # def get_image(self) -> np.ndarray:
-    #     """
-    #     Get most recently snapped image.
-        
-    #     Delegates to camera's get_image() method.
-        
-    #     Returns:
-    #         Most recent image as numpy array
-    #     """
-    #     return self.camera.get_image()
-    
-    # def pop_next_image(self) -> np.ndarray:
-    #     """
-    #     Pop next image from buffer.
-        
-    #     Delegates to camera's pop_next_image() method.
-        
-    #     Returns:
-    #         Next buffered image as numpy array
-    #     """
-    #     return self.camera.pop_next_image()
 
 
 # Factory function for creating image data interfaces

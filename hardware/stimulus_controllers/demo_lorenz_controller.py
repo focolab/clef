@@ -16,11 +16,10 @@ class LorenzStimulusController(DummyStimulusController):
 
     def __init__(self, hardware_manager):
         """
-        Initialize dummy stimulus controller.
-        
+        Initialize Lorenz demo stimulus controller.
+
         Args:
             hardware_manager: HardwareManager instance
-            config: Configuration dictionary
         """
         super().__init__(hardware_manager)
     

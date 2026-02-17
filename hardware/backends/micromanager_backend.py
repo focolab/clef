@@ -23,9 +23,6 @@ from utils import numba_utils
 
 logger = logging.getLogger(__name__)
 
-# Import MMSubroutines to use existing initialization logic
-# from utils import MMSubroutines
-
 # Import JavaObject for pycromanager ASI stage buffer
 try:
     from pycromanager import JavaObject
@@ -870,21 +867,7 @@ class MicroManagerBackend(BaseHardwareBackend):
         """
         logger.info(f"Initializing Micro-Manager backend: {self.config.backend}")
 
-        # Build args dict for MMSubroutines (temporary bridge)
-        # This will be removed when MMSubroutines is fully refactored
-        # args = {
-        #     "gooey_args": {
-        #         "acquisition_backend": self.config.backend,
-        #         "microscope_name": self.config.microscope_name or "unknown",
-        #         "input_recording": input_recording,
-        #     }
-        # }
         acquisition_backend = self.config.backend_configuration.backend_name
-        # microscope_name = self.config.microscope_name or "unknown"
-        
-        # Use config file from HardwareConfig
-        # config_file = self.config.mm_config_path
-        
         # Initialize MMC using existing function
         if acquisition_backend == 'test' or acquisition_backend == 'dummy':
             self.mmc = DummyMMC.DummyMMC()
@@ -989,20 +972,6 @@ class MicroManagerBackend(BaseHardwareBackend):
             "binning": binning,
             "exposure": self.mmc.getExposure(),
         }
-
-        # intensity_405 = self.mmc.getProperty("DAC405", "Volts")
-        # intensity_488 = self.mmc.getProperty("DAC488", "Volts")
-        # intensity_561 = self.mmc.getProperty("DAC561", "Volts")
-        # intensity_639 = self.mmc.getProperty("DAC639", "Volts")
-        # more_metadata = {
-        #     "camera_mode": self.mmc.getCurrentConfig("Camera Mode"),
-        #     "objective": self.mmc.getCurrentConfig("Objective"),
-        #     "intensity_488": intensity_488,
-        #     "intensity_561": intensity_561,
-        #     "intensity_405": intensity_405,
-        #     "intensity_639": intensity_639,
-        # }
-        # metadata.update(more_metadata)
 
         metadata['backend_name'] = self.config.backend
 

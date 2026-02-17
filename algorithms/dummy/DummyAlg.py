@@ -83,10 +83,10 @@ class DummyAlg:
     def process_sample(self, img, sample_ndx):
         """
         Process a single frame.
-        
+
         Args:
             img: Image array (numpy array)
-            zndx: Z-plane index
+            sample_ndx: Sample index
         """
         self.sample_count = self.sample_count + 1
 
