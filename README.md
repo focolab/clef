@@ -19,12 +19,12 @@ pip install clef[all]
 
 ```bash
 # Run with config files
-clef --hardware config/demo/demo_lorenz_hardware.yaml \
-     --experiment config/demo/demo_lorenz_experiment.yaml \
-     --algorithm config/demo/demo_lorenz_algorithm.yaml
+clef --hardware config/demo/demo_ring_attractor_hardware.yaml \
+     --experiment config/demo/demo_ring_attractor_experiment.yaml \
+     --algorithm config/demo/demo_ring_attractor_algorithm.yaml
 
 # Validate configs
-clef --validate-config --hardware config/demo/demo_lorenz_hardware.yaml
+clef --validate-config --hardware config/demo/demo_ring_attractor_hardware.yaml
 ```
 
 ## Development
