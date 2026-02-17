@@ -1,7 +1,6 @@
 import time
 import sys
 import numpy as np
-import tifffile as tf
 from datetime import datetime
 import logging
 import os
