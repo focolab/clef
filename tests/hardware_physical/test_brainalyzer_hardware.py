@@ -164,17 +164,7 @@ class TestPolygonStimulusController:
         logger.info('Configuring stimulus device')
         hardware.stimulus.configure_stimulus(config={'interface_type': stim_interface})
 
-        # Build legacy args for controller
-        args = {
-            # "gooey_args": {
-            #     "trigger_algorithm": "Brainalyzer",
-            #     "stim_interface": stim_interface
-            # },
-            # "roi": [0, 0, 2048, 2048]
-            "roi": hardware.camera.get_roi()
-        }
-        
-        controller = PolygonStimulusController(hardware, args)
+        controller = PolygonStimulusController(hardware)
         controller.spool()
         
         yield controller

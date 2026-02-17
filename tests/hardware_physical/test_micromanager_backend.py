@@ -180,14 +180,16 @@ class TestStageOperations:
     def test_configure_zstack(self, stage_connected):
         """Test configuring Z-stack sequence."""
         logger.info("Testing Z-stack configuration...")
-        
+
         config = {
             "z_start": -10.5,
             "z_end": 10.5,
             "z_step": 3.0,
-            "pad_z": 0
+            "pad_z": 0,
+            "ttl_device": "TTL1-8",
+            "ttl_state": "18"
         }
-        
+
         stage_connected.configure_stage(config)
         logger.info("✓ Z-stack configured successfully")
 
@@ -280,16 +282,24 @@ class TestDataInterface:
         assert dtype == np.uint16
         logger.info(f"✓ Sample dtype: {dtype}")
     
-    def test_sample_single_frame(self, data_interface_connected, camera_connected):
+    def test_sample_single_frame(self, data_interface_connected, camera_connected, innovation_core_config):
         """Test sampling a single frame via data interface."""
         logger.info("Testing single frame sampling...")
-        
+
+        # Configure experiment config for sampling
+        from config.config_manager import ConfigManager
+        config_manager = ConfigManager()
+        config_manager.load_experiment_config("config/demo/hardware_physical_experiment.yaml")
+
+        # Configure sampling buffer
+        data_interface_connected.configure_sampling(config_manager.experiment_config)
+
         # Start acquisition
         camera_connected.start_acquisition(buffer_size=10)
-        
+
         import time
         time.sleep(0.2)
-        
+
         # Sample frame
         frame = data_interface_connected.sample_data()
         
@@ -374,7 +384,9 @@ class TestIntegratedAcquisition:
             "z_start": -z_step,
             "z_end": z_step,
             "z_step": z_step,
-            "pad_z": 0
+            "pad_z": 0,
+            "ttl_device": "TTL1-8",
+            "ttl_state": "18"
         }
         stage.configure_stage(stage_config)
         
