@@ -39,8 +39,9 @@ from config.config_manager import (
     AlgorithmConfig,
     AcquisitionConfig,
     SubjectMetadata,
-    AlgorithmConfiguration,
+    AlgorithmParameters,
     StimulusParameters,
+    GUIParameters,
 )
 from engine.closed_loop_engine import ClosedLoopEngine
 
@@ -96,18 +97,20 @@ def create_demo_configs(input_tiff_path: str) -> dict:
     # Algorithm Config - Enable GUI for interactive demo
     algorithm_config = AlgorithmConfig(
         algorithm_type="Brainalyzer",
-        save_algorithm_plot=True,
-        algorithm_configuration=AlgorithmConfiguration(
-            enable_gui=True,
-            gui_mode="neural_imaging",
+        algorithm_params=AlgorithmParameters(
             stim_cooldown_frames=50,
             skip_stimulation_probability=0.0,
             delay_stimulation_probability=0.0,
-            stimulus_params=StimulusParameters(
-                enabled=True,
-                duration_frames_options=[20, 40],
-                intensity_percent_options=[10, 20, 30],
-            ),
+        ),
+        stimulus_params=StimulusParameters(
+            enabled=True,
+            duration_frames_options=[20, 40],
+            intensity_percent_options=[10, 20, 30],
+        ),
+        gui_params=GUIParameters(
+            enable_gui=True,
+            gui_mode="neural_imaging",
+            save_algorithm_plot=True,
         ),
     )
     

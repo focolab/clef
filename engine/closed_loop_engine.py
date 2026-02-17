@@ -527,8 +527,9 @@ def create_test_config() -> dict[str, Any]:
         BackendConfiguration,
         StimulusConfiguration,
         SystemProperties,
-        AlgorithmConfiguration,
+        AlgorithmParameters,
         StimulusParameters,
+        GUIParameters,
     )
 
     hardware_config = HardwareConfig(
@@ -554,15 +555,14 @@ def create_test_config() -> dict[str, Any]:
         subject=subject_metadata,
     )
 
-    stimulus_params = StimulusParameters(
-        enabled=False,
-    )
-
     algorithm_config = AlgorithmConfig(
         algorithm_type="dummy",
-        algorithm_configuration=AlgorithmConfiguration(
+        algorithm_params=AlgorithmParameters(),
+        stimulus_params=StimulusParameters(enabled=False),
+        gui_params=GUIParameters(
             enable_gui=False,
-            stimulus_params=stimulus_params,
+            gui_mode='none',
+            save_algorithm_plot=False,
         ),
     )
     

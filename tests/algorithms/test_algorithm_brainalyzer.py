@@ -22,6 +22,7 @@ from config.config_manager import (
     SubjectMetadata,
     AlgorithmParameters,
     StimulusParameters,
+    GUIParameters,
     SystemDevices,
     DeviceConfig,
 )
@@ -36,13 +37,16 @@ class TestBrainalyzerInitialization:
         """Create test algorithm config."""
         return AlgorithmConfig(
             algorithm_type="Brainalyzer",
-            enable_gui=False,  # No GUI for unit tests
-            gui_mode="neural_imaging",
             algorithm_params=AlgorithmParameters(
                 stimulus_diameter_pixels=30,
             ),
             stimulus_params=StimulusParameters(
                 enabled=False,
+            ),
+            gui_params=GUIParameters(
+                enable_gui=False,  # No GUI for unit tests
+                gui_mode="neural_imaging",
+                save_algorithm_plot=False,
             ),
         )
     
@@ -336,9 +340,14 @@ class TestBrainalyzerMetadata:
         
         algorithm_config = AlgorithmConfig(
             algorithm_type="Brainalyzer",
-            gui_mode="neural_imaging",
+            algorithm_params=AlgorithmParameters(),
             stimulus_params=StimulusParameters(
                 enabled=False
+            ),
+            gui_params=GUIParameters(
+                enable_gui=False,
+                gui_mode="neural_imaging",
+                save_algorithm_plot=False,
             ),
         )
         
@@ -380,9 +389,14 @@ class TestBrainalyzerBehaviorMode:
         
         algorithm_config = AlgorithmConfig(
             algorithm_type="Brainalyzer",
-            gui_mode="behavior",  # Behavior mode
+            algorithm_params=AlgorithmParameters(),
             stimulus_params=StimulusParameters(
                 enabled=False,
+            ),
+            gui_params=GUIParameters(
+                enable_gui=False,
+                gui_mode="behavior",  # Behavior mode
+                save_algorithm_plot=False,
             ),
         )
         

@@ -159,17 +159,19 @@ def algorithm_yaml(temp_config_dir):
     """Create algorithm YAML."""
     config = {
         'algorithm_type': 'brainalyzer',
-        'save_algorithm_plot': True,
-        'algorithm_configuration': {
-            'enable_gui': True,
-            'gui_mode': 'neural_imaging',
+        'algorithm_params': {
             'threshold': 0.5,
             'window_size': 10,
-            'stimulus_params': {
-                'enabled': True,
-                'power': 80.0,
-                'duration_ms': 100.0
-            }
+        },
+        'stimulus_params': {
+            'enabled': True,
+            'power': 80.0,
+            'duration_ms': 100.0
+        },
+        'gui_params': {
+            'enable_gui': True,
+            'gui_mode': 'neural_imaging',
+            'save_algorithm_plot': True,
         }
     }
     
@@ -220,10 +222,12 @@ def default_configs(temp_config_dir):
     # Algorithm default
     algorithm_default = {
         'algorithm_type': 'dummy',
-        'save_algorithm_plot': False,
-        'algorithm_configuration': {
+        'algorithm_params': {},
+        'stimulus_params': {'enabled': False},
+        'gui_params': {
             'enable_gui': False,
-            'stimulus_params': {'enabled': False}
+            'gui_mode': 'none',
+            'save_algorithm_plot': False,
         }
     }
     with open(defaults_dir / "algorithm_default.yaml", 'w') as f:
@@ -363,21 +367,21 @@ def test_load_algorithm_config(temp_config_dir, algorithm_yaml, default_configs)
     """Test loading algorithm config."""
     cm = ConfigManager(package_root=temp_config_dir)
     config = cm.load_algorithm_config(algorithm_yaml)
-    
+
     assert isinstance(config, AlgorithmConfig)
     assert config.algorithm_type == 'brainalyzer'
-    assert config.algorithm_configuration.enable_gui is True
-    assert config.algorithm_configuration.stimulus_params.enabled is True
+    assert config.gui_params.enable_gui is True
+    assert config.stimulus_params.enabled is True
 
 
 def test_algorithm_config_defaults(temp_config_dir, default_configs):
     """Test algorithm config loads with defaults."""
     cm = ConfigManager(package_root=temp_config_dir)
     config = cm.load_algorithm_config()
-    
+
     assert config.algorithm_type == 'dummy'
-    assert config.algorithm_configuration.enable_gui is False
-    assert config.algorithm_configuration.stimulus_params.enabled is False
+    assert config.gui_params.enable_gui is False
+    assert config.stimulus_params.enabled is False
 
 
 # ============================================================================
