@@ -59,14 +59,14 @@ def polygon_config():
     return HardwareConfig(
         backend="dummy",
         stim_interface="InvCore-LDI-Polygon-640",
-        polygon_calibration_path="./test_calibrations.json",
         stimulus_devices={
             "InvCore-LDI-Polygon-640": StimulusDeviceConfig(
                 type="polygon",
                 intensity_device="89 North Laser Diode Illuminator",
                 intensity_property="640 Intensity",
                 shutter_device="89 North Laser Diode Illuminator",
-                slm_device=None
+                slm_device=None,
+                polygon_calibration_path="./test_calibrations.json"
             )
         }
     )

@@ -67,10 +67,10 @@ def polygon_hardware_config():
                 intensity_device="89 North Laser Diode Illuminator",
                 intensity_property="640 Intensity",
                 shutter_device="89 North Laser Diode Illuminator",
-                slm_device=None  # Will be queried from MMC
+                slm_device=None,  # Will be queried from MMC
+                polygon_calibration_path="./test_calibrations.json"
             )
-        },
-        polygon_calibration_path="./test_calibrations.json"
+        }
     )
 
 

@@ -382,27 +382,27 @@ class TestHardwareManagerMetadataWithData:
         """Test hardware metadata includes data interface metadata."""
         hw_manager = HardwareManager(minimal_hardware_config)
         hw_manager.initialize()
-        
+
         metadata = hw_manager.get_metadata()
-        assert 'data' in metadata
-        assert isinstance(metadata['data'], dict)
-    
+        assert 'data_interface' in metadata
+        assert isinstance(metadata['data_interface'], dict)
+
     def test_data_metadata_includes_data_type(self, minimal_hardware_config):
         """Test data metadata includes data_type field."""
         hw_manager = HardwareManager(minimal_hardware_config)
         hw_manager.initialize()
-        
+
         metadata = hw_manager.get_metadata()
-        assert metadata['data']['data_type'] == 'microscopy_image'
-    
+        assert metadata['data_interface']['data_type'] == 'microscopy_image'
+
     def test_data_metadata_includes_shape_dtype(self, minimal_hardware_config):
         """Test data metadata includes shape and dtype."""
         hw_manager = HardwareManager(minimal_hardware_config)
         hw_manager.initialize()
-        
+
         metadata = hw_manager.get_metadata()
-        assert 'shape' in metadata['data']
-        assert 'dtype' in metadata['data']
+        assert 'image_size' in metadata['data_interface']
+        assert 'dtype' in metadata['data_interface']
 
 
 class TestHardwareManagerCameraBackwardCompat:
