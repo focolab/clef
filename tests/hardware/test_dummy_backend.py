@@ -141,10 +141,12 @@ class TestDummyCamera:
     
     def test_dummy_camera_with_input_file(self):
         """Test DummyCamera loads data from input file."""
+        pytest.importorskip("tifffile")
+
         # Create a temporary TIFF file
         with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as f:
             temp_path = f.name
-        
+
         try:
             # Create test data
             test_data = np.random.randint(0, 65536, size=(10, 200, 200), dtype=np.uint16)

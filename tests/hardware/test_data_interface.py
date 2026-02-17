@@ -20,6 +20,8 @@ import json
 import numpy as np
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
+
+pytest.importorskip("tifffile")
 import tifffile as tf
 
 # Add parent directory to path

@@ -154,6 +154,7 @@ def minimal_configs(temp_output_dir):
 @pytest.fixture
 def dummy_tiff_file(temp_output_dir):
     """Create a dummy TIFF file for testing with file input."""
+    pytest.importorskip("tifffile")
     import tifffile as tf
     
     # Create small test dataset
