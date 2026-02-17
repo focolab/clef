@@ -49,8 +49,8 @@ class DisplayRGBAlgorithm:
         self.hardware_manager = hardware_manager
         
         # Extract config parameters
-        gooey_args = self.args.get("gooey_args", {})
-        self.frames_to_grab = gooey_args.get("total_frames", 100)
+        # gooey_args = self.args.get("gooey_args", {})
+        # self.frames_to_grab = gooey_args.get("total_frames", 100)
         
         # Algorithm parameters
         if algorithm_config:

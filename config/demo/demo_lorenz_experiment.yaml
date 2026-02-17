@@ -5,7 +5,7 @@ experimenter: "CLEF_Demo"
 output_dir: "./demo_output/lorenz"
 save_images: true
 save_metadata: true
-save_mip_video: false
+save_sample_video: false
 
 # Acquisition parameters
 acquisition:
@@ -31,14 +31,9 @@ subject:
   orientation:
     nose: null
     vnc: null
-  num_eggs: 0
   notes: "Lorenz attractor with o=10, p=28, b=8/3. Closed-loop perturbation demo."
 
 # Development options
 dev_options:
-  prefill_wb_ops: false
+  # prefill_wb_ops: false
   send_sms_on_completion: false
-
-# Not used for Lorenz demo
-input_recording_path: null
-z_step_size_um: 1.0

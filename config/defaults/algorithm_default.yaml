@@ -4,32 +4,15 @@
 # Algorithm selection
 algorithm_type: "dummy"  # Options: dummy, Brainalyzer, PointAndClick, etc.
 
-# GUI settings
-enable_gui: false
-gui_mode: "neural_imaging"  # Options: neural_imaging, behavior
-save_algorithm_plot: false
-
 # Core algorithm parameters
-algorithm_params:
-  # Cooldown period after stimulation (frames)
-  stim_cooldown_frames: 900  # ~90 sec at 10 fps
-  
-  # Probabilistic stimulus modulation
-  skip_stimulation_probability: 0.0  # 0.0-1.0, probability of skipping a trigger
-  delay_stimulation_probability: 0.0  # 0.0-1.0, probability of delaying a trigger
-  stim_delay_frames_options: [200, 400]  # Delay options in frames
-  
-  # For StimOnsetFromList algorithm
-  stim_onset_list: []  # List of frame indices to trigger stimulation
-  
-  # ROI/stimulus size (pixels)
-  stimulus_diameter_pixels: 10
+algorithm_configuration:
 
-# Stimulus parameters
-stimulus_params:
-  enabled: false
-  randomize: false  # Randomly select from options below
-  duration_frames_options: [48]  # Options for stimulus duration (frames)
-  intensity_percent_options: [10]  # Options for stimulus intensity (%)
-  duration_frames: 48  # Default duration if not randomizing
-  intensity_percent: 10  # Default intensity if not randomizing
+  # GUI settings
+  enable_gui: false
+  gui_mode: "none"  # For multimodal algs e.g. neural_imaging, behavior
+
+  # Stimulus parameters to initialize for algorithm
+  stimulus_params:
+    enabled: false
+
+  save_algorithm_plot: false # Algorithms may provide convenient summary plots

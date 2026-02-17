@@ -1,0 +1,77 @@
+# CLEF Hardware Configuration for Innovation Core LDI + Polygon
+# This configuration defines the LDI laser and Polygon SLM stimulus system
+
+# Hardware backend selection
+backend: "pycromanager"
+
+# Micro-Manager configuration file path
+mm_config_path: "C:\\Program Files\\Micro-Manager-2.0beta\\YOUR_CONFIG.cfg"
+
+# Stimulus interface class
+stim_interface: "InvCore-LDI-Polygon-640"
+
+# Microscope name (temporary, backward compatibility)
+microscope_name: "innovation core ldi polygon"
+
+# Stimulus device configuration
+stimulus_devices:
+  InvCore-LDI-Polygon-640:
+    type: "polygon"
+    intensity_device: "89 North Laser Diode Illuminator"
+    intensity_property: "640 Intensity"
+    shutter_device: "89 North Laser Diode Illuminator"
+    slm_device: null  # Will be queried from MMC via getSLMDevice()
+
+# Device configurations
+devices:
+  camera:
+    device_name: "PrimeBSI"
+    device_type: "camera"
+    properties:
+      ExposeOutMode: "Rolling Shutter"
+    configs: {}
+  
+  ldi:
+    device_name: "89 North Laser Diode Illuminator"
+    device_type: "laser"
+    properties:
+      "640 Intensity": 0  # Initialize to 0
+    configs: {}
+  
+  slm:
+    device_name: "Polygon"  # Or whatever your SLM device is called
+    device_type: "slm"
+    properties: {}
+    configs: {}
+  
+  objective_turret:
+    device_name: "ObjectiveTurret"
+    device_type: "turret"
+    properties: {}
+    configs: {}
+
+# System-level Micro-Manager properties
+system_properties:
+  auto_shutter: false
+  circular_buffer_mb: 10000
+  shutters:
+    - device_name: "89 North Laser Diode Illuminator"
+      state: true  # Open shutter during init
+
+# Strobe settings
+strobe_acquisition: false
+strobe_inter_frame_interval_ms: 80
+
+# Static ROI
+use_static_stim_roi: false
+
+# Illumination channels
+illumination_channels:
+  - name: "640nm LDI"
+    device: "89 North Laser Diode Illuminator"
+    wavelength: 640
+    power: 0
+    exposure_ms: 10.0
+
+# Calibration files
+polygon_calibration_path: "./res/peripherals/MightexPolygon1000/calibrations.json"

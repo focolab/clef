@@ -1,0 +1,40 @@
+# Experiment configuration for Brainalyzer hardware demo
+experiment_name: "brainalyzer_hardware_demo"
+experimenter: "CLEF_Demo"
+output_dir: "./demo_output_hardware"
+save_images: true
+save_metadata: true
+save_sample_video: false
+
+# Acquisition parameters
+acquisition:
+  num_samples: 975 
+
+  # this should be in algorithm or removed
+  baseline_samples: 0 
+
+  # this should be removed
+  save_structural_scan: "none"
+
+# Subject metadata
+# FEWER REQUIRED FIELDS MORE EXTRA FIELDS FOR SUBJECT DETAILS
+subject:
+  subject_id: "demo_subject"
+  subject_type: "C. elegans"
+  genotype: "demo_strain"
+  treatment: null
+  treatment_details:
+    condition: "hardware_validation"
+    atr_concentration_uM: null
+  orientation:
+    nose: null
+    vnc: null
+  notes: "Hardware validation demo with LDI Polygon stimulus"
+
+# THIS SHOULD BE ELSEWHERE
+input_recording_path: null
+
+dev_options: null
+  # prefill_wb_ops: false
+  # send_sms_on_completion: false
+

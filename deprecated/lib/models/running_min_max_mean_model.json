@@ -1,8 +1,0 @@
-{
-    "model_name": "SMDV min/max/mean",
-    "model_class": "running_min_max_mean_model",
-    "model_description": "Quantify and transform SMDV and AVA to estimate SMDV phase",
-    "model_inference_instructions": "ROI 1: AVA, ROI 2: SMDV",
-    "model_card": {},
-    "model": {}
-}

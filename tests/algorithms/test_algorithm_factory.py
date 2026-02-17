@@ -37,7 +37,6 @@ def mock_configs():
     algorithm_config.algorithm_params.delay_stimulation_probability = 0.4
     algorithm_config.algorithm_params.stim_delay_frames_options = [200, 400]
     algorithm_config.algorithm_params.stim_onset_list = []
-    algorithm_config.algorithm_params.stimulus_diameter_pixels = 10
     algorithm_config.stimulus_params = Mock()
     algorithm_config.stimulus_params.duration_frames_options = [48]
     algorithm_config.stimulus_params.intensity_percent_options = [10]
@@ -47,19 +46,19 @@ def mock_configs():
     experiment_config.output_dir = "./test_output"
     experiment_config.save_images = True
     experiment_config.save_metadata = True
-    experiment_config.save_mip_video = False
+    experiment_config.save_sample_video = False
     experiment_config.input_recording_path = None
-    experiment_config.z_step_size_um = 1.0
+    # experiment_config.z_step_size_um = 1.0
     
     experiment_config.acquisition = Mock()
     experiment_config.acquisition.num_samples = 100
-    experiment_config.acquisition.z_planes = 10
-    experiment_config.acquisition.save_structural_scan = "none"
-    experiment_config.acquisition.baseline_samples = 0
+    # experiment_config.acquisition.z_planes = 10
+    # experiment_config.acquisition.save_structural_scan = "none"
+    # experiment_config.acquisition.baseline_samples = 0
     
     experiment_config.subject = Mock()
     experiment_config.subject.genotype = "test_strain"
-    experiment_config.subject.num_eggs = 0
+    # experiment_config.subject.num_eggs = 0
     experiment_config.subject.notes = ""
     experiment_config.subject.treatment_details = Mock()
     experiment_config.subject.treatment_details.condition = ""
@@ -69,18 +68,15 @@ def mock_configs():
     experiment_config.subject.orientation.vnc = "up"
     
     experiment_config.dev_options = Mock()
-    experiment_config.dev_options.prefill_wb_ops = False
+    # experiment_config.dev_options.prefill_wb_ops = False
     experiment_config.dev_options.send_sms_on_completion = False
     
     # Mock HardwareConfig
     hardware_config = Mock()
     hardware_config.backend = "dummy"
-    hardware_config.mm_config_path = "test.cfg"
     hardware_config.stim_interface = "dummy"
     hardware_config.microscope_name = "test"
     hardware_config.use_static_stim_roi = False
-    hardware_config.strobe_acquisition = False
-    hardware_config.strobe_inter_frame_interval_ms = 80
     
     return {
         "algorithm": algorithm_config,

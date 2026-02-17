@@ -173,13 +173,14 @@ class HardwareManager:
         if not self._initialized:
             return {}
         
-        metadata = self._backend.get_metadata()
+        base_metadata = {}
+        base_metadata['backend_metadata'] = self._backend.get_metadata()
         
         # Add data interface metadata
         if self._data_interface:
-            metadata['data'] = self._data_interface.get_metadata()
+            base_metadata['data_interface'] = self._data_interface.get_metadata()
         
-        return metadata
+        return base_metadata
     
     def get_backend(self) -> BaseHardwareBackend:
         """

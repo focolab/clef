@@ -13,8 +13,8 @@ from typing import Dict, Any, Tuple, Union, Optional
 
 from hardware.data_interface import DataInterface
 from hardware.camera_interface import CameraInterface
+import tifffile as tf
 from config.config_manager import ExperimentConfig
-from utils import MMSubroutines
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,9 @@ class ImageDataInterface(DataInterface):
         self.strobe_acquisition = False # TODO untested
         self.next_call: float = 0. # Next discrete sample
         self.false_grab_count: int = 0 # Errors thrown while trying to get images from buffer
+
+        # Pointer to sample index
+        self.sample_ndx = 0
         
         # Data buffer for temporary storage
         self.storage_shape = self.get_sample_shape()
@@ -101,11 +104,19 @@ class ImageDataInterface(DataInterface):
             except Exception as err:
                 false_grab_count += 1
                 logger.debug(f"False grab #{false_grab_count}: {err}")
+
+        # append sample to sample vec
+        self.store_sample(img)
             
         # Fall back to single frame acquisition
-        # return self.camera.acquire_frame()
         self.sample_time_list.append(time.time())
         return img
+    
+    def store_sample(self, frame):
+
+        # Note at initialization sample shape is xy, after configure_sampling it becomes tyx
+        self.samples[self.sample_ndx,:] = frame
+        self.sample_ndx += 1
     
     def start_sampling(self, buffer_size: int = 0) -> None:
         """
@@ -114,7 +125,8 @@ class ImageDataInterface(DataInterface):
         Args:
             buffer_size: Circular buffer size (0 = unlimited)
         """
-        self.camera.start_acquisition(buffer_size=buffer_size)
+        # self.camera.start_acquisition(buffer_size=buffer_size)
+        self.camera.start_acquisition()
         logger.debug(f"Started continuous image sampling (buffer_size={buffer_size})")
     
     def stop_sampling(self) -> None:
@@ -179,7 +191,7 @@ class ImageDataInterface(DataInterface):
         if not filepath.endswith('.tiff'):
             filepath = filepath + '.tiff'
 
-        MMSubroutines.saveScanTiffs(fname=filepath, img_array=data)
+        tf.imwrite(filepath, data)
         logger.info(f"Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
     
     def configure_sampling(self, config: ExperimentConfig | None) -> None:
@@ -192,12 +204,6 @@ class ImageDataInterface(DataInterface):
                    - roi: region of interest as (x, y, width, height)
                    - Other camera-specific settings
         """
-        # pass settings to camera
-        # TODO camera takes dict argument... configure_sampling should really be taking dict argument too
-        # This should be done elsewhere -- this call changes hardware options, whereas below
-        # we're just initiating data buffer
-        # self.camera.configure_camera(config)
-
         # initiate internal buffer
         sample_shape = tuple([config.acquisition.num_samples]) + self.get_sample_shape()
         logging.info(f'Initializing sample buffer of shape {sample_shape}')

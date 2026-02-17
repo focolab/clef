@@ -4,7 +4,6 @@
 backend: "ring_attractor_demo"
 stim_interface: "ring_attractor"
 microscope_name: "ring_attractor_sim"
-strobe_acquisition: false
 
 # Ring attractor system parameters
 ring_params:

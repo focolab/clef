@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 
 class LorenzStimulusController(DummyStimulusController):
     """Lorenz-specific stimulus controller extending dummy controller."""
+
+    def __init__(self, hardware_manager):
+        """
+        Initialize dummy stimulus controller.
+        
+        Args:
+            hardware_manager: HardwareManager instance
+            config: Configuration dictionary
+        """
+        super().__init__(hardware_manager)
     
     def submit_stim_params(self, stim_params: Dict[str, Any], image_ndx: int) -> None:
         """

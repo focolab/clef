@@ -21,7 +21,7 @@ class InputStimulusController(BaseStimulusController):
     as stimulus events during closed-loop experiments.
     """
     
-    def __init__(self, hardware_manager, config: Dict[str, Any]):
+    def __init__(self, hardware_manager):
         """
         Initialize input stimulus controller.
         
@@ -29,7 +29,7 @@ class InputStimulusController(BaseStimulusController):
             hardware_manager: HardwareManager instance
             config: Configuration dictionary
         """
-        super().__init__(hardware_manager, config)
+        super().__init__(hardware_manager)
         
         # Import pynput
         try:
@@ -49,16 +49,19 @@ class InputStimulusController(BaseStimulusController):
             self.mouse = None
         
         # Parse config for default input sequences
-        gooey_args = config.get("gooey_args", {})
+        # gooey_args = config.get("gooey_args", {})
         
         # Default keyboard sequence (can be overridden per stimulus)
-        self.default_keys = self._parse_key_sequence(
-            gooey_args.get("default_key_sequence", ["space"])
-        )
-        
+        # self.default_keys = self._parse_key_sequence(
+        #     gooey_args.get("default_key_sequence", ["space"])
+        # )
+
         # Default mouse action
-        self.default_mouse_action = gooey_args.get("default_mouse_action", "click")
-        self.default_mouse_button = gooey_args.get("default_mouse_button", "left")
+        # self.default_mouse_action = gooey_args.get("default_mouse_action", "click")
+        # self.default_mouse_button = gooey_args.get("default_mouse_button", "left")
+        self.default_keys = ['space']
+        self.default_mouse_action = 'click'
+        self.default_mouse_button = 'left'
         
         # Input event history
         self.input_events = []

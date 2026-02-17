@@ -41,132 +41,87 @@ def save_metadata(savefilename, metadata):
 
     except Exception as err:
         logging.critical("Exception during saving metadata file: {}".format(err))
-        print("unsaved metadata: {}".format(metadata))
+        logging.debug(f"unsaved metadata: {metadata}")
 
     finally:
         logging.debug("Done saving acquisition metadata!")
 
 
 def generate_mip_movie(savefilename, frames, zsize, exposure, quality=6, bitrate="10M", GUI_mode='neural_imaging'):
-
-    logging.debug("Saving MIP movie...")
-
-    # convert to mip movie
-    try:
-
-        import imageio
-
-        # grab bounds
-        vols_to_grab = frames.shape[0] // zsize
-        ysize = frames.shape[1]
-        xsize = frames.shape[2]
-
-        # recast array for mip
-        tosave = frames.reshape((vols_to_grab, zsize, ysize, xsize)).max(axis=1)
-
-        # grab a frame somewhat in
-        # f0 = tosave.flatten()
-        # f0.sort()
-        # take avg of top % pixelsf0
-        # mymax = np.median(f0[-int(xsize * ysize * 0.01) :])
-        # mymin = np.amin(f0)
-
-        mymax = np.amax(tosave)
-        mymin = np.amin(tosave)
-
-        # compress to MIP, scale to min/max
-        tosave[tosave > mymax] = mymax
-        # tosave[tosave < mymin] = mymin
-        # tosave = (tosave - mymin) / (mymax - mymin) * 255 # how to make this uint16? 
-        # tosave = tosave - mymin
-        # tosave = (tosave * 255)  // (mymax - mymin) 
-        tosave = (tosave * 255) // mymax
-
-        # save Zx speedup (cause that's a nice round number?)
-        multiplier = 2
-        imageio.mimwrite(
-            savefilename + "_{}x.mp4".format(multiplier * zsize),
-            tosave.astype(np.uint8),
-            fps=multiplier * 1000 // int(exposure),
-            # quality=6,
-            codec='h264_nvenc',
-            output_params=['-b:v', bitrate],
-        )
-
-    except Exception as err:
-        logging.exception("Exception during MIP movie generation: {}".format(err))
+    """Stub: MIP movie generation removed."""
+    logging.debug("generate_mip_movie: stub, no-op")
 
 
-def prefill_wb_ops(
-    savefileroot,
-    metadata,
-    meta_template_fname="res/meta_template.mat",
-    wboptions_template_fname="res/wboptions_template.mat",
-):
+# def prefill_wb_ops(
+#     savefileroot,
+#     metadata,
+#     meta_template_fname="res/meta_template.mat",
+#     wboptions_template_fname="res/wboptions_template.mat",
+# ):
     
-    import scipy.io
+#     import scipy.io
 
-    # load
-    try:
-        meta = scipy.io.loadmat(meta_template_fname)
-        wbops = scipy.io.loadmat(wboptions_template_fname)
-    except FileNotFoundError as err:
-        logging.exception(
-            "Error while trying to load wb-matlab template param files: {}".format(err)
-        )
-        return
+#     # load
+#     try:
+#         meta = scipy.io.loadmat(meta_template_fname)
+#         wbops = scipy.io.loadmat(wboptions_template_fname)
+#     except FileNotFoundError as err:
+#         logging.exception(
+#             "Error while trying to load wb-matlab template param files: {}".format(err)
+#         )
+#         return
 
-    try:
-        # grab fields from metadata
-        num_frames = metadata["gooey_args"]["total_frames"]
-        zsize = metadata["gooey_args"]["zsize"]
-        total_time = metadata["frame_time_list"][-1]
-        rec_id = metadata["id"]
+#     try:
+#         # grab fields from metadata
+#         num_frames = metadata["gooey_args"]["total_frames"]
+#         zsize = metadata["gooey_args"]["zsize"]
+#         total_time = metadata["frame_time_list"][-1]
+#         rec_id = metadata["id"]
 
-        # prefill form fields eww gross
-        meta["totalTime"][0][0] = total_time
+#         # prefill form fields eww gross
+#         meta["totalTime"][0][0] = total_time
 
-        meta["fileInfoOverride"][0][0][0][0] = np.array([num_frames // zsize])
-        meta["fileInfoOverride"][0][0][1][0] = np.array([zsize])
-        meta["fileInfoOverride"][0][0][2][0] = np.array([1])
+#         meta["fileInfoOverride"][0][0][0][0] = np.array([num_frames // zsize])
+#         meta["fileInfoOverride"][0][0][1][0] = np.array([zsize])
+#         meta["fileInfoOverride"][0][0][2][0] = np.array([1])
 
-        if "stim_metadata" in metadata:
-            ons = metadata["stim_metadata"]["stim_onset_times_simple"]
-            meta["stimulus"][0][0][2] = np.array(ons)
+#         if "stim_metadata" in metadata:
+#             ons = metadata["stim_metadata"]["stim_onset_times_simple"]
+#             meta["stimulus"][0][0][2] = np.array(ons)
 
-        meta["fileInfo"][0][0][1][0][0] = np.array(rec_id + ".tiff")
+#         meta["fileInfo"][0][0][1][0][0] = np.array(rec_id + ".tiff")
 
-        # x
-        meta["fileInfo"][0][0][2][0][0] = metadata["xsize"]
-        meta["fileInfo"][0][0][6][0][0] = metadata["xsize"]
+#         # x
+#         meta["fileInfo"][0][0][2][0][0] = metadata["xsize"]
+#         meta["fileInfo"][0][0][6][0][0] = metadata["xsize"]
 
-        # y
-        meta["fileInfo"][0][0][3][0][0] = metadata["ysize"]
-        meta["fileInfo"][0][0][7][0][0] = metadata["ysize"]
+#         # y
+#         meta["fileInfo"][0][0][3][0][0] = metadata["ysize"]
+#         meta["fileInfo"][0][0][7][0][0] = metadata["ysize"]
 
-        # total frames
-        meta["fileInfo"][0][0][4][0][0] = num_frames
-        meta["fileInfo"][0][0][5][0][0] = num_frames
+#         # total frames
+#         meta["fileInfo"][0][0][4][0][0] = num_frames
+#         meta["fileInfo"][0][0][5][0][0] = num_frames
 
-    except Exception as err:
-        logging.exception(
-            "Error while setting prefilled wb-matlab form fields: {}".format(err)
-        )
-        return
+#     except Exception as err:
+#         logging.exception(
+#             "Error while setting prefilled wb-matlab form fields: {}".format(err)
+#         )
+#         return
 
-    # write
-    try:
+#     # write
+#     try:
 
-        meta_savefilename = savefileroot + "/meta.mat"
-        wbops_savefilename = savefileroot + "/wboptions.mat"
-        scipy.io.savemat(meta_savefilename, meta)
-        scipy.io.savemat(wbops_savefilename, wbops)
+#         meta_savefilename = savefileroot + "/meta.mat"
+#         wbops_savefilename = savefileroot + "/wboptions.mat"
+#         scipy.io.savemat(meta_savefilename, meta)
+#         scipy.io.savemat(wbops_savefilename, wbops)
 
-    except Exception as err:
-        logging.exception(
-            "Error while trying to write wb-matlab prefilled files: {}".format(err)
-        )
-        return
+#     except Exception as err:
+#         logging.exception(
+#             "Error while trying to write wb-matlab prefilled files: {}".format(err)
+#         )
+#         return
 
 def lazy_serialize(res, to_str=True):
 
@@ -193,35 +148,8 @@ def lazy_serialize(res, to_str=True):
 
 
 def notify(msg, interface=None, ops={}):
-
-    logging.debug(
-        "Notifying wb-live via interface: {}, message: {}".format(interface, msg)
-    )
-
-    if interface == "twilio-sms":
-
-        try:
-
-            from twilio.rest import Client
-
-            # Your Account SID from twilio.com/console
-            account_sid = ops.get("twilio-sid", "AC4465d6c58ea433aa4917d09617dd8dbc")
-
-            # Your Auth Token from twilio.com/console
-            auth_token = ops.get("twilio-auth", "6dfeb1dcf3104b45254c69a05177abf0")
-            client = Client(account_sid, auth_token)
-
-            # Numbers
-            to_num = ops.get("twilio-to", "+19788442244")
-            from_num = ops.get("twilio-from", "+12029337546")
-
-            message = client.messages.create(to=to_num, from_=from_num, body=msg)
-
-            logging.debug("Notify response: {}".format(message.sid))
-
-        except Exception as err:
-
-            logging.error("Error during wbliveUtils::notify, {}".format(err))
+    """Stub: SMS notification removed."""
+    logging.debug("notify: stub, no-op (msg={})".format(msg))
 
 
 def play_wblive_sound(sound_name="laser"):

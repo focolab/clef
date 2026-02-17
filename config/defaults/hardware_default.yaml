@@ -1,82 +1,57 @@
 # CLEF Minimal Hardware Configuration
 # Place this in: config/defaults/hardware_default.yaml
 
-# Hardware backend selection
-backend: "dummy"  # Options: pycromanager, pymmcore, dummy
-
 # Micro-Manager configuration (ignored for dummy backend)
-mm_config_path: null
+backend_configuration:
 
-# Stimulus interface class
-stim_interface: "dummy"  # Options: InvCoreLDIPolygon, InvCoreSpinningDisk639, dummy, etc.
+  # Hardware backend selection
+  backend_name: "dummy"  # Options: pycromanager, pymmcore, dummy
 
-# Microscope name (temporary, backward compatibility)
-microscope_name: null
+# configuration of stimulus hardware parameters
+stimulus_configuration:
 
-# Strobe settings
-strobe_acquisition: false
-strobe_inter_frame_interval_ms: 80
-
-# Static ROI
-use_static_stim_roi: false
+  # Stimulus interface class
+  stim_interface: "dummy"  # Options: InvCoreLDIPolygon, InvCoreSpinningDisk639, dummy, etc.
 
 # Stimulus device configuration
 # Maps stimulus interface types to their hardware control parameters
 stimulus_devices:
-  InvCore-SpinningDisk-639:
-    type: "widefield_laser"
-    voltage_device: "DAC639"
-    voltage_property: "Volts"
-    ttl_device: "TTL1-8"
-    ttl_line: "TTL-4"
-    max_volts: 3.5
-  
-  InvCore-LDI-Polygon-640:
-    type: "polygon"
-    intensity_device: "89 North Laser Diode Illuminator"
-    intensity_property: "640 Intensity"
-    shutter_device: "89 North Laser Diode Illuminator"
-    slm_device: null  # Will be queried from MMC
-  
-  InvCore-ThunderscopeLED3:
-    type: "led"
-    intensity_device: "LED-Lightboard"
-    intensity_property: "Intensity"
-    shutter_device: "LED-Lightboard"
-  
+
+  # no op stimulus device
   dummy:
     type: "dummy"
 
 # Device configurations
-devices:
+system_devices:
+
+  # The system captures data with a camera
   camera:
     device_name: "Camera"
     device_type: "camera"
     properties:
       Exposure: 100.0
       Binning: 1
-    configs: {}  # Micro-Manager config group presets (e.g., {"Channel": "488"})
       
-  stage:
-    device_name: "XYStage"
-    device_type: "stage"
-    properties:
-      Speed: 1.0
-    configs: {}
+  # The system may be able to actuate the sample with a stage
+  stage: null
+
+  # Illumination channels 
+  illumination_channels:
+    - name: "dummy"
+      device: "dummy"
+      wavelength: null
+      power: 100.0
+      exposure_ms: 100.0
 
 # System-level Micro-Manager properties
 system_properties:
+
+  # Microscope name
+  system_name: 'dummy'
+
+  # Shutters
   auto_shutter: null  # null = don't set, true/false = set value
   circular_buffer_mb: null  # null = don't set, integer = buffer size in MB
+  configs: {}  # Micro-Manager config group presets (e.g., {"Channel": "488"})
   shutters: []  # List of shutter states: [{"device_name": "LaserShutter", "state": true}]
 
-# Illumination channels
-illumination_channels:
-  - name: "Brightfield"
-    device: "LED"
-    wavelength: null
-    power: 50.0
-    exposure_ms: 100.0
-
-# Calibration files
-polygon_calibration_path: null
