@@ -1,5 +1,4 @@
 # Demo data and output
-*.png
 *.pdf
 *.log
 *__pycache__*
