@@ -131,6 +131,7 @@ class GUIParameters(BaseModel):
     enable_gui: bool = Field(False, description="Enable algorithm GUI")
     gui_mode: str = Field("none", description="GUI mode (neural_imaging/behavior/none)")
     save_algorithm_plot: bool = Field(False, description="Save algorithm output plots")
+    gui_screenshot_freq: Optional[int] = Field(0, description="Save GUI screenshot every N samples (0 = disabled)")
 
     model_config = ConfigDict(extra="allow")
 
