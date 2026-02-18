@@ -163,7 +163,7 @@ class Brainalyzer:
         """
         # Build vis_args for worker subprocess
         try:
-            gui_screenshot_freq = algorithm_config.gui_params.gui_screenshot_freq
+            gui_screenshot_freq = self.algorithm_config.gui_params.gui_screenshot_freq
         except Exception:
             gui_screenshot_freq = 0
 

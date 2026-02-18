@@ -1,7 +1,7 @@
 # Experiment configuration for Brainalyzer demo
 experiment_name: "brainalyzer_demo"
 experimenter: "CLEF_Demo"
-output_dir: "./demo_output"
+output_dir: "./demo_output/brainalyzer"
 save_images: true
 save_metadata: true
 save_sample_video: false
