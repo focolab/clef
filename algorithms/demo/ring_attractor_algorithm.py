@@ -15,6 +15,7 @@ The algorithm:
 """
 
 import logging
+from pathlib import Path
 import numpy as np
 from typing import Dict, Any, Optional, Tuple
 from scipy import ndimage
@@ -64,6 +65,7 @@ class RingAttractorAlgorithm:
         
         # Extract config parameters
         self.samples_to_grab = experiment_config.acquisition.num_samples
+        self.saveroot = experiment_config.output_dir
         
         # Get algorithm-specific parameters
         if algorithm_config:
@@ -87,9 +89,15 @@ class RingAttractorAlgorithm:
             self.auto_stim_enabled = params.auto_stim_enabled
             self.auto_stim_theta_min = params.auto_stim_theta_min
             self.auto_stim_theta_max = params.auto_stim_theta_max
-            
+
             # Trajectory visualization
             self.fading_trajectory_samples = params.fading_trajectory_samples
+
+            # Screenshot frequency
+            try:
+                self.gui_screenshot_freq = algorithm_config.gui_params.gui_screenshot_freq
+            except Exception:
+                self.gui_screenshot_freq = 0
         else:
             # Defaults
             self.inner_radius = 3.0
@@ -104,6 +112,7 @@ class RingAttractorAlgorithm:
             self.auto_stim_theta_min = 0.0
             self.auto_stim_theta_max = np.pi / 4
             self.fading_trajectory_samples = 100
+            self.gui_screenshot_freq = 0
         
         # Image center (for converting to centered coordinates)
         self.center_x = self.image_width / 2.0
@@ -241,13 +250,31 @@ class RingAttractorAlgorithm:
             self.visualizer.update_trajectory()
             self.visualizer.update_info_text()
             self.visualizer.process_events()
-        
+
+        self._maybe_save_screenshot(sample_ndx)
+
         # Log periodically
         if self.frame_count % 100 == 0:
             logger.info(
                 f"Frame {self.frame_count}: x={x_centered:.1f}, y={y_centered:.1f}, r={r:.1f}, ring={ring_idx}"
             )
     
+    def _maybe_save_screenshot(self, sample_ndx: int):
+        """Save a screenshot of the GUI window at the configured frequency."""
+        if not self.gui_screenshot_freq or sample_ndx % self.gui_screenshot_freq != 0:
+            return
+        if not self.visualizer:
+            return
+        try:
+            screenshot_dir = Path(self.saveroot) / "gui_screenshot"
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            path = screenshot_dir / f"screenshot_{sample_ndx:06d}.png"
+            pixmap = self.visualizer.window.grab()
+            pixmap.save(str(path), "PNG")
+            logger.debug(f"Saved GUI screenshot: {path}")
+        except Exception as err:
+            logger.warning(f"Failed to save GUI screenshot at sample {sample_ndx}: {err}")
+
     def process_volume(self):
         """Process completed volume (not used in this demo)."""
         pass

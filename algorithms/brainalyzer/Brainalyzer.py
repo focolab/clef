@@ -162,6 +162,11 @@ class Brainalyzer:
         Must be called after set_roi() to ensure dimensions are correct.
         """
         # Build vis_args for worker subprocess
+        try:
+            gui_screenshot_freq = self.algorithm_config.gui_params.gui_screenshot_freq
+        except Exception:
+            gui_screenshot_freq = 0
+
         self.vis_args = {
             "id": self.rec_id,
             "saveroot": self.saveroot,
@@ -174,6 +179,7 @@ class Brainalyzer:
             "GUI_mode": self.GUI_mode,
             "camera_binning": self.camera_binning,
             "dtype": self.dtype,
+            "gui_screenshot_freq": gui_screenshot_freq,
         }
 
         logger.info(f'Instantiating worker with vis_args: {self.vis_args}')

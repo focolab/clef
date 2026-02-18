@@ -71,6 +71,7 @@ class BrainalyzerWorker(Process):
         self.roi_plot_cmap = self.vis_args.get('roi_plot_cmap', "bright")
         self.GUI_mode = self.vis_args.get('GUI_mode', 'neural_imaging')
         self.camera_binning = self.vis_args.get("camera_binning", "1x1")
+        self.gui_screenshot_freq = self.vis_args.get("gui_screenshot_freq", 0)
         self.num_rois_added = 0
         self.stim_cmap_list = [np.array((255, 0, 0), dtype=np.uint8)]
         self.shared_frame_memory_list = []
@@ -504,6 +505,22 @@ class BrainalyzerWorker(Process):
 
         if self.GUI_mode == 'neural_imaging':
             self.update_quant_roi_plot()
+
+        self._maybe_save_screenshot()
+
+    def _maybe_save_screenshot(self):
+        """Save a screenshot of the GUI window at the configured frequency."""
+        if not self.gui_screenshot_freq or self.image_count % self.gui_screenshot_freq != 0:
+            return
+        try:
+            screenshot_dir = Path(self.saveroot) / "gui_screenshot"
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            path = screenshot_dir / f"screenshot_{self.image_count:06d}.png"
+            pixmap = self.window.grab()
+            pixmap.save(str(path), "PNG")
+            logger.debug(f"Saved GUI screenshot: {path}")
+        except Exception as err:
+            logger.warning(f"Failed to save GUI screenshot at frame {self.image_count}: {err}")
 
 
     def update_refractory_counter(self):

@@ -33,3 +33,4 @@ gui_params:
   enable_gui: false
   gui_mode: "neural_imaging"
   save_algorithm_plot: true
+  gui_screenshot_freq: 100
