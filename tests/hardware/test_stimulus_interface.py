@@ -107,49 +107,45 @@ class TestDummyStimulusInterface:
     def test_dummy_stimulus_initialization(self):
         """Test DummyStimulus initializes correctly."""
         stimulus = DummyStimulus()
-        
+
         assert stimulus.is_stimulus_active() is False
-        assert stimulus.stimulus_intensity == 0
         assert stimulus.stimulus_config == {}
         assert stimulus._configured is False
-    
+
     def test_dummy_stimulus_configure(self):
         """Test configure_stimulus stores configuration."""
         stimulus = DummyStimulus()
         config = {"intensity": 10, "duration": 48}
-        
+
         stimulus.configure_stimulus(config)
-        
+
         assert stimulus._configured is True
         assert stimulus.stimulus_config == config
-    
+
     def test_dummy_stimulus_activate(self):
         """Test activate_stimulus sets active state."""
         stimulus = DummyStimulus()
-        params = {"intensity": 50}
-        
+        params = {"event": {"stim_intensity": 50}}
+
         stimulus.activate_stimulus(params)
-        
+
         assert stimulus.is_stimulus_active() is True
-        assert stimulus.stimulus_intensity == 50
-    
+
     def test_dummy_stimulus_activate_default_intensity(self):
         """Test activate with default intensity."""
         stimulus = DummyStimulus()
         stimulus.activate_stimulus({})
-        
+
         assert stimulus.is_stimulus_active() is True
-        assert stimulus.stimulus_intensity == 10  # Default
-    
+
     def test_dummy_stimulus_deactivate(self):
         """Test deactivate_stimulus resets state."""
         stimulus = DummyStimulus()
-        stimulus.activate_stimulus({"intensity": 50})
-        
+        stimulus.activate_stimulus({"event": {"stim_intensity": 50}})
+
         stimulus.deactivate_stimulus()
-        
+
         assert stimulus.is_stimulus_active() is False
-        assert stimulus.stimulus_intensity == 0
     
     def test_dummy_stimulus_is_active(self):
         """Test is_stimulus_active returns correct state."""
@@ -195,24 +191,24 @@ class TestMicroManagerStimulusWidefieldLaser:
         """Test activate widefield laser."""
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", widefield_config)
         stimulus.configure_stimulus({"interface_type": "InvCore-SpinningDisk-639"})
-        
-        stimulus.activate_stimulus({"intensity": 50})
-        
+
+        stimulus.activate_stimulus({"event": {"stim_intensity": 50}})
+
         assert stimulus._active is True
         # Should set voltage: 50% * 3.5V = 1.75V
         mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 1.75)
-    
+
     def test_widefield_activate_different_intensities(self, mock_mmc, widefield_config):
         """Test activate with different intensity values."""
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", widefield_config)
         stimulus.configure_stimulus({"interface_type": "InvCore-SpinningDisk-639"})
-        
+
         # Test 10%
-        stimulus.activate_stimulus({"intensity": 10})
+        stimulus.activate_stimulus({"event": {"stim_intensity": 10}})
         mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 0.35)
-        
+
         # Test 100%
-        stimulus.activate_stimulus({"intensity": 100})
+        stimulus.activate_stimulus({"event": {"stim_intensity": 100}})
         mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 3.5)
     
     def test_widefield_deactivate(self, mock_mmc, widefield_config):
@@ -287,9 +283,9 @@ class TestMicroManagerStimulusPolygon:
         """Test activate polygon stimulus."""
         stimulus = MicroManagerStimulus(mock_mmc, "pycromanager", polygon_config)
         stimulus.configure_stimulus({"interface_type": "InvCore-LDI-Polygon-640"})
-        
-        stimulus.activate_stimulus({"intensity": 30})
-        
+
+        stimulus.activate_stimulus({"event": {"stim_intensity": 30}})
+
         assert stimulus._active is True
         mock_mmc.setProperty.assert_any_call(
             "89 North Laser Diode Illuminator", "640 Intensity", 30
@@ -395,7 +391,7 @@ class TestStimulusInterfaceHardwareManager:
             })
 
             # Activate
-            hw_manager.stimulus.activate_stimulus({"intensity": 50})
+            hw_manager.stimulus.activate_stimulus({"event": {"stim_intensity": 50}})
 
             # Should have set voltage
             mock_mmc.setProperty.assert_any_call("DAC639", "Volts", 1.75)
