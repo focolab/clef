@@ -877,7 +877,7 @@ class RingVisualizer:
         """Update image display with fixed color scaling."""
         self.image_widget.setImage(
             img.T, autoLevels=False, autoRange=False,
-            levels=(0, int(self.algorithm.image_width * 5))
+            levels=(0, int(self.algorithm.image_width))
         )
 
     def update_trajectory(self):
