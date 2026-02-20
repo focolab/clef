@@ -9,12 +9,12 @@ from stim_params to the ring attractor backend.
 import logging
 from typing import Dict, Any
 
-from hardware.stimulus_controllers.dummy_controller import DummyStimulusController
+from hardware.stimulus_controllers.simple_controller import SimpleStimulusController
 
 logger = logging.getLogger(__name__)
 
 
-class RingAttractorStimulusController(DummyStimulusController):
+class RingAttractorStimulusController(SimpleStimulusController):
     """Ring attractor stimulus controller with radial and omega perturbation control."""
 
     def __init__(self, hardware_manager):
@@ -59,19 +59,18 @@ class RingAttractorStimulusController(DummyStimulusController):
             f"omega_perturbation={self.omega_perturbation:.2f}"
         )
     
-    def _activate_hardware(self, intensity: float) -> None:
+    def _activate_hardware(self, stim_params: Dict[str, Any]) -> None:
         """
         Activate stimulus hardware with ring-specific parameters.
-        
+
         Args:
-            intensity: Stimulus intensity (from parent class, not used directly)
+            stim_params: The current stim_params dict (ring params already stored on self)
         """
-        # Pass both radial and angular perturbations to stimulus interface
-        params = {
-            "radial_perturbation": self.radial_perturbation,
-            "omega_perturbation": self.omega_perturbation
-        }
-        self.hardware_manager.stimulus.activate_stimulus(params)
+        # params = {
+        #     "radial_perturbation": self.radial_perturbation,
+        #     "omega_perturbation": self.omega_perturbation
+        # }
+        self.hardware_manager.stimulus.activate_stimulus(stim_params)
 
         logger.debug(
             f"Activated ring stimulus: radial_perturbation={self.radial_perturbation}, "

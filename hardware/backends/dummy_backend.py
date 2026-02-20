@@ -230,7 +230,7 @@ class DummyStimulus(StimulusInterface):
         """Initialize dummy stimulus."""
         self._active = False
         self._current_params = None
-        self.stimulus_intensity = 0
+        # self.stimulus_intensity = 0
         self.stimulus_config = {}
         self._configured = False
     
@@ -244,14 +244,14 @@ class DummyStimulus(StimulusInterface):
         """
         self._active = True
         self._current_params = params
-        self.stimulus_intensity = params.get('intensity', 10)
+        # self.stimulus_intensity = params.get('intensity', 10)
         logger.debug(f"Dummy: Activated stimulus with params {params}")
     
     def deactivate_stimulus(self) -> None:
         """Simulate stimulus deactivation."""
         self._active = False
         self._current_params = None
-        self.stimulus_intensity = 0
+        # self.stimulus_intensity = 0
         logger.debug("Dummy: Deactivated stimulus")
     
     def configure_stimulus(self, config: Dict[str, Any]) -> None:
