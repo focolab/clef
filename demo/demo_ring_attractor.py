@@ -25,12 +25,12 @@ This demonstrates:
 - Metadata capture and visualization
 
 Usage:
-    python demo/20251209_demo_ring_attractor.py
-    
+    python demo/demo_ring_attractor.py
+
     or via CLI:
-    clef-cli --hardware config/demo/demo_ring_attractor_hardware.yaml \
-             --experiment config/demo/demo_ring_attractor_experiment.yaml \
-             --algorithm config/demo/demo_ring_attractor_algorithm.yaml
+    python -m cli.clef_cli --hardware config/demo/demo_ring_attractor_hardware.yaml \
+                           --experiment config/demo/demo_ring_attractor_experiment.yaml \
+                           --algorithm config/demo/demo_ring_attractor_algorithm.yaml
 """
 
 import sys
@@ -69,9 +69,12 @@ def print_demo_header():
     print("  4. Camera observes puncta position following the trajectory")
     print("  5. Algorithm extracts (theta, ring_index) state from each frame")
     print("  6. Interactive GUI provides:")
-    print("     • 'Trigger Stimulus' button for manual control")
-    print("     • Intensity slider (0-100%) to scale perturbation")
-    print("     • Optional auto-trigger checkbox (theta ∈ [0, π/4])")
+    print("     • 'Manual Stimulation' button to apply a perturbation")
+    print("     • r slider (-30 to +30) to set radial perturbation magnitude")
+    print("     • ω slider (-5 to +5) to set angular velocity perturbation")
+    print("     • 'Add Closed-Loop ROI' to draw auto-trigger region on state space")
+    print("     • 'Delete ROIs' to remove all ROIs")
+    print("     • 'Clear Stim Markers' to reset stimulus event markers on plot")
     print("  7. Stimulus effects:")
     print("     • Applies radial perturbation to push across potential barrier")
     print("     • System naturally relaxes to other ring's limit cycle")
