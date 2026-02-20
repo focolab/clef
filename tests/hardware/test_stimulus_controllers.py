@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from hardware.hardware_manager import HardwareManager
 from hardware.stimulus_controllers import create_stimulus_controller
 from hardware.stimulus_controllers.base_controller import BaseStimulusController
-from hardware.stimulus_controllers.dummy_controller import DummyStimulusController
+from hardware.stimulus_controllers.simple_controller import SimpleStimulusController
 from hardware.stimulus_controllers.widefield_controller import WidefieldStimulusController
 from hardware.stimulus_controllers.polygon_controller import PolygonStimulusController
 from config.config_manager import HardwareConfig
@@ -42,7 +42,7 @@ class TestBaseStimulusController:
         class TestController(BaseStimulusController):
             def submit_stim_params(self, stim_params, image_ndx):
                 pass
-            def _activate_hardware(self, intensity):
+            def _activate_hardware(self, stim_params):
                 pass
             def _deactivate_hardware(self):
                 pass
@@ -58,25 +58,24 @@ class TestBaseStimulusController:
         class TestController(BaseStimulusController):
             def submit_stim_params(self, stim_params, image_ndx):
                 pass
-            def _activate_hardware(self, intensity):
+            def _activate_hardware(self, stim_params):
                 self.activated = True
-                self.activation_intensity = intensity
+                self.activated_params = stim_params
             def _deactivate_hardware(self):
                 pass
-        
+
         controller = TestController(mock_hardware_manager)
-        controller.stim_on_list = [100]
-        controller.stim_intensity_list = [50]
+        controller.last_stim_params = {"stim_on": 100, "event": {"value": 50}}
         controller.activated = False
-        
+
         # Check at wrong frame - should not activate
         controller.check_stim(99)
         assert controller.activated is False
-        
+
         # Check at correct frame - should activate
         controller.check_stim(100)
         assert controller.activated is True
-        assert controller.activation_intensity == 50
+        assert controller.activated_params["stim_on"] == 100
         assert len(controller.stim_on_time_list) == 1
     
     def test_base_controller_check_stim_deactivation(self, mock_hardware_manager):
@@ -84,7 +83,7 @@ class TestBaseStimulusController:
         class TestController(BaseStimulusController):
             def submit_stim_params(self, stim_params, image_ndx):
                 pass
-            def _activate_hardware(self, intensity):
+            def _activate_hardware(self, stim_params):
                 pass
             def _deactivate_hardware(self):
                 self.deactivated = True
@@ -107,7 +106,7 @@ class TestBaseStimulusController:
         class TestController(BaseStimulusController):
             def submit_stim_params(self, stim_params, image_ndx):
                 pass
-            def _activate_hardware(self, intensity):
+            def _activate_hardware(self, stim_params):
                 pass
             def _deactivate_hardware(self):
                 pass
@@ -130,7 +129,7 @@ class TestBaseStimulusController:
         class TestController(BaseStimulusController):
             def submit_stim_params(self, stim_params, image_ndx):
                 pass
-            def _activate_hardware(self, intensity):
+            def _activate_hardware(self, stim_params):
                 pass
             def _deactivate_hardware(self):
                 pass
@@ -148,76 +147,74 @@ class TestBaseStimulusController:
         assert onsets_rel == [10.0, 20.0, 30.0]
 
 
-class TestDummyStimulusController:
-    """Test DummyStimulusController implementation."""
-    
-    def test_dummy_controller_initialization(self, mock_hardware_manager):
-        """Test DummyStimulusController initializes."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
+class TestSimpleStimulusController:
+    """Test SimpleStimulusController implementation."""
+
+    def test_simple_controller_initialization(self, mock_hardware_manager):
+        """Test SimpleStimulusController initializes."""
+        controller = SimpleStimulusController(mock_hardware_manager)
+
         assert controller.hardware_manager == mock_hardware_manager
         assert isinstance(controller, BaseStimulusController)
-    
-    def test_dummy_controller_submit_stim_params_pulsed(self, mock_hardware_manager):
+
+    def test_simple_controller_submit_stim_params_pulsed(self, mock_hardware_manager):
         """Test submit_stim_params with pulsed stimulus."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
+        controller = SimpleStimulusController(mock_hardware_manager)
+
         stim_params = {
             "stim_on": 100,
             "stim_off": 148,
-            "event": {"stim_intensity": 50}
+            "event": {"value": 50}
         }
-        
+
         controller.submit_stim_params(stim_params, 50)
-        
+
         assert 100 in controller.stim_on_list
         assert 148 in controller.stim_off_list
-        assert 50 in controller.stim_intensity_list
+        assert controller.last_stim_params == stim_params
         assert stim_params in controller.stim_param_list
-    
-    def test_dummy_controller_submit_stim_params_none(self, mock_hardware_manager):
+
+    def test_simple_controller_submit_stim_params_none(self, mock_hardware_manager):
         """Test submit_stim_params handles None gracefully."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
+        controller = SimpleStimulusController(mock_hardware_manager)
+
         # Should not raise
         controller.submit_stim_params(None, 50)
-        
+
         assert len(controller.stim_on_list) == 0
-    
-    def test_dummy_controller_activate_hardware(self, mock_hardware_manager):
+
+    def test_simple_controller_activate_hardware(self, mock_hardware_manager):
         """Test _activate_hardware delegates to hardware_manager."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
-        controller._activate_hardware(50)
-        
-        mock_hardware_manager.stimulus.activate_stimulus.assert_called_once()
-        call_args = mock_hardware_manager.stimulus.activate_stimulus.call_args[0][0]
-        assert call_args["intensity"] == 50
-    
-    def test_dummy_controller_deactivate_hardware(self, mock_hardware_manager):
+        controller = SimpleStimulusController(mock_hardware_manager)
+        stim_params = {"stim_on": 100, "event": {"value": 50}}
+
+        controller._activate_hardware(stim_params)
+
+        mock_hardware_manager.stimulus.activate_stimulus.assert_called_once_with(stim_params)
+
+    def test_simple_controller_deactivate_hardware(self, mock_hardware_manager):
         """Test _deactivate_hardware delegates to hardware_manager."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
+        controller = SimpleStimulusController(mock_hardware_manager)
+
         controller._deactivate_hardware()
-        
+
         mock_hardware_manager.stimulus.deactivate_stimulus.assert_called_once()
-    
-    def test_dummy_controller_full_cycle(self, mock_hardware_manager):
-        """Test complete stimulus cycle with dummy controller."""
-        controller = DummyStimulusController(mock_hardware_manager)
-        
-        # Submit params
+
+    def test_simple_controller_full_cycle(self, mock_hardware_manager):
+        """Test complete stimulus cycle with simple controller."""
+        controller = SimpleStimulusController(mock_hardware_manager)
+
         stim_params = {
             "stim_on": 100,
             "stim_off": 148,
-            "event": {"stim_intensity": 50}
+            "event": {"value": 50}
         }
         controller.submit_stim_params(stim_params, 50)
-        
+
         # Check at activation frame
         controller.check_stim(100)
         mock_hardware_manager.stimulus.activate_stimulus.assert_called_once()
-        
+
         # Check at deactivation frame
         controller.check_stim(148)
         mock_hardware_manager.stimulus.deactivate_stimulus.assert_called_once()
@@ -247,8 +244,7 @@ class TestWidefieldStimulusController:
         
         assert 100 in controller.stim_on_list
         assert 148 in controller.stim_off_list
-        assert 50 in controller.stim_intensity_list
-    
+
     def test_widefield_controller_submit_stream_on(self, mock_hardware_manager):
         """Test submit streaming stimulus ON event."""
         controller = WidefieldStimulusController(mock_hardware_manager)
@@ -289,12 +285,11 @@ class TestWidefieldStimulusController:
     def test_widefield_controller_activate_hardware(self, mock_hardware_manager):
         """Test widefield activation."""
         controller = WidefieldStimulusController(mock_hardware_manager)
-        
-        controller._activate_hardware(75)
-        
-        mock_hardware_manager.stimulus.activate_stimulus.assert_called_once()
-        call_args = mock_hardware_manager.stimulus.activate_stimulus.call_args[0][0]
-        assert call_args["intensity"] == 75
+        stim_params = {"stim_on": 100, "event": {"value": 75}}
+
+        controller._activate_hardware(stim_params)
+
+        mock_hardware_manager.stimulus.activate_stimulus.assert_called_once_with(stim_params)
 
 
 class TestPolygonStimulusController:
@@ -350,8 +345,7 @@ class TestPolygonStimulusController:
         controller.submit_stim_params(stim_params, 50)
         
         assert 100 in controller.stim_on_list
-        assert 50 in controller.stim_intensity_list
-        
+
         # Event should be modified to list format
         event = controller.stim_param_list[0]["event"]
         assert isinstance(event["x"], list)
@@ -445,15 +439,15 @@ class TestStimulusControllerFactory:
     """Test stimulus controller factory function."""
     
     def test_factory_creates_dummy(self, mock_hardware_manager):
-        """Test factory creates DummyStimulusController for dummy."""
+        """Test factory creates SimpleStimulusController for dummy."""
         controller = create_stimulus_controller("dummy", mock_hardware_manager)
-        assert isinstance(controller, DummyStimulusController)
+        assert isinstance(controller, SimpleStimulusController)
     
     def test_factory_creates_dummy_variants(self, mock_hardware_manager):
         """Test factory recognizes dummy variants."""
         for name in ["no stim", "test", "dummy"]:
             controller = create_stimulus_controller(name, mock_hardware_manager)
-            assert isinstance(controller, DummyStimulusController)
+            assert isinstance(controller, SimpleStimulusController)
     
     def test_factory_creates_widefield(self, mock_hardware_manager):
         """Test factory creates WidefieldStimulusController."""
@@ -522,7 +516,7 @@ class TestStimulusControllerIntegration:
         stim_params = {
             "stim_on": 100,
             "stim_off": 148,
-            "event": {"stim_intensity": 50}
+            "event": {"value": 50}
         }
         controller.submit_stim_params(stim_params, 50)
         

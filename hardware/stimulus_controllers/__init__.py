@@ -30,10 +30,9 @@ def create_stimulus_controller(
     Raises:
         ValueError: If stimulus interface is unknown
     """
-    from hardware.stimulus_controllers.dummy_controller import DummyStimulusController
+    from hardware.stimulus_controllers.simple_controller import SimpleStimulusController
     from hardware.stimulus_controllers.widefield_controller import WidefieldStimulusController
     from hardware.stimulus_controllers.polygon_controller import PolygonStimulusController
-    from hardware.stimulus_controllers.demo_lorenz_controller import LorenzStimulusController
     from hardware.stimulus_controllers.demo_ring_attractor_controller import RingAttractorStimulusController
     from hardware.stimulus_controllers.input_stimulus_controller import InputStimulusController
     
@@ -42,8 +41,8 @@ def create_stimulus_controller(
     
     # Dummy/test interfaces
     if interface_lower in ["no stim", "dummy", "test"]:
-        logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
-        return DummyStimulusController(hardware_manager)
+        logger.info(f"Creating SimpleStimulusController for '{stim_interface}'")
+        return SimpleStimulusController(hardware_manager)
     
     # Widefield interfaces
     elif "spinningdisk" in interface_lower or "spinning-disk" in interface_lower or "639" in interface_lower:
@@ -60,10 +59,6 @@ def create_stimulus_controller(
         # For now, use widefield controller (can be specialized later)
         logger.info(f"Creating WidefieldStimulusController for '{stim_interface}' (LED)")
         return WidefieldStimulusController(hardware_manager)
-    
-    elif "lorenz" in interface_lower:
-        logger.info(f"Creating DummyStimulusController for '{stim_interface}'")
-        return LorenzStimulusController(hardware_manager)
     
     elif "ring_attractor" in interface_lower or "ring" in interface_lower:
         logger.info(f"Creating RingAttractorStimulusController for '{stim_interface}'")
@@ -85,7 +80,7 @@ def create_stimulus_controller(
 __all__ = [
     'create_stimulus_controller',
     'BaseStimulusController',
-    'DummyStimulusController', 
+    'SimpleStimulusController',
     'WidefieldStimulusController',
     'PolygonStimulusController',
 ]

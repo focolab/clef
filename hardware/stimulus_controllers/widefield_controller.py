@@ -27,14 +27,12 @@ class WidefieldStimulusController(BaseStimulusController):
             return
         
         logger.info(f"WidefieldController: received stim params: {stim_params}, image_ndx: {image_ndx}")
-        
+
+        self.last_stim_params = stim_params
+
         # Extract event type
         event = stim_params.get('event', {})
         event_type = event.get('event_type')
-        
-        # Extract intensity if present
-        if "stim_intensity" in event:
-            self.stim_intensity_list.append(event["stim_intensity"])
         
         # Handle stream-widefield events specially
         if event_type == 'stream-widefield':
@@ -70,16 +68,15 @@ class WidefieldStimulusController(BaseStimulusController):
                 self.stim_param_list[-1]["stim_off"] = stim_params["stim_off"]
             logger.debug(f"WidefieldController: Stream stim OFF at frame {stim_params['stim_off']}")
     
-    def _activate_hardware(self, intensity: float) -> None:
+    def _activate_hardware(self, stim_params: Dict[str, Any]) -> None:
         """
         Activate widefield stimulus hardware.
-        
+
         Args:
-            intensity: Stimulus intensity value (typically 0-100%)
+            stim_params: The current stim_params dict
         """
-        params = {"intensity": intensity}
-        self.hardware_manager.stimulus.activate_stimulus(params)
-        logger.debug(f"WidefieldController: Activated stimulus at intensity {intensity}")
+        self.hardware_manager.stimulus.activate_stimulus(stim_params)
+        logger.debug(f"WidefieldController: Activated stimulus with params {stim_params}")
     
     def _deactivate_hardware(self) -> None:
         """Deactivate widefield stimulus hardware."""

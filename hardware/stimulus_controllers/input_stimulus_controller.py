@@ -107,7 +107,9 @@ class InputStimulusController(BaseStimulusController):
         logger.debug(
             f"InputStimulusController: Received params at frame {image_ndx}: {stim_params}"
         )
-        
+
+        self.last_stim_params = stim_params
+
         # Track parameters
         if stim_params.get("stim_on") is not None:
             self.stim_param_list.append(stim_params)
@@ -117,23 +119,18 @@ class InputStimulusController(BaseStimulusController):
             if stim_params.get("stim_off") is not None:
                 self.stim_off_list.append(stim_params["stim_off"])
     
-    def _activate_hardware(self, intensity: float) -> None:
+    def _activate_hardware(self, stim_params: Dict[str, Any]) -> None:
         """
         Activate input stimulus (deliver keyboard/mouse events).
-        
+
         Args:
-            intensity: Not used for input events
+            stim_params: The current stim_params dict
         """
         if not self.keyboard:
             logger.warning("pynput not available, skipping input stimulus")
             return
-        
-        # Get current stimulus params
-        if not self.stim_param_list:
-            logger.warning("No stimulus params available")
-            return
-        
-        current_params = self.stim_param_list[-1]
+
+        current_params = stim_params
         
         # Execute keyboard events
         keys = current_params.get('keys', self.default_keys)

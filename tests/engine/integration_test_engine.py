@@ -300,8 +300,8 @@ class TestClosedLoopEngineIntegration:
                 assert engine.stim_controller is not None
                 
                 # Verify it's the right type (all dummy variants should create DummyStimulusController)
-                from hardware.stimulus_controllers.dummy_controller import DummyStimulusController
-                assert isinstance(engine.stim_controller, DummyStimulusController)
+                from hardware.stimulus_controllers.simple_controller import SimpleStimulusController
+                assert isinstance(engine.stim_controller, SimpleStimulusController)
                 
             finally:
                 engine.cleanup()
