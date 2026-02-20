@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any
 from hardware.backends.base_backend import BaseHardwareBackend
 from hardware.backends.dummy_backend import DummyHardwareBackend
 from hardware.backends.micromanager_backend import MicroManagerBackend
-from hardware.backends.demo_lorenz_backend import LorenzDemoBackend
 from hardware.backends.screenshot_backend import ScreenshotBackend
 from hardware.camera_interface import CameraInterface
 from hardware.stage_interface import StageInterface
@@ -55,9 +54,6 @@ class HardwareManager:
         elif backend_type in ["pycromanager", "pymmcore"]:
             self._backend = MicroManagerBackend(self.config)
             logger.info(f"Selected MicroManagerBackend for {backend_type}")
-        elif backend_type == "lorenz_demo":
-            self._backend = LorenzDemoBackend(self.config)
-            logger.info("Selected LorenzDemoBackend")
         elif backend_type == "ring_attractor_demo":
             self._backend = RingAttractorBackend(self.config)
             logger.info("Selected RingAttractorBackend")
@@ -67,7 +63,7 @@ class HardwareManager:
         else:
             raise ValueError(
                 f"Unknown backend type: {backend_type}. "
-                f"Supported: 'dummy', 'test', 'pycromanager', 'pymmcore', 'lorenz_demo', 'screenshot'"
+                f"Supported: 'dummy', 'test', 'pycromanager', 'pymmcore', 'ring_attractor_demo', 'screenshot'"
             )
     
     def initialize(self, **kwargs) -> None:

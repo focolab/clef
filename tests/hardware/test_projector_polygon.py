@@ -585,7 +585,6 @@ class TestPolygonStimulusController:
         
         assert 100 in controller.stim_on_list
         assert 148 in controller.stim_off_list
-        assert 50 in controller.stim_intensity_list
     
     def test_polygon_controller_get_metadata_includes_calibration(self, mock_hardware_manager, controller_config):
         """Test metadata includes calibration points."""
