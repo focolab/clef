@@ -355,7 +355,7 @@ def test_acquisition_config_validation_negative_frames(temp_config_dir):
     with pytest.raises(ValidationError) as exc_info:
         cm.load_experiment_config(path)
     
-    assert "greater than 0" in str(exc_info.value)
+    assert "num_samples" in str(exc_info.value)
 
 
 

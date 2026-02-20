@@ -277,7 +277,8 @@ class ClosedLoopEngine:
         Raises:
             Exception: When algorithm processing encounters an error
         """
-        logger.info(f"Starting acquisition loop for {self.samples_to_grab} samples...")
+        mode = "endless" if self.samples_to_grab == -1 else f"{self.samples_to_grab} samples"
+        logger.info(f"Starting acquisition loop ({mode})...")
         
         self.is_running = True
         self.sample_count = 0  # RENAMED: was img_count
@@ -299,7 +300,7 @@ class ClosedLoopEngine:
             self.data_interface.start_sampling(buffer_size=0)
             
         try:
-            while self.is_running and self.sample_count < self.samples_to_grab:
+            while self.is_running and (self.samples_to_grab == -1 or self.sample_count < self.samples_to_grab):
                 
                 # get data sample
                 sample = self.data_interface.sample_data()
@@ -310,7 +311,8 @@ class ClosedLoopEngine:
                     
                 # Periodic logging
                 if self.sample_count % 200 == 0:
-                    logger.info(f"Sample: {self.sample_count}/{self.samples_to_grab}")
+                    total = "∞" if self.samples_to_grab == -1 else self.samples_to_grab
+                    logger.info(f"Sample: {self.sample_count}/{total}")
                     
                 # Handle cooldown (TODO: move to algorithm/controller)
                 if self.cooldown_counter > 0:
