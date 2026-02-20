@@ -2,7 +2,8 @@
 Ring Attractor Stimulus Controller
 
 Extends DummyStimulusController with ring-specific functionality.
-Accepts intensity parameter and passes it to the stimulus interface.
+Passes radial_perturbation (-30 to +30) and omega_perturbation (-30 to +30)
+from stim_params to the ring attractor backend.
 """
 
 import logging
@@ -14,21 +15,20 @@ logger = logging.getLogger(__name__)
 
 
 class RingAttractorStimulusController(DummyStimulusController):
-    """Ring attractor stimulus controller with intensity and omega perturbation control."""
-    
-    def __init__(self, hardware_manager, config: Dict[str, Any]):
+    """Ring attractor stimulus controller with radial and omega perturbation control."""
+
+    def __init__(self, hardware_manager):
         """
         Initialize ring attractor stimulus controller.
-        
+
         Args:
             hardware_manager: HardwareManager instance
-            config: Configuration dictionary
         """
-        super().__init__(hardware_manager, config)
-        
+        super().__init__(hardware_manager)
+
         # Default parameters (can be updated by algorithm)
-        self.stim_intensity = 0  # Radial perturbation: -30 to +30
-        self.omega_perturbation = 0.0  # Angular velocity perturbation: -5 to +5
+        self.radial_perturbation = 0  # Radial perturbation: -30 to +30
+        self.omega_perturbation = 0.0  # Angular velocity perturbation: -30 to +30
         
         logger.info("RingAttractorStimulusController initialized")
     
@@ -38,7 +38,7 @@ class RingAttractorStimulusController(DummyStimulusController):
         
         Args:
             stim_params: Dictionary containing stimulus parameters including:
-                - event: Dict with 'stim_intensity' and 'omega_perturbation'
+                - event: Dict with 'radial_perturbation' and 'omega_perturbation'
             image_ndx: Current image index
         """
         if not stim_params:
@@ -51,11 +51,11 @@ class RingAttractorStimulusController(DummyStimulusController):
 
         # Extract ring-specific parameters
         event = stim_params.get('event', {})
-        self.stim_intensity = event.get('stim_intensity', 0) 
+        self.radial_perturbation = event.get('radial_perturbation', 0)
         self.omega_perturbation = event.get('omega_perturbation', 0.0)
-        
+
         logger.debug(
-            f"Ring stimulus submitted: intensity={self.stim_intensity}, "
+            f"Ring stimulus submitted: radial_perturbation={self.radial_perturbation}, "
             f"omega_perturbation={self.omega_perturbation:.2f}"
         )
     
@@ -68,12 +68,12 @@ class RingAttractorStimulusController(DummyStimulusController):
         """
         # Pass both radial and angular perturbations to stimulus interface
         params = {
-            "intensity": self.stim_intensity,
+            "radial_perturbation": self.radial_perturbation,
             "omega_perturbation": self.omega_perturbation
         }
         self.hardware_manager.stimulus.activate_stimulus(params)
-        
+
         logger.debug(
-            f"Activated ring stimulus: intensity={self.stim_intensity}, "
+            f"Activated ring stimulus: radial_perturbation={self.radial_perturbation}, "
             f"omega_perturbation={self.omega_perturbation:.2f}"
         )
