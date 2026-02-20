@@ -282,94 +282,91 @@ class RingAttractorAlgorithm:
     def check_stim(self, image_ndx: int, cooldown_counter: int = 0) -> Tuple[Dict, int]:
         """
         Check if stimulus should be triggered.
-        
+
         Args:
             image_ndx: Current image index
             cooldown_counter: Current cooldown value
-            
+
         Returns:
             tuple: (stim_params dict, new_cooldown_counter)
         """
         # Use provided cooldown counter
         if cooldown_counter > 0:
             self.cooldown_counter = cooldown_counter
-        
+
         # Decrement cooldown
         if self.cooldown_counter > 0:
             self.cooldown_counter -= 1
             return {}, self.cooldown_counter
-        
+
         # Check manual trigger
         if self.manual_stim_pending:
             self.manual_stim_pending = False
-            
+
             stim_params = {
                 'stim_on': image_ndx + 1,
                 'stim_off': image_ndx + 20,  # arbitrary duration
                 'event': {
-                    'stim_intensity': self.current_stim_intensity,
+                    'radial_perturbation': self.current_stim_intensity,
                     'omega_perturbation': self.current_omega_perturbation,
                     'frame': image_ndx,
                     'trigger_type': 'manual'
                 }
             }
-            
+
             self.stim_events.append({
                 'frame': image_ndx,
                 'x': self.x_history[-1] if self.x_history else 0,
                 'y': self.y_history[-1] if self.y_history else 0,
                 'theta': self.theta_history[-1] if self.theta_history else 0,
                 'ring': self.ring_history[-1] if self.ring_history else 0,
-                'stim_intensity': self.current_stim_intensity,
+                'radial_perturbation': self.current_stim_intensity,
                 'omega_perturbation': self.current_omega_perturbation,
                 'trigger_type': 'manual'
             })
-            
+
             self.cooldown_counter = self.stim_cooldown_frames
             logger.info(
                 f"Manual stimulus triggered at frame {image_ndx}, "
-                f"perturbation={self.current_stim_intensity}, "
+                f"radial_perturbation={self.current_stim_intensity}, "
                 f"omega_perturbation={self.current_omega_perturbation}"
             )
-            
-            return stim_params, self.cooldown_counter
-        
-        # Check auto-trigger
-        if self.visualizer.auto_stim_checkbox.isChecked() and len(self.theta_history) > 0:
-            theta = self.theta_history[-1]
-            
-            if self.auto_stim_theta_min <= theta <= self.auto_stim_theta_max:
 
+            return stim_params, self.cooldown_counter
+
+        # Check closed-loop ROI trigger
+        if self.visualizer and len(self.x_history) > 0:
+            x = self.x_history[-1]
+            y = self.y_history[-1]
+            if self.visualizer.is_state_in_any_roi(x, y):
                 intensity = self.visualizer.intensity_slider.value()
-                omega_perturbation = self.visualizer.omega_slider.value() / 10.0  # Convert to -10.0 to +10.0
+                omega_perturbation = self.visualizer.omega_slider.value() / 10.0
                 stim_params = {
                     'stim_on': image_ndx + 1,
                     'stim_off': image_ndx + 20,
                     'event': {
-                        'stim_intensity': intensity,
-                        'omega_perturbation': omega_perturbation,  # No omega perturbation for auto-stim
+                        'radial_perturbation': intensity,
+                        'omega_perturbation': omega_perturbation,
                         'frame': image_ndx,
-                        'trigger_type': 'auto',
-                        'theta': theta
+                        'trigger_type': 'roi',
+                        'x': x,
+                        'y': y,
                     }
                 }
-                
                 self.stim_events.append({
                     'frame': image_ndx,
-                    'x': self.x_history[-1],
-                    'y': self.y_history[-1],
-                    'theta': theta,
+                    'x': x,
+                    'y': y,
+                    'theta': self.theta_history[-1],
                     'ring': self.ring_history[-1],
-                    'stim_intensity': intensity,
-                    'omega_perturbation': 0,
-                    'trigger_type': 'auto'
+                    'radial_perturbation': intensity,
+                    'omega_perturbation': omega_perturbation,
+                    'trigger_type': 'roi'
                 })
-                
                 self.cooldown_counter = self.stim_cooldown_frames
-                logger.info(f"Auto stimulus triggered at frame {image_ndx}, theta={theta:.3f}")
-                
+                logger.info(f"ROI stimulus triggered at frame {image_ndx}, x={x:.1f}, y={y:.1f}")
                 return stim_params, self.cooldown_counter
-        
+
         return {}, 0
     
     def trigger_manual_stimulus(self, intensity: float, omega_perturbation: float):
@@ -528,220 +525,416 @@ class RingAttractorAlgorithm:
         )
 
 
+class _RotatedLabel(QtWidgets.QLabel):
+    """QLabel that draws its text rotated 90° counter-clockwise."""
+
+    def paintEvent(self, event):
+        from pyqtgraph.Qt import QtGui
+        painter = QtGui.QPainter(self)
+        painter.setPen(QtGui.QColor('#555555'))
+        painter.setFont(self.font())
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(-90)
+        rect = QtCore.QRectF(-self.height() / 2, -self.width() / 2, self.height(), self.width())
+        painter.drawText(rect, QtCore.Qt.AlignCenter, self.text())
+        painter.end()
+
+
 class RingVisualizer:
     """Real-time visualization with XY state space plot showing raw positions."""
-    
+
+    # Colors
+    COLOR_INNER_RING = '#2EC4B6'   # teal
+    COLOR_OUTER_RING = '#FF9F1C'   # amber
+    COLOR_TRAJECTORY = '#A8DADC'   # light cyan
+    COLOR_HEAD_NORMAL = '#F4D35E'  # yellow
+    COLOR_HEAD_COOLDOWN = '#E84855'  # red
+    COLOR_STIM_MARKER = '#E84855'  # same red as cooldown head
+
     def __init__(self, algorithm: 'RingAttractorAlgorithm'):
         """Initialize visualizer with XY state space plot."""
         self.algorithm = algorithm
-        
+
         self.QtCore = QtCore
         self.QtWidgets = QtWidgets
         self.pg = pg
-        
+
+        # Closed-loop ROI list
+        self._rois = []
+
         # Create Qt application
         self.app = pg.mkQApp("RingVisualizer")
         with open(CSS_PATH, 'r') as f:
             self.app.setStyleSheet(f.read())
-        
+
         # Create main window
         self.window = QtWidgets.QWidget()
-        self.window.setWindowTitle("Ring Attractor - XY State Space Demo")
-        self.window.resize(1200, 700)
-        
-        # Create layout - 2 columns
+        self.window.setWindowTitle("Ring Attractor — Closed-Loop Demo")
+        self.window.resize(1280, 780)
+
+        # Root layout: 3 columns
         self.layout = QtWidgets.QGridLayout()
+        self.layout.setColumnStretch(0, 0)   # image column — fixed
+        self.layout.setColumnStretch(1, 1)   # state space — stretch
+        self.layout.setColumnStretch(2, 0)   # control panel — fixed
         self.window.setLayout(self.layout)
-        
-        # === LEFT: Image display ===
+
+        # ── LEFT: Image column ──────────────────────────────────────────
+        img_col = QtWidgets.QVBoxLayout()
+
+        img_heading = QtWidgets.QLabel("Raw 'Microscopy' Images")
+        img_heading.setStyleSheet("font-weight: bold; font-size: 13px; padding-bottom: 2px;")
+        img_col.addWidget(img_heading)
+
+        eq_label = QtWidgets.QLabel(
+            "Gaussian pucta drawn according to:<br>"
+            "<small>dr/dt = −k(r−r₁)(r−mid)(r−r₂) + u<br>"
+            "dθ/dt = ω + u_ω</small>"
+        )
+        eq_label.setStyleSheet("color: #555; padding-bottom: 4px;")
+        img_col.addWidget(eq_label)
+
         self.image_widget = pg.ImageView()
         self.image_widget.ui.roiBtn.hide()
         self.image_widget.ui.menuBtn.hide()
-        self.layout.addWidget(self.image_widget, 0, 0, 2, 1)
-        
-        # === RIGHT: XY state space ===
+        self.image_widget.ui.histogram.hide()
+        self.image_widget.setFixedSize(320, 320)
+
+        # Image with rotated Y-axis label on left
+        img_row = QtWidgets.QHBoxLayout()
+        img_row.setSpacing(2)
+        y_axis_label = _RotatedLabel("Y (px)")
+        y_axis_label.setFixedWidth(16)
+        y_axis_label.setFixedHeight(320)
+        img_row.addWidget(y_axis_label)
+        img_row.addWidget(self.image_widget)
+        img_col.addLayout(img_row)
+
+        x_axis_label = QtWidgets.QLabel("X (px)")
+        x_axis_label.setAlignment(QtCore.Qt.AlignHCenter)
+        x_axis_label.setStyleSheet("font-size: 11px; color: #555; padding-left: 16px;")
+        img_col.addWidget(x_axis_label)
+        img_col.addStretch()
+
+        img_container = QtWidgets.QWidget()
+        img_container.setLayout(img_col)
+        self.layout.addWidget(img_container, 0, 0, 2, 1)
+
+        # ── CENTER: State space column ──────────────────────────────────
+        plot_col = QtWidgets.QVBoxLayout()
+
+        plot_heading = QtWidgets.QLabel("Extracted Data — State Space")
+        plot_heading.setStyleSheet("font-weight: bold; font-size: 13px; padding-bottom: 2px;")
+        plot_col.addWidget(plot_heading)
+
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setAspectLocked(True)
-        self.plot_widget.setTitle("XY State Space (Raw Positions)")
-        self.plot_widget.setLabel('left', 'Y (pixels, centered)')
-        self.plot_widget.setLabel('bottom', 'X (pixels, centered)')
-        self.layout.addWidget(self.plot_widget, 0, 1, 1, 1)
-        
+        self.plot_widget.setLabel('left', 'Y position (px, centered)')
+        self.plot_widget.setLabel('bottom', 'X position (px, centered)')
+        plot_col.addWidget(self.plot_widget)
+
+        plot_container = QtWidgets.QWidget()
+        plot_container.setLayout(plot_col)
+        self.layout.addWidget(plot_container, 0, 1, 2, 1)
+
         # Draw ring circles
         self._draw_ring_circles()
-        
-        # Trajectory plot
-        self.trajectory_plot = self.plot_widget.plot(pen=pg.mkPen('c', width=2))
-        self.current_pos_plot = self.plot_widget.plot(
-            pen=None, symbol='o', symbolSize=10, symbolBrush='y'
+
+        # Trajectory trail
+        self.trajectory_plot = self.plot_widget.plot(
+            pen=pg.mkPen(self.COLOR_TRAJECTORY, width=2)
         )
-        
-        # === BOTTOM RIGHT: Control panel ===
-        self.control_widget = QtWidgets.QWidget()
-        self.control_layout = QtWidgets.QVBoxLayout()
-        self.control_widget.setLayout(self.control_layout)
-        self.layout.addWidget(self.control_widget, 1, 1, 1, 1)
-        
-        # Trigger button
-        self.trigger_button = QtWidgets.QPushButton("Apply Perturbation")
+
+        # Current position "head"
+        self.current_pos_plot = self.plot_widget.plot(
+            pen=None, symbol='o', symbolSize=12,
+            symbolBrush=self.COLOR_HEAD_NORMAL, symbolPen=None
+        )
+
+        # Stim event X markers
+        self.stim_marker_plot = self.plot_widget.plot(
+            pen=None, symbol='x', symbolSize=14,
+            symbolBrush=self.COLOR_STIM_MARKER,
+            symbolPen=pg.mkPen(self.COLOR_STIM_MARKER, width=2)
+        )
+        self._stim_marker_x = []
+        self._stim_marker_y = []
+        self._stim_events_offset = 0  # index into algorithm.stim_events after last clear
+
+        # ── RIGHT: Control panel ────────────────────────────────────────
+        ctrl_col = QtWidgets.QVBoxLayout()
+        ctrl_col.setSpacing(6)
+
+        # Instructions
+        instructions = QtWidgets.QLabel(
+            "<b>Instructions</b><br>"
+            "1. Watch the puncta orbit the ring attractors.<br>"
+            "2. Use <i>Manual Stimulation</i> to push<br>"
+            "&nbsp;&nbsp;&nbsp;the system between rings.<br>"
+            "3. Draw a <i>Closed-Loop ROI</i> on the state<br>"
+            "&nbsp;&nbsp;&nbsp;space to trigger automatically<br>"
+            "&nbsp;&nbsp;&nbsp;when the state enters that region.<br>"
+            "4. Adjust sliders to tune the perturbation."
+        )
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet(
+            "QLabel { background: #f0f4f8; border: 1px solid #c8d0d8; "
+            "border-radius: 4px; padding: 8px; font-size: 11px; }"
+        )
+        ctrl_col.addWidget(instructions)
+
+        # Manual stimulation button
+        self.trigger_button = QtWidgets.QPushButton("Manual Stimulation")
+        self.trigger_button.setFixedHeight(28)
         self.trigger_button.clicked.connect(self._on_trigger_clicked)
-        self.control_layout.addWidget(self.trigger_button)
-        
-        # Radial perturbation slider (-30 to +30)
+        ctrl_col.addWidget(self.trigger_button)
+
+        # ROI buttons
+        roi_layout = QtWidgets.QHBoxLayout()
+        self.add_roi_button = QtWidgets.QPushButton("Add Closed-Loop ROI")
+        self.add_roi_button.setFixedHeight(28)
+        self.add_roi_button.clicked.connect(self._on_add_roi_clicked)
+        roi_layout.addWidget(self.add_roi_button)
+
+        self.delete_rois_button = QtWidgets.QPushButton("Delete ROIs")
+        self.delete_rois_button.setFixedHeight(28)
+        self.delete_rois_button.clicked.connect(self._on_delete_rois_clicked)
+        roi_layout.addWidget(self.delete_rois_button)
+        ctrl_col.addLayout(roi_layout)
+
+        # Closed-loop trigger description
+        cl_box = QtWidgets.QLabel(
+            "<b>Closed-Loop Trigger</b><br>"
+            "When the system state (X, Y) enters a<br>"
+            "drawn ROI, a stimulus is automatically<br>"
+            "delivered (subject to cooldown).<br>"
+            "Drag corners to resize; drag body to move."
+        )
+        cl_box.setWordWrap(True)
+        cl_box.setStyleSheet(
+            "QLabel { background: #fff8e7; border: 1px solid #f0c040; "
+            "border-radius: 4px; padding: 8px; font-size: 11px; }"
+        )
+        ctrl_col.addWidget(cl_box)
+
+        # Separator
+        sep = QtWidgets.QFrame()
+        sep.setFrameShape(QtWidgets.QFrame.HLine)
+        sep.setStyleSheet("color: #ccc;")
+        ctrl_col.addWidget(sep)
+
+        # Stimulus Parameters superheading
+        stim_heading = QtWidgets.QLabel("Stimulus Parameters")
+        stim_heading.setStyleSheet("font-weight: bold; font-size: 12px;")
+        ctrl_col.addWidget(stim_heading)
+
+        # Radial perturbation slider
         slider_layout = QtWidgets.QHBoxLayout()
-        slider_layout.addWidget(QtWidgets.QLabel("Radial:"))
+        slider_layout.addWidget(QtWidgets.QLabel("r:"))
         self.intensity_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.intensity_slider.setMinimum(-100)
         self.intensity_slider.setMaximum(100)
         self.intensity_slider.setValue(0)
+        self.intensity_slider.setFixedHeight(20)
         self.intensity_slider.valueChanged.connect(self._on_intensity_changed)
         slider_layout.addWidget(self.intensity_slider)
-        self.intensity_label = QtWidgets.QLabel("0 (none)")
-        self.intensity_label.setMinimumWidth(100)
+        self.intensity_label = QtWidgets.QLabel("0")
+        self.intensity_label.setFixedWidth(80)
         slider_layout.addWidget(self.intensity_label)
-        self.control_layout.addLayout(slider_layout)
-        
-        # Omega perturbation slider (-5 to +5)
-        omega_slider_layout = QtWidgets.QHBoxLayout()
-        omega_slider_layout.addWidget(QtWidgets.QLabel("Omega:"))
+        ctrl_col.addLayout(slider_layout)
+
+        # Omega perturbation slider
+        omega_layout = QtWidgets.QHBoxLayout()
+        omega_layout.addWidget(QtWidgets.QLabel("ω:"))
         self.omega_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.omega_slider.setMinimum(-100)  # -10.0 with 0.1 resolution
-        self.omega_slider.setMaximum(100)   # +10.0 with 0.1 resolution
+        self.omega_slider.setMinimum(-100)
+        self.omega_slider.setMaximum(100)
         self.omega_slider.setValue(0)
+        self.omega_slider.setFixedHeight(20)
         self.omega_slider.valueChanged.connect(self._on_omega_changed)
-        omega_slider_layout.addWidget(self.omega_slider)
-        self.omega_label = QtWidgets.QLabel("0.0 (none)")
-        self.omega_label.setMinimumWidth(100)
-        omega_slider_layout.addWidget(self.omega_label)
-        self.control_layout.addLayout(omega_slider_layout)
-        
-        # Helper text
-        helper_text = QtWidgets.QLabel(
-            "<small><b>Radial Perturbation:</b><br>"
-            "• Positive (+) = push outward<br>"
-            "• Negative (-) = pull inward<br>"
-            "• ~±15 will switch rings<br><br>"
-            "<b>Omega Perturbation:</b><br>"
-            "• Positive (+) = speed up rotation<br>"
-            "• Negative (-) = slow down rotation</small>"
+        omega_layout.addWidget(self.omega_slider)
+        self.omega_label = QtWidgets.QLabel("0.0")
+        self.omega_label.setFixedWidth(80)
+        omega_layout.addWidget(self.omega_label)
+        ctrl_col.addLayout(omega_layout)
+
+        # Slider helper
+        slider_help = QtWidgets.QLabel(
+            "<small>r: + push out, − pull in (~±15 switches rings)<br>"
+            "ω: + speed up, − slow down rotation (±30)</small>"
         )
-        helper_text.setStyleSheet("QLabel { color: #666; padding: 5px; }")
-        self.control_layout.addWidget(helper_text)
-        
-        # Auto-stim checkbox
-        self.auto_stim_checkbox = QtWidgets.QCheckBox("Auto-trigger at θ ∈ [0, π/4]")
-        self.auto_stim_checkbox.setChecked(self.algorithm.auto_stim_enabled)
-        self.auto_stim_checkbox.stateChanged.connect(self._on_auto_stim_changed)
-        self.control_layout.addWidget(self.auto_stim_checkbox)
-        
+        slider_help.setStyleSheet("color: #666;")
+        ctrl_col.addWidget(slider_help)
+
+        # Separator
+        sep2 = QtWidgets.QFrame()
+        sep2.setFrameShape(QtWidgets.QFrame.HLine)
+        sep2.setStyleSheet("color: #ccc;")
+        ctrl_col.addWidget(sep2)
+
+        # Clear stim markers button
+        self.clear_markers_button = QtWidgets.QPushButton("Clear Stim Markers")
+        self.clear_markers_button.setFixedHeight(24)
+        self.clear_markers_button.clicked.connect(self._on_clear_markers_clicked)
+        ctrl_col.addWidget(self.clear_markers_button)
+
         # Info text
         self.info_text = QtWidgets.QLabel()
         self.info_text.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
-        self.info_text.setStyleSheet("QLabel { background-color: white; padding: 10px; }")
-        self.control_layout.addWidget(self.info_text)
-        
+        self.info_text.setWordWrap(True)
+        self.info_text.setStyleSheet(
+            "QLabel { background: #f8f8f8; border: 1px solid #ddd; "
+            "border-radius: 4px; padding: 8px; font-size: 11px; }"
+        )
+        ctrl_col.addWidget(self.info_text)
+        ctrl_col.addStretch()
+
+        ctrl_container = QtWidgets.QWidget()
+        ctrl_container.setFixedWidth(260)
+        ctrl_container.setLayout(ctrl_col)
+        self.layout.addWidget(ctrl_container, 0, 2, 2, 1)
+
         self.window.show()
-        logger.info("RingVisualizer with XY state space initialized")
-    
+        logger.info("RingVisualizer initialized")
+
     def _draw_ring_circles(self):
         """Draw dotted circles for ring attractors."""
-        # Inner ring
-        theta = np.linspace(0, 2*np.pi, 100)
+        theta = np.linspace(0, 2 * np.pi, 200)
         x_inner = self.algorithm.inner_radius * np.cos(theta)
         y_inner = self.algorithm.inner_radius * np.sin(theta)
-        self.plot_widget.plot(x_inner, y_inner, pen=pg.mkPen('b', width=2, style=QtCore.Qt.DotLine))
-        
-        # Outer ring
+        self.plot_widget.plot(
+            x_inner, y_inner,
+            pen=pg.mkPen(self.COLOR_INNER_RING, width=2, style=QtCore.Qt.DotLine)
+        )
         x_outer = self.algorithm.outer_radius * np.cos(theta)
         y_outer = self.algorithm.outer_radius * np.sin(theta)
-        self.plot_widget.plot(x_outer, y_outer, pen=pg.mkPen('r', width=2, style=QtCore.Qt.DotLine))
-    
+        self.plot_widget.plot(
+            x_outer, y_outer,
+            pen=pg.mkPen(self.COLOR_OUTER_RING, width=2, style=QtCore.Qt.DotLine)
+        )
+
+    # ── ROI helpers ────────────────────────────────────────────────────
+
+    def _on_add_roi_clicked(self):
+        """Add a draggable RectROI to the state space plot."""
+        r = self.algorithm.inner_radius
+        roi = pg.RectROI(
+            pos=[-r * 0.5, -r * 0.5],
+            size=[r, r],
+            pen=pg.mkPen('#F4D35E', width=2),
+            handlePen=pg.mkPen('#F4D35E', width=2),
+            movable=True,
+            resizable=True,
+        )
+        self.plot_widget.addItem(roi)
+        self._rois.append(roi)
+        logger.info("Closed-loop ROI added")
+
+    def _on_delete_rois_clicked(self):
+        """Remove all closed-loop ROIs from the plot."""
+        for roi in self._rois:
+            self.plot_widget.removeItem(roi)
+        self._rois.clear()
+        logger.info("All closed-loop ROIs deleted")
+
+    def is_state_in_any_roi(self, x: float, y: float) -> bool:
+        """Return True if (x, y) falls inside any closed-loop ROI."""
+        for roi in self._rois:
+            pos = roi.pos()
+            size = roi.size()
+            if pos.x() <= x <= pos.x() + size.x() and pos.y() <= y <= pos.y() + size.y():
+                return True
+        return False
+
+    # ── Button callbacks ───────────────────────────────────────────────
+
     def _on_trigger_clicked(self):
-        """Handle manual trigger button click."""
         intensity = self.intensity_slider.value()
-        omega_perturbation = self.omega_slider.value() / 10.0  # Convert to -10.0 to +10.0
+        omega_perturbation = self.omega_slider.value() / 10.0
         self.algorithm.trigger_manual_stimulus(intensity, omega_perturbation)
-    
+
     def _on_intensity_changed(self, value):
-        """Handle intensity slider change."""
-        if value > 0:
-            label = f"+{value} (outward)"
-        elif value < 0:
-            label = f"{value} (inward)"
-        else:
-            label = "0 (none)"
+        label = f"+{value} (out)" if value > 0 else (f"{value} (in)" if value < 0 else "0")
         self.intensity_label.setText(label)
         self.algorithm.current_stim_intensity = value
-    
+
     def _on_omega_changed(self, value):
-        """Handle omega slider change."""
-        omega_value = value / 10.0  # Convert to -5.0 to +5.0
-        if omega_value > 0:
-            label = f"+{omega_value:.1f} (faster)"
-        elif omega_value < 0:
-            label = f"{omega_value:.1f} (slower)"
-        else:
-            label = "0.0 (none)"
+        omega_value = value / 10.0
+        label = f"+{omega_value:.1f} (↑)" if omega_value > 0 else (f"{omega_value:.1f} (↓)" if omega_value < 0 else "0.0")
         self.omega_label.setText(label)
         self.algorithm.current_omega_perturbation = omega_value
-    
-    def _on_auto_stim_changed(self, state):
-        """Handle auto-stim checkbox change."""
-        enabled = state == QtCore.Qt.Checked
-        self.algorithm.set_auto_stim_enabled(enabled)
-    
+
+    def _on_clear_markers_clicked(self):
+        self._stim_marker_x.clear()
+        self._stim_marker_y.clear()
+        self._stim_events_offset = len(self.algorithm.stim_events)
+        self.stim_marker_plot.setData([], [])
+        logger.info("Stim markers cleared")
+
+    # ── Per-frame update methods ───────────────────────────────────────
+
     def update_image(self, img: np.ndarray, puncta_x: float, puncta_y: float):
-        """Update image display with puncta marker."""
-        self.image_widget.setImage(img.T, autoLevels=False, autoRange=False)
-    
+        """Update image display with fixed color scaling."""
+        self.image_widget.setImage(
+            img.T, autoLevels=False, autoRange=False,
+            levels=(0, int(self.algorithm.image_width))
+        )
+
     def update_trajectory(self):
-        """Update XY state space trajectory plot."""
+        """Update XY state space trajectory and head color."""
         if len(self.algorithm.x_history) < 2:
             return
-        
-        # Get last N points for fading trail
+
         N = min(self.algorithm.fading_trajectory_samples, len(self.algorithm.x_history))
         x_coords = self.algorithm.x_history[-N:]
         y_coords = self.algorithm.y_history[-N:]
-        
-        # Plot trajectory
+
         self.trajectory_plot.setData(x_coords, y_coords)
-        
-        # Current position
-        if x_coords:
-            self.current_pos_plot.setData([x_coords[-1]], [y_coords[-1]])
-    
+
+        # Head color: red during cooldown, yellow otherwise
+        in_cooldown = self.algorithm.cooldown_counter > 0
+        head_color = self.COLOR_HEAD_COOLDOWN if in_cooldown else self.COLOR_HEAD_NORMAL
+        self.current_pos_plot.setData(
+            [x_coords[-1]], [y_coords[-1]],
+            symbolBrush=head_color, symbolPen=None
+        )
+
+        # Append new stim markers (only events after last clear)
+        shown_count = self._stim_events_offset + len(self._stim_marker_x)
+        if len(self.algorithm.stim_events) > shown_count:
+            for event in self.algorithm.stim_events[shown_count:]:
+                self._stim_marker_x.append(event['x'])
+                self._stim_marker_y.append(event['y'])
+            self.stim_marker_plot.setData(self._stim_marker_x, self._stim_marker_y)
+
     def update_info_text(self):
         """Update info text."""
         if not self.algorithm.x_history:
             return
-            
+
         x = self.algorithm.x_history[-1]
         y = self.algorithm.y_history[-1]
         theta = self.algorithm.theta_history[-1] if self.algorithm.theta_history else 0
         ring_idx = self.algorithm.ring_history[-1] if self.algorithm.ring_history else 0
         r = np.sqrt(x**2 + y**2)
-        
-        info = f"""
-        <b>Ring Attractor Closed-Loop Demo</b><br><br>
-        <b>Frame:</b> {self.algorithm.frame_count} / {self.algorithm.samples_to_grab}<br>
-        <b>Current State:</b><br>
-        &nbsp;&nbsp;X = {x:.1f} px<br>
-        &nbsp;&nbsp;Y = {y:.1f} px<br>
-        &nbsp;&nbsp;R = {r:.1f} px<br>
-        &nbsp;&nbsp;Theta = {theta:.3f} rad ({np.degrees(theta):.1f}°)<br>
-        &nbsp;&nbsp;Ring = {'Inner' if ring_idx == 0 else 'Outer'}<br>
-        <br>
-        <b>Stimulus Events:</b> {len(self.algorithm.stim_events)}<br>
-        <b>Ring Transitions:</b> {self.algorithm.transition_count}<br>
-        <b>Cooldown:</b> {self.algorithm.cooldown_counter} frames<br>
-        """
+        cooldown = self.algorithm.cooldown_counter
+
+        info = (
+            f"<b>Frame:</b> {self.algorithm.frame_count} / {self.algorithm.samples_to_grab}<br>"
+            f"<b>X</b> = {x:.1f} px &nbsp; <b>Y</b> = {y:.1f} px<br>"
+            f"<b>R</b> = {r:.1f} px &nbsp; <b>θ</b> = {np.degrees(theta):.1f}°<br>"
+            f"<b>Ring:</b> {'Inner' if ring_idx == 0 else 'Outer'}<br>"
+            f"<b>Cooldown:</b> {cooldown} frames<br>"
+            f"<b>Stim events:</b> {len(self.algorithm.stim_events)}<br>"
+            f"<b>Transitions:</b> {self.algorithm.transition_count}<br>"
+            f"<b>Active ROIs:</b> {len(self._rois)}"
+        )
         self.info_text.setText(info)
-    
+
     def process_events(self):
         """Process Qt events."""
         self.app.processEvents()
-    
+
     def close(self):
         """Close visualizer."""
         self.window.close()

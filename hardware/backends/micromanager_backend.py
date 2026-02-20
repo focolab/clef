@@ -532,7 +532,8 @@ class MicroManagerStimulus(StimulusInterface):
         self._current_params = params
 
         stim_type = self._device_config.type
-        intensity = params.get("intensity", 10)
+        event = params.get('event', {})
+        intensity = event.get("stim_intensity", 10)
         
         if stim_type == "widefield_laser":
             self._activate_widefield_laser(intensity)

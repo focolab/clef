@@ -9,7 +9,7 @@ save_sample_video: false
 
 # Acquisition parameters
 acquisition:
-  num_samples: 2000
+  num_samples: 20000
 
 # Subject metadata
 subject:

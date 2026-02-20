@@ -95,7 +95,9 @@ class PolygonStimulusController(BaseStimulusController):
             return
         
         logger.info(f"PolygonController: received stim params: {stim_params}, image_ndx: {image_ndx}")
-        
+
+        self.last_stim_params = stim_params
+
         # Update polygon mask if event present
         if "event" in stim_params:
             self._update_polygon_mask(stim_params)
@@ -103,10 +105,6 @@ class PolygonStimulusController(BaseStimulusController):
         # Extract event info
         event = stim_params.get('event', {})
         stim_type = event.get('event_type')
-        
-        # Store intensity
-        if "stim_intensity" in event:
-            self.stim_intensity_list.append(event["stim_intensity"])
         
         # Check if stimulus is pulsed (has both on and off times)
         if stim_params.get("stim_on") is not None and stim_params.get("stim_off") is not None:
@@ -142,8 +140,6 @@ class PolygonStimulusController(BaseStimulusController):
             event["dynamic_event_frame_ndx"] = [t]
             
             self.stim_on_list.append(stim_params["stim_on"])
-            if "stim_intensity" in stim_params:
-                self.stim_intensity_list.append(stim_params["stim_intensity"])
             self.stim_param_list.append(stim_params)
         
         # Received off but no on
@@ -199,16 +195,15 @@ class PolygonStimulusController(BaseStimulusController):
         # Delegate mask update to hardware backend
         self.hardware_manager.stimulus.update_polygon_mask(stim_params)
     
-    def _activate_hardware(self, intensity: float) -> None:
+    def _activate_hardware(self, stim_params: Dict[str, Any]) -> None:
         """
         Activate polygon stimulus hardware.
-        
+
         Args:
-            intensity: Stimulus intensity value
+            stim_params: The current stim_params dict
         """
-        params = {"intensity": intensity}
-        self.hardware_manager.stimulus.activate_stimulus(params)
-        logger.debug(f"PolygonController: Activated stimulus at intensity {intensity}")
+        self.hardware_manager.stimulus.activate_stimulus(stim_params)
+        logger.debug(f"PolygonController: Activated stimulus with params {stim_params}")
     
     def _deactivate_hardware(self) -> None:
         """Deactivate polygon stimulus hardware."""

@@ -112,12 +112,11 @@ def run_brainalyzer_demo(input_tiff_path: str):
         logger.info("=" * 60)
         logger.info("")
         logger.info("INTERACTIVE DEMO INSTRUCTIONS")
-        logger.info("  1. GUI window showing real-time image display is open")
-        logger.info("  2. Use mouse to click on z-plane images")
-        logger.info("  3. Add quantification ROIs (green) to track intensity")
-        logger.info("  4. Add stimulus ROIs (red, dotted) to define stim regions")
-        logger.info("  5. Click 'pulse stimulate ROI(s)' to trigger stimulus")
-        logger.info("  6. Watch ROI intensity plots update in real-time")
+        logger.info("  1. GUI window opens with real-time z-plane image display")
+        logger.info("  2. Click on any z-plane image to add an ROI at that location")
+        logger.info("  3. ROIs appear as colored overlays; intensity is plotted in real-time")
+        logger.info("  4. Use GUI controls to manually trigger stimulus or set thresholds")
+        logger.info("  5. Close the window or press Ctrl+C to stop acquisition")
         logger.info("=" * 60)
         logger.info("")
 
@@ -161,14 +160,14 @@ def run_brainalyzer_demo(input_tiff_path: str):
 
 def main():
     """Main entry point for demo."""
-    default_tiff = 'C:/Users/rldun/Desktop/temp_render/example_data/20221106-21-47-31/20221106-21-47-1_minified_8z_100t.tif'
-
     if len(sys.argv) > 1:
         input_tiff = sys.argv[1]
     elif os.environ.get("BRAINALYZER_DEMO_TIFF"):
         input_tiff = os.environ["BRAINALYZER_DEMO_TIFF"]
     else:
-        input_tiff = default_tiff
+        print("Usage: python demo/demo_brainalyzer.py <path/to/input.tif>")
+        print("  or set environment variable BRAINALYZER_DEMO_TIFF")
+        sys.exit(1)
 
     success = run_brainalyzer_demo(input_tiff)
     sys.exit(0 if success else 1)

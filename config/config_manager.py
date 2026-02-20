@@ -73,7 +73,14 @@ class SystemDevices(BaseModel):
 
 class AcquisitionConfig(BaseModel):
     """Acquisition parameters."""
-    num_samples: int = Field(100, gt=0, description="Number of frames to acquire")
+    num_samples: int = Field(100, description="Number of samples to acquire. Use -1 for endless mode (runs until stopped).")
+
+    @field_validator("num_samples")
+    @classmethod
+    def validate_num_samples(cls, v):
+        if v != -1 and v <= 0:
+            raise ValueError("num_samples must be a positive integer or -1 for endless mode")
+        return v
     model_config = ConfigDict(extra="allow")
 
 

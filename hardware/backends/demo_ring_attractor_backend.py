@@ -367,8 +367,9 @@ class RingStimulus(DummyStimulus):
         super().activate_stimulus(params)
         
         # Get perturbation strengths from parameters
-        perturbation_strength = params.get('intensity', 0.0)
-        omega_perturbation = params.get('omega_perturbation', 0.0)
+        event = params.get('event', {})
+        perturbation_strength = event.get('radial_perturbation', 0.0)
+        omega_perturbation = event.get('omega_perturbation', 0.0)
         
         # Apply both radial and angular perturbations
         self.ring.apply_perturbation(perturbation_strength, omega_perturbation)

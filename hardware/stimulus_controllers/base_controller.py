@@ -33,13 +33,13 @@ class BaseStimulusController(ABC):
         """
         self.hardware_manager = hardware_manager
 
-        # Timing tracking (from old StimBaseClass)
+        # Timing tracking
         self.stim_on_list = []
         self.stim_off_list = []
         self.stim_on_time_list = []
         self.stim_off_time_list = []
-        self.stim_intensity_list = []
         self.stim_param_list = []
+        self.last_stim_params = None
     
     @abstractmethod
     def submit_stim_params(self, stim_params: Dict[str, Any], image_ndx: int) -> None:
@@ -55,23 +55,19 @@ class BaseStimulusController(ABC):
     def check_stim(self, img_count: int) -> None:
         """
         Check if stimulus should be activated/deactivated at current frame.
-        
+
         Args:
             img_count: Current image count
         """
         # Activation check
-        if img_count in self.stim_on_list:
-            idx = self.stim_on_list.index(img_count)
-            intensity = self.stim_intensity_list[idx] if idx < len(self.stim_intensity_list) else 1
-            
-            logger.info(
-                f"BaseStimulusController: activating stim on frame {img_count}"
-            )
-            
-            # Delegate to hardware
-            self._activate_hardware(intensity)
+        if (
+            self.last_stim_params is not None
+            and img_count == self.last_stim_params.get("stim_on")
+        ):
+            logger.info(f"BaseStimulusController: activating stim on frame {img_count}")
+            self._activate_hardware(self.last_stim_params)
             self.stim_on_time_list.append(time.time())
-        
+
         # Deactivation check
         if img_count in self.stim_off_list:
             logger.info(
@@ -83,12 +79,12 @@ class BaseStimulusController(ABC):
             self.stim_off_time_list.append(time.time())
     
     @abstractmethod
-    def _activate_hardware(self, intensity: float) -> None:
+    def _activate_hardware(self, stim_params: Dict[str, Any]) -> None:
         """
-        Activate stimulus hardware with given intensity.
-        
+        Activate stimulus hardware with the current stim params.
+
         Args:
-            intensity: Stimulus intensity value
+            stim_params: The stim_params dict from the most recent submit_stim_params call
         """
         pass
     
