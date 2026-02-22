@@ -918,8 +918,8 @@ class MicroManagerBackend(BaseHardwareBackend):
                 ttl_device = self.config.system_devices.stage.ttl_device
 
                 # Split z planes symmetrically around 0; assumes current position is center
-                z_start = -(num_planes//2) * z_step
-                z_end = num_planes//2 * z_step
+                z_start = -(num_planes - 1) * z_step / 2
+                z_end = (num_planes - 1) * z_step / 2
                 self._stage.configure_z_stack(z_start=z_start, z_end=z_end, z_step=z_step, num_planes=num_planes, ttl_device=ttl_device, ttl_state=ttl_state)
         except Exception as err:
             logger.error(f'Error while configuring z-stack: {err}')
@@ -960,12 +960,6 @@ class MicroManagerBackend(BaseHardwareBackend):
         if not self._initialized or not self.mmc:
             return {}
         
-        # Use MMSubroutines.get_metadata
-        # args = {
-        #     "gooey_args": {
-        #         "microscope_name": self.config.microscope_name or "unknown",
-        #     }
-        # }
         cam = self.mmc.getCameraDevice()
         binning = self.mmc.getProperty(cam, "Binning")
 
