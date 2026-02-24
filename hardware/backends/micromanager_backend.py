@@ -61,6 +61,8 @@ class MicroManagerCamera(CameraInterface):
         
         self._width = self._roi[2]
         self._height = self._roi[3]
+
+        logger.info(f'Micro-Manager camera intialized with ROI {self._roi}')
     
     def acquire_frame(self) -> np.ndarray:
         """Acquire a single frame."""
@@ -165,7 +167,7 @@ class MicroManagerCamera(CameraInterface):
                 except Exception as e:
                     logger.warning(f"Could not set property {prop_name}={prop_value}: {e}")
         
-        logger.debug(f"Micro-Manager: Camera configured with {config}")
+        logger.info(f"Micro-Manager: Camera configured with config {config}")
 
 
 class MicroManagerStage(StageInterface):
@@ -914,6 +916,8 @@ class MicroManagerBackend(BaseHardwareBackend):
             if stage_cfg and getattr(stage_cfg, 'num_z_planes', None) and stage_cfg.num_z_planes > 1:
                 num_planes = self.config.system_devices.stage.num_z_planes
                 z_step = self.config.system_devices.stage.z_step_size_um
+
+                # ttl pulses from illumination trigger stage move
                 ttl_state = self.config.system_devices.stage.ttl_state
                 ttl_device = self.config.system_devices.stage.ttl_device
 
@@ -938,9 +942,10 @@ class MicroManagerBackend(BaseHardwareBackend):
         if self.mmc:
 
             # Build minimal args for close function
-            # hardcoded
-            try: 
-                laserTTLs = "TTL1-8"
+            try:
+                
+                # safe close-down may be dependent on specific hardware 
+                laserTTLs = self.config.system_devices.stage.ttl_device
                 stage = self.mmc.getFocusDevice()
                 self.mmc.stopStageSequence(stage)
                 self.mmc.waitForDevice(stage)

@@ -1,14 +1,14 @@
 # Experiment configuration for Brainalyzer hardware demo
 experiment_name: "SCaMP and opto"
 experimenter: "Raymond Dunn"
-output_dir: "./20260222_RLD_1"
+output_dir: "E:/Kato lab/RLD/20260222_RLD_1"
 save_images: true
 save_metadata: true
 save_sample_video: false
 
 # Acquisition parameters
 acquisition:
-  num_samples: 3600
+  num_samples: 1200
 
   # this should be in algorithm or removed
   baseline_samples: 0 
