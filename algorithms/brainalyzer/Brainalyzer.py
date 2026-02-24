@@ -436,22 +436,31 @@ class Brainalyzer:
     def close(self):
         """Close the worker process and clean up resources."""
         # Close the shared memory buffers
-        for shm in self.shared_frame_memory_list:
-            shm.close()
-            shm.unlink()
-            
-        if self.shared_image_count:
-            self.shared_image_count.shm.close()
-            self.shared_image_count.shm.unlink()
+        try: 
+            for shm in self.shared_frame_memory_list:
+                shm.close()
+                shm.unlink()
+                
+            if self.shared_image_count:
+                self.shared_image_count.shm.close()
+                self.shared_image_count.shm.unlink()
+        except Exception as err:
+            logger.info(f'Error while trying to unlink subprocess shared memory: {err}')
+        
+        try:
+            # Close stage-related shared memory
+            if self.GUI_mode == "behavior" and hasattr(self, 'shared_stage_offset_xy'):
+                self.shared_stage_offset_xy.shm.close()
+                self.shared_stage_offset_xy.shm.unlink()
+        except Exception as err:
+            logger.info(f"Error while trying to unlink stage subprocess shared memory: {err}")
 
         # Close the worker process
         if self.parent_conn:
-            self.parent_conn.send("close")
-
-        # Close stage-related shared memory
-        if self.GUI_mode == "behavior" and hasattr(self, 'shared_stage_offset_xy'):
-            self.shared_stage_offset_xy.shm.close()
-            self.shared_stage_offset_xy.shm.unlink()
+            try: 
+                self.parent_conn.send("close")
+            except Exception as err:
+                logger.info(f'Error while trying to close Brainalyzer subprocess: {err}. Was the GUI already closed? ')
 
     # Internal methods
     def get_event(self):
@@ -464,46 +473,3 @@ class Brainalyzer:
     def store_frame_in_shm(self, img, zndx):
         """Store frame in shared memory buffer."""
         self.shared_ndarray_list[zndx][:] = img[:]
-
-# def create_brainalyzer_from_legacy_args(args: Dict[str, Any], local_handles: Optional[Dict[str, Any]] = None):
-#     """
-#     Backward compatibility wrapper: Create Brainalyzer from legacy args dict.
-    
-#     This function allows existing code to continue using the old args format
-#     while the new code uses Config objects internally.
-    
-#     Args:
-#         args: Legacy args dictionary with gooey_args structure
-#         local_handles: Optional dictionary of local handles (mmc, etc.)
-        
-#     Returns:
-#         Brainalyzer instance
-        
-#     Example:
-#         >>> # Old way (still works)
-#         >>> alg = create_brainalyzer_from_legacy_args(args, local_handles)
-#         >>> 
-#         >>> # New way (preferred)
-#         >>> alg = Brainalyzer(algorithm_config, experiment_config, hardware_config)
-#     """
-#     from engine.closed_loop_engine import convert_gooey_args_to_configs
-#     from hardware.hardware_manager import HardwareManager
-    
-#     # Convert legacy args to configs
-#     gooey_args = args.get("gooey_args", args)
-#     configs = convert_gooey_args_to_configs(gooey_args)
-#     hm = HardwareManager(configs['hardware'])
-    
-#     # Create Brainalyzer with configs
-#     alg = Brainalyzer(
-#         algorithm_config=configs["algorithm"],
-#         experiment_config=configs["experiment"],
-#         hardware_manager=hm,
-#         local_handles=local_handles
-#     )
-    
-#     # Extract ROI from args if present (for backward compatibility)
-#     if "roi" in args:
-#         alg.set_roi(args["roi"])
-    
-#     return alg
