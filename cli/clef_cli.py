@@ -221,23 +221,7 @@ def run_experiment(config_manager: ConfigManager) -> bool:
             algorithm_config=config_manager.algorithm_config
         )
         
-        logger.info("Initializing hardware...")
-        engine.initialize_hardware()
-        
-        logger.info("Preparing acquisition...")
-        engine.prepare_acquisition()
-        
-        logger.info("Initializing algorithm...")
-        engine.initialize_algorithm()
-        
-        logger.info("Initializing stimulus controller...")
-        engine.initialize_stimulus()
-        
-        logger.info("Starting acquisition loop...")
-        engine.run_acquisition_loop()
-        
-        logger.info("Saving metadata...")
-        engine.save_metadata()
+        engine.run()
         
         logger.info("✓ Experiment completed successfully")
         return True

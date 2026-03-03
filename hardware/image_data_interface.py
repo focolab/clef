@@ -60,6 +60,8 @@ class ImageDataInterface(DataInterface):
         # store some useful local variables for testing
         self.xsize = self.storage_shape[1]
         self.ysize = self.storage_shape[0]
+
+        logger.info(f"ImageDataInterface intialized with shape {self.get_sample_shape()}")
     
     def sample_data(self) -> np.ndarray:
         """
@@ -102,8 +104,8 @@ class ImageDataInterface(DataInterface):
                 else:
                     img = self.camera.pop_next_image()
             except Exception as err:
-                false_grab_count += 1
-                logger.debug(f"False grab #{false_grab_count}: {err}")
+                self.false_grab_count += 1
+                logger.debug(f"False grab #{self.false_grab_count}: {err}")
 
         # append sample to sample vec (only if buffer is configured)
         if self.sample_ndx < self.samples.shape[0] and len(self.samples.shape) == 3:
@@ -193,8 +195,9 @@ class ImageDataInterface(DataInterface):
             filepath = filepath + '.tiff'
 
         import tifffile as tf
+        logger.info(f"Saving image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
         tf.imwrite(filepath, data)
-        logger.info(f"Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
+        logger.info(f"Success! Saved image data to {filepath} (shape={data.shape}, dtype={data.dtype})")
     
     def configure_sampling(self, config: ExperimentConfig | None) -> None:
         """

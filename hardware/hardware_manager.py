@@ -77,7 +77,7 @@ class HardwareManager:
         
         # Create appropriate data interface based on backend type
         if isinstance(self._backend, ScreenshotBackend):
-            # NEW: Use RGBDataInterface for screenshot backend
+            # Use RGBDataInterface for screenshot backend
             from hardware.rgb_data_interface import RGBDataInterface
             self._data_interface = RGBDataInterface(self._backend.screenshot_source)
             logger.debug("Created RGBDataInterface for screenshot backend")

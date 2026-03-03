@@ -77,7 +77,7 @@ class ClosedLoopEngine:
         
         # Components (initialized later)
         self.hardware: HardwareManager = None
-        self.mmc = None  # Legacy - will be removed
+        # self.mmc = None  # Legacy - will be removed
         # self.xsize = 200  # default for unit tests
         # self.ysize = 200  # default for unit tests
         self.alg = None
@@ -135,7 +135,7 @@ class ClosedLoopEngine:
         
         # For legacy components that still need mmc directly
         # This will be removed as components are refactored
-        self.mmc = self.hardware.get_mmc()
+        # self.mmc = self.hardware.get_mmc()
         
         logger.info(f"Hardware initialized with shape/dtype: {self.sample_shape}/{self.sample_dtype}")
         
@@ -234,7 +234,7 @@ class ClosedLoopEngine:
         # Configure camera for acquisition through hardware manager
         self.data_interface.configure_sampling(self.experiment_config) # send expeirment config to data interface
         self.samples = self.data_interface.samples # use mutable structure for pointer ref
-        logger.debug("Data interface prepared for acquisition")
+        logger.info("Data interface prepared for acquisition")
         
         # Run pre-acquisition structural scan if requested
         # self._run_structural_scan_pre()
@@ -388,6 +388,7 @@ class ClosedLoopEngine:
             metadata["stim_metadata"] = self.stim_controller.get_metadata(args=metadata)
             
         # Save to file
+        # TODO do data saving in different module than wbliveutils 
         wbliveUtils.save_metadata(
             savefilename=self.saveroot + "_metadata.json",
             metadata=metadata
@@ -439,7 +440,7 @@ class ClosedLoopEngine:
             except Exception as err:
                 logger.warning(f"Error closing algorithm: {err}")
                 
-        # NEW: Close stimulus controller
+        # Close stimulus controller
         if self.stim_controller:
             try:
                 self.stim_controller.close()
@@ -472,8 +473,8 @@ class ClosedLoopEngine:
         1. Initialize hardware (via HardwareManager)
         2. Prepare acquisition
         3. Initialize algorithm
-        4. Initialize stimulus controller (NEW: config-based)
-        5. Run acquisition loop (NEW: uses controller)
+        4. Initialize stimulus controller
+        5. Run acquisition loop
         6. Save data
         7. Cleanup
         
@@ -483,18 +484,26 @@ class ClosedLoopEngine:
             logger.info("="*60)
             logger.info("Starting Closed-Loop Acquisition Engine")
             logger.info("="*60)
-            
-            # Initialization phase
+
+            # logger.info("Initializing hardware...")
             self.initialize_hardware()
+            
+            # logger.info("Preparing acquisition...")
             self.prepare_acquisition()
+            
+            # logger.info("Initializing algorithm...")
             self.initialize_algorithm()
-            self.initialize_stimulus()  # NEW: Uses config-based controller
             
-            # Acquisition phase
+            # logger.info("Initializing stimulus controller...")
+            self.initialize_stimulus()
+            
+            # logger.info("Starting acquisition loop...")
             self.run_acquisition_loop()
-            
-            # Post-processing phase
-            self._save_data()  # UPDATED: uses data interface
+
+            # logger.info("Saving data...")
+            self._save_data()
+
+            # logger.info("Saving metadata...")
             self.save_metadata()
             
         except Exception as err:
