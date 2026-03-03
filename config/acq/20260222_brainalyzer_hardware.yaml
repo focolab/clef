@@ -1,7 +1,7 @@
 # Hardware configuration for Innovation Core microscope with LDI Polygon
 backend_configuration:
   backend_name: "pycromanager"
-  mm_config_path: "C:\\Program Files\\Micro-Manager-2.0\\InnovationCore_Config.cfg"
+  # mm_config_path: "C:\\Program Files\\Micro-Manager-2.0\\InnovationCore_Config.cfg"
   microscope_name: "innovation core spinning disk"
 
 stimulus_configuration:
@@ -63,11 +63,11 @@ system_devices:
     configs: {}
     properties: {}
     ttl_device: "TTL1-8"
-    ttl_state: "18"
+    ttl_state: "20" # 18 for 488 triggering, 20 for 561 triggering
     z_step_size_um: 2.5
     # z_step_size_um: 0
-    num_z_planes: 12
-    # num_z_planes: 1
+    # num_z_planes: 12
+    num_z_planes: 1
 
   # Illumination channels
   illumination_channels:
@@ -88,8 +88,8 @@ system_properties:
   system_name: 'InnovationCoreSpinningDisk'
   auto_shutter: false
   circular_buffer_mb: 10000
-  configs:
-    Channel: "561"
+  # configs:
+  #   Channel: "561"
   shutters:
     - device_name: "89 North Laser Diode Illuminator"
       state: true

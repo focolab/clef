@@ -657,7 +657,7 @@ class BrainalyzerWorker(Process):
         event_data = {}
         event_data = {'x': [], 'y': [], 'width': [], 'height': []}
         for roi_dict in self.stim_roi_dict_list:
-            x, y = roi_dict['stim_roi'].pos()
+            y, x = roi_dict['stim_roi'].pos()
             width, height = roi_dict['stim_roi'].size()
             event_data['x'].append(int(x))
             event_data['y'].append(int(y))
