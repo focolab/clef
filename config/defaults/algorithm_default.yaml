@@ -2,7 +2,7 @@
 # Place this in: config/defaults/algorithm_default.yaml
 
 # Algorithm selection
-algorithm_type: "dummy"  # Options: dummy, Brainalyzer, PointAndClick, etc.
+algorithm_type: ""  # Options: dummy, Brainalyzer, PointAndClick, etc.
 
 # Algorithm-specific parameters
 algorithm_params: {}
