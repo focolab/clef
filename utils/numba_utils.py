@@ -2,16 +2,6 @@ import numpy as np
 import json
 import logging
 
-# conditional import, necessary for standalone testing
-try:
-    from utils import MMSubroutines
-except ImportError as err:
-    # change path and try again
-    try:
-        import MMSubroutines
-    except ImportError as err:
-        logging.critical('Error while trying to import MMSubroutines: {}'.format(err))
-
 # import numba, patch for testing 
 try:
     import numba
@@ -290,77 +280,77 @@ def generate_pg_multi_rectangle_mask(ix_arr, iy_arr, width_arr, height_arr,  pcx
     )
     return mask
 
-def draw_polygons_on_structural_image(
-    datadir="", rec_id="", use_mip=True, zsize=12, finfo=""
-):
+# def draw_polygons_on_structural_image(
+#     datadir="", rec_id="", use_mip=True, zsize=12, finfo=""
+# ):
 
-    # load structural images
-    data = MMSubroutines.load_structural_images(datadir, rec_id)
-    # data = load_structural_images(datadir, rec_id)
+#     # load structural images
+#     data = MMSubroutines.load_structural_images(datadir, rec_id)
+#     # data = load_structural_images(datadir, rec_id)
 
-    # shape into
-    img = data.reshape((3, data.shape[1] // zsize, zsize, data.shape[2], data.shape[3]))
-    img = img.max(axis=1)
-    logging.debug("Structural data reshaped into {}".format(img.shape))
+#     # shape into
+#     img = data.reshape((3, data.shape[1] // zsize, zsize, data.shape[2], data.shape[3]))
+#     img = img.max(axis=1)
+#     logging.debug("Structural data reshaped into {}".format(img.shape))
 
-    if use_mip:
-        logging.debug("Using structural MIP for ROI")
-        img = img.max(axis=1)
+#     if use_mip:
+#         logging.debug("Using structural MIP for ROI")
+#         img = img.max(axis=1)
 
-    logging.debug("Please enter a shape ROI")
+#     logging.debug("Please enter a shape ROI")
 
-    # start event loop/gui
-    with napari.gui_qt():
+#     # start event loop/gui
+#     with napari.gui_qt():
 
-        # intialize viewer
-        viewer = napari.Viewer(ndisplay=2)
-        viewer.theme = "light"
+#         # intialize viewer
+#         viewer = napari.Viewer(ndisplay=2)
+#         viewer.theme = "light"
 
-        @viewer.bind_key("u")
-        def print_message(viewer):
-            try:
+#         @viewer.bind_key("u")
+#         def print_message(viewer):
+#             try:
 
-                screenshot_fname = datadir + "\\{}_polygon-mask{}.png".format(
-                    rec_id, finfo
-                )
-                logging.debug("Saving screenshot of napari window")
+#                 screenshot_fname = datadir + "\\{}_polygon-mask{}.png".format(
+#                     rec_id, finfo
+#                 )
+#                 logging.debug("Saving screenshot of napari window")
 
-                viewer.screenshot(screenshot_fname)
+#                 viewer.screenshot(screenshot_fname)
 
-                viewer.close()
-            except Exception as err:
-                logging.exception(
-                    "Error while trying to save a screenshot during napari drawing: {}".format(
-                        err
-                    )
-                )
+#                 viewer.close()
+#             except Exception as err:
+#                 logging.exception(
+#                     "Error while trying to save a screenshot during napari drawing: {}".format(
+#                         err
+#                     )
+#                 )
 
-        # add the structural image data
-        layerbf = viewer.add_image(img[2], colormap="gray")
-        layer561 = viewer.add_image(img[1], colormap="red", blending="additive")
-        layer488 = viewer.add_image(img[0], colormap="green", blending="additive")
+#         # add the structural image data
+#         layerbf = viewer.add_image(img[2], colormap="gray")
+#         layer561 = viewer.add_image(img[1], colormap="red", blending="additive")
+#         layer488 = viewer.add_image(img[0], colormap="green", blending="additive")
 
-        # add the shapes layer and do some presets
-        shape_layer = viewer.add_shapes(name="polygon_mask")
-        shape_layer.current_face_color = "#FFA500"
-        shape_layer.mode = "add_rectangle"
+#         # add the shapes layer and do some presets
+#         shape_layer = viewer.add_shapes(name="polygon_mask")
+#         shape_layer.current_face_color = "#FFA500"
+#         shape_layer.mode = "add_rectangle"
 
-    # get drawn polygons
-    shape_list = shape_layer.data
+#     # get drawn polygons
+#     shape_list = shape_layer.data
 
-    # get dimensionality of shapes
-    if use_mip or zsize == 1:
-        dims = 2
-    else:
-        dims = 3
+#     # get dimensionality of shapes
+#     if use_mip or zsize == 1:
+#         dims = 2
+#     else:
+#         dims = 3
 
-    pgons = {
-        "shape_list": shape_list,
-        "shape_type": shape_layer.shape_type,
-        "dims": dims,
-    }
+#     pgons = {
+#         "shape_list": shape_list,
+#         "shape_type": shape_layer.shape_type,
+#         "dims": dims,
+#     }
 
-    return pgons
+#     return pgons
 
 
 def polygons_to_masks(
