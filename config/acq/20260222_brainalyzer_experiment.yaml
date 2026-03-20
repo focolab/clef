@@ -1,14 +1,14 @@
 # Experiment configuration for Brainalyzer hardware demo
 experiment_name: "SCaMP and opto"
 experimenter: "Raymond Dunn"
-output_dir: "E:/Kato lab/RLD/20260222_RLD_1"
+output_dir: "E:/Kato lab/RLD/20260320_RLD_1"
 save_images: true
 save_metadata: true
 save_sample_video: false
 
 # Acquisition parameters
 acquisition:
-  num_samples: 1200
+  num_samples: 2400
 
   # this should be in algorithm or removed
   baseline_samples: 0 
@@ -19,17 +19,17 @@ acquisition:
 # Subject metadata
 # FEWER REQUIRED FIELDS MORE EXTRA FIELDS FOR SUBJECT DETAILS
 subject:
-  subject_id: "FC143"
+  subject_id: "FC144"
   subject_type: "C. elegans"
-  genotype: "FC143"
+  genotype: "FC144"
   treatment: "ATR"
   treatment_details:
-    condition: "hardware_validation"
-    atr_concentration_uM: "100uM"
+    condition: "ATR"
+    atr_concentration_uM: "0"
   orientation:
     nose: "right"
     vnc: "down"
-  notes: ""
+  notes: "FC144.2"
 
 # THIS SHOULD BE ELSEWHERE
 input_recording_path: null
