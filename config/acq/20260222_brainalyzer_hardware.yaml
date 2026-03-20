@@ -64,10 +64,10 @@ system_devices:
     properties: {}
     ttl_device: "TTL1-8"
     ttl_state: "20" # 18 for 488 triggering, 20 for 561 triggering
-    z_step_size_um: 2.5
+    z_step_size_um: 3
     # z_step_size_um: 0
-    # num_z_planes: 12
-    num_z_planes: 1
+    num_z_planes: 6
+    # num_z_planes: 1
 
   # Illumination channels
   illumination_channels:
