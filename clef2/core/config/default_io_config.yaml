@@ -2,12 +2,14 @@
 
 # Input devices for sampling data
 input_devices:
-  - input_device_name: null
-    input_device_type: null
+  - input_device_name: "default_input"
+    input_device_type: "base"
+    input_device_class: "base_input_device"
     input_device_parameters: {}
 
 # Output devices that the logic can trigger
 output_devices:
-  - output_device_name: null
-    output_device_type: null
+  - output_device_name: "default_output"
+    output_device_type: "base"
+    output_device_class: "base_output_device"
     output_device_parameters: {}
