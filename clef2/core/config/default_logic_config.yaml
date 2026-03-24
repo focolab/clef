@@ -16,6 +16,12 @@ io_parameters:
       output_parameters: {}
       output_enabled: false
 
+  input_devices:
+    - input_device_name: null
+      input_device_type: null
+      input_parameters: {}
+      input_enabled: false
+
 # GUI settings, if applicable to the logic/algorithm
 gui_parameters:
   enable_gui: false

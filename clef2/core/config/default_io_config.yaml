@@ -1,12 +1,13 @@
+# CLEF Minimal IO Configuration
 
 # Input devices for sampling data
-input_devices: 
-- input_device_name: null
-  input_device_type: null
-  input_parameters: {}
+input_devices:
+  - input_device_name: null
+    input_device_type: null
+    input_device_parameters: {}
 
 # Output devices that the logic can trigger
 output_devices:
-- output_device_name: null
-  output_device_type: null
-  output_parameters: {}
+  - output_device_name: null
+    output_device_type: null
+    output_device_parameters: {}
