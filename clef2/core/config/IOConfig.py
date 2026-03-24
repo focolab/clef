@@ -12,6 +12,7 @@ class InputDeviceConfig(BaseModel):
 
     input_device_name: Optional[str] = None
     input_device_type: Optional[str] = None
+    input_device_class: Optional[str] = None
     input_device_parameters: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="allow")
@@ -22,6 +23,7 @@ class OutputDeviceConfig(BaseModel):
 
     output_device_name: Optional[str] = None
     output_device_type: Optional[str] = None
+    output_device_class: Optional[str] = None
     output_device_parameters: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="allow")
