@@ -2,38 +2,40 @@ import yaml
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 logger = logging.getLogger(__name__)
 
 
+class InputDeviceConfig(BaseModel):
+    """Configuration for a single input device."""
 
-class DeviceConfig(BaseModel):  
-    """
-    Configuration for a single input or output device.
+    input_device_name: Optional[str] = None
+    input_device_type: Optional[str] = None
+    input_device_parameters: Dict[str, Any] = Field(default_factory=dict)
 
-    """
-    
-    device_name: str
-    device_type: str
-    device_parameters: Dict[str, Any] = Field(default_factory=dict)
-
-    # Extra fields for extensibility
     model_config = ConfigDict(extra="allow")
+
+
+class OutputDeviceConfig(BaseModel):
+    """Configuration for a single output device."""
+
+    output_device_name: Optional[str] = None
+    output_device_type: Optional[str] = None
+    output_device_parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="allow")
+
 
 class IOConfig(BaseModel):
     """
     Configuration for input/output devices.
-    
+
     Defines parameters for input and output devices used in the experiment, including
     device types, parameters, and enabled status.
     """
-    
-    # Input devices configuration
-    input_devices: List[Dict[str, Any]] = Field(default_factory=DeviceConfig)
-    
-    # Output devices configuration
-    output_devices: List[Dict[str, Any]] = Field(default_factory=DeviceConfig)
 
-    # Extra fields for extensibility
+    input_devices: List[InputDeviceConfig] = Field(default_factory=list)
+    output_devices: List[OutputDeviceConfig] = Field(default_factory=list)
+
     model_config = ConfigDict(extra="allow")
