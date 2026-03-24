@@ -9,7 +9,7 @@ import pytest
 import yaml
 from pathlib import Path
 
-from clef2.core.config.IOConfig import IOConfig
+from clef2.core.config.config_manager import ConfigManager
 from clef2.core.io.input_device.BaseInputDevice import BaseInputDevice
 from clef2.core.io.output_device.BaseOutputDevice import BaseOutputDevice
 from clef2.core.io.io_manager import IOManager
@@ -30,15 +30,17 @@ def io_yaml():
 
 
 @pytest.fixture
-def io_config(io_yaml):
-    """IOConfig built from the default YAML."""
-    return IOConfig(**io_yaml)
+def config_manager():
+    """ConfigManager with default IO config loaded."""
+    cm = ConfigManager(defaults_dir=CONFIG_DIR)
+    cm.load_io_config()
+    return cm
 
 
 @pytest.fixture
-def io_manager(io_config):
+def io_manager(config_manager):
     """IOManager built from default config (no apps/io plugin scanning)."""
-    return IOManager(io_config=io_config, apps_io_dir=Path("__nonexistent__"))
+    return IOManager(config_manager=config_manager, apps_io_dir=Path("__nonexistent__"))
 
 
 # ---------------------------------------------------------------------------

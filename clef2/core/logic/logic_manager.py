@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from clef2.core.logic.BaseClosedLoopLogic import BaseClosedLoopLogic
-from clef2.core.config.ClosedLoopLogicConfig import ClosedLoopLogicConfig
+from clef2.core.config.config_manager import ConfigManager
 from clef2.core.io.io_manager import IOManager
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,12 @@ class LogicManager:
 
     def __init__(
         self,
-        logic_config: ClosedLoopLogicConfig,
+        config_manager: ConfigManager,
         io_manager: IOManager,
         apps_logic_dir: Optional[Path] = None,
     ):
-        self.logic_config = logic_config
+        self.config_manager = config_manager
+        self.logic_config = config_manager.logic_config
         self.io_manager = io_manager
         self.apps_logic_dir = Path(apps_logic_dir) if apps_logic_dir else APPS_LOGIC_DIR
 
