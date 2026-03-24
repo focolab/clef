@@ -79,8 +79,9 @@ class TestBaseClosedLoopLogic:
     def test_no_op_methods(self):
         logic = BaseClosedLoopLogic(name="noop")
         logic.initialize_model()
-        result = logic.process_sample(sample=None)
-        assert result == {"triggered": False, "trigger_value": 0.0}
+        logic.process_sample(sample=None)
+        assert logic.check_logic() is None
+        logic.save_data()
         logic.close()
 
     def test_get_metadata(self):
@@ -142,19 +143,21 @@ class TestLogicManagerExecution:
         name = logic_yaml["logic_algorithms"][0]["logic_algorithm_name"]
         logic_manager.initialize_model(name)
 
-    def test_process_sample_all(self, logic_manager, logic_yaml):
-        results = logic_manager.process_sample(sample=None)
-        assert len(results) == len(logic_yaml["logic_algorithms"])
-        for result in results:
-            assert "triggered" in result
-            assert "trigger_value" in result
-            assert "logic_name" in result
+    def test_process_sample_all(self, logic_manager):
+        logic_manager.process_sample(sample=None)
 
     def test_process_sample_by_name(self, logic_manager, logic_yaml):
         name = logic_yaml["logic_algorithms"][0]["logic_algorithm_name"]
-        results = logic_manager.process_sample(sample=None, name=name)
-        assert len(results) == 1
-        assert results[0]["logic_name"] == name
+        logic_manager.process_sample(sample=None, name=name)
+
+    def test_check_logic_all(self, logic_manager):
+        update = logic_manager.check_logic()
+        assert isinstance(update, dict)
+
+    def test_check_logic_by_name(self, logic_manager, logic_yaml):
+        name = logic_yaml["logic_algorithms"][0]["logic_algorithm_name"]
+        update = logic_manager.check_logic(name=name)
+        assert isinstance(update, dict)
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +176,17 @@ class TestLogicManagerLifecycle:
     def test_close_missing_raises(self, logic_manager):
         with pytest.raises(KeyError, match="No logic named"):
             logic_manager.close("nonexistent")
+
+    def test_save_data_all(self, logic_manager):
+        logic_manager.save_data()
+
+    def test_save_data_by_name(self, logic_manager, logic_yaml):
+        name = logic_yaml["logic_algorithms"][0]["logic_algorithm_name"]
+        logic_manager.save_data(name=name)
+
+    def test_save_data_missing_raises(self, logic_manager):
+        with pytest.raises(KeyError, match="No logic named"):
+            logic_manager.save_data(name="nonexistent")
 
 
 # ---------------------------------------------------------------------------

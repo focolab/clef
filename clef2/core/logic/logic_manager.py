@@ -136,23 +136,44 @@ class LogicManager:
         for logic in self.logic_instances.values():
             logic.initialize_model()
 
-    def process_sample(self, sample: Any, name: Optional[str] = None) -> list[dict]:
+    def process_sample(self, sample: Any, name: Optional[str] = None):
         """Process sample through logic algorithm(s).
 
         If name given, run only that algorithm; otherwise run all.
-        Returns list of result dicts.
         """
         targets = (
             [self.get_logic(name)]
             if name is not None
             else list(self.logic_instances.values())
         )
-        results = []
         for logic in targets:
-            result = logic.process_sample(sample)
-            result["logic_name"] = logic.name
-            results.append(result)
-        return results
+            logic.process_sample(sample)
+
+    def check_logic(self, name: Optional[str] = None) -> Dict[str, Any]:
+        """Check logic state and collect output update requests.
+
+        Returns a single dict keyed by output device name, formatted for
+        io_manager.update_output(). Warns if multiple algorithms try to
+        update the same output device.
+        """
+        targets = (
+            [self.get_logic(name)]
+            if name is not None
+            else list(self.logic_instances.values())
+        )
+        merged: Dict[str, Any] = {}
+        for logic in targets:
+            logic_update = logic.check_logic()
+            if logic_update is None:
+                continue
+            for device_name, device_kwargs in logic_update.items():
+                if device_name in merged:
+                    logger.warning(
+                        f"Conflicting update for output device '{device_name}': "
+                        f"logic '{logic.name}' overwrites previous update"
+                    )
+                merged[device_name] = device_kwargs
+        return merged
 
     # ------------------------------------------------------------------
     # Metadata
@@ -170,6 +191,14 @@ class LogicManager:
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+
+    def save_data(self, name: Optional[str] = None, **kwargs):
+        """Save data from logic instance(s). If name given, save only that one; otherwise all."""
+        if name is not None:
+            self.get_logic(name).save_data(**kwargs)
+            return
+        for logic in self.logic_instances.values():
+            logic.save_data(**kwargs)
 
     def close(self, name: Optional[str] = None):
         """Close logic instance(s). If name given, close only that one; otherwise all."""

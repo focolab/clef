@@ -153,21 +153,19 @@ class TestClosedLoopLogicConfig:
         config = config_manager.load_logic_config()
         assert isinstance(config, ClosedLoopLogicConfig)
 
-    def test_logic_algorithm(self, config_manager, logic_yaml):
+    def test_logic_algorithms_count(self, config_manager, logic_yaml):
         config = config_manager.load_logic_config()
-        assert config.logic_algorithm == logic_yaml["logic_algorithm"]
+        assert len(config.logic_algorithms) == len(logic_yaml["logic_algorithms"])
 
-    def test_logic_parameters(self, config_manager, logic_yaml):
+    def test_first_entry_fields(self, config_manager, logic_yaml):
         config = config_manager.load_logic_config()
-        assert config.logic_parameters == logic_yaml["logic_parameters"]
-
-    def test_io_parameters(self, config_manager, logic_yaml):
-        config = config_manager.load_logic_config()
-        assert config.io_parameters == logic_yaml["io_parameters"]
-
-    def test_gui_parameters(self, config_manager, logic_yaml):
-        config = config_manager.load_logic_config()
-        assert config.gui_parameters == logic_yaml["gui_parameters"]
+        entry = config.logic_algorithms[0]
+        yaml_entry = logic_yaml["logic_algorithms"][0]
+        assert entry.logic_algorithm_name == yaml_entry["logic_algorithm_name"]
+        assert entry.logic_class == yaml_entry["logic_class"]
+        assert entry.logic_parameters == yaml_entry["logic_parameters"]
+        assert entry.io_parameters == yaml_entry["io_parameters"]
+        assert entry.gui_parameters == yaml_entry["gui_parameters"]
 
     def test_stored_on_manager(self, config_manager):
         config_manager.load_logic_config()
