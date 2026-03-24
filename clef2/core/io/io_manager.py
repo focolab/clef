@@ -151,6 +151,23 @@ class IOManager:
         for dev in self.output_devices.values():
             dev.close()
 
+    # ------------------------------------------------------------------
+    # Metadata
+    # ------------------------------------------------------------------
+
+    def get_metadata(self) -> dict:
+        """Get metadata about the IOManager and all devices."""
+        return {
+            "input_devices": {
+                name: dev.get_metadata() if hasattr(dev, "get_metadata") else {"name": name}
+                for name, dev in self.input_devices.items()
+            },
+            "output_devices": {
+                name: dev.get_metadata() if hasattr(dev, "get_metadata") else {"name": name}
+                for name, dev in self.output_devices.items()
+            },
+        }
+
     def _get_device(self, name: str):
         """Look up a device by name across both input and output devices."""
         if name in self.input_devices:
