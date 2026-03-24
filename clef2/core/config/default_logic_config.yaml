@@ -5,7 +5,8 @@ logic_algorithms:
     logic_class: "base_closed_loop_logic"
     logic_parameters: {}
     io_parameters:
-      output_device_name: "default_output"
+      output_device_names:
+        - "default_output"
     gui_parameters:
       enable_gui: false
-      gui_mode: "none"  # Options: neural_imaging, behavior, none
+      gui_mode: "none"

@@ -89,11 +89,9 @@ class LogicManager:
 
         # Resolve output device references
         output_devices = {}
-        output_device_name = entry.io_parameters.get("output_device_name")
-        if output_device_name:
-            output_devices[output_device_name] = self.io_manager.get_output_device(
-                output_device_name
-            )
+        output_device_names = entry.io_parameters.get("output_device_names", [])
+        for device_name in output_device_names:
+            output_devices[device_name] = self.io_manager.get_output_device(device_name)
 
         if not logic_class_key:
             logger.info(f"No logic_class for '{name}', using BaseClosedLoopLogic")
