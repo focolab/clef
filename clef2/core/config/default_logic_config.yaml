@@ -1,22 +1,11 @@
 # CLEF Minimal Closed-Loop Logic Configuration
 
-# Algorithm selection
-logic_algorithm: ""  #
-
-# Algorithm-specific parameters
-logic_parameters: {}
-
-# Trigger-related algorithm parameters
-io_parameters:
-
-  # List of output devices that the logic can trigger
-  output_devices:
-    - output_device_name: null
-      output_device_type: null
-      output_parameters: {}
-      output_enabled: false
-
-# GUI settings, if applicable to the logic/algorithm
-gui_parameters:
-  enable_gui: false
-  gui_mode: "none"  # Options: neural_imaging, behavior, none
+logic_algorithms:
+  - logic_algorithm_name: "default_logic"
+    logic_class: "base_closed_loop_logic"
+    logic_parameters: {}
+    io_parameters:
+      output_device_name: "default_output"
+    gui_parameters:
+      enable_gui: false
+      gui_mode: "none"  # Options: neural_imaging, behavior, none
