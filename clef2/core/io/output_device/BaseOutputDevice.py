@@ -65,7 +65,7 @@ class BaseOutputDevice:
         """Configure the output device."""
         pass
 
-    def update_output(self, data: Any = None):
+    def update_output(self, **kwargs):
         """Update the output device with new data or commands."""
         pass
 

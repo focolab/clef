@@ -56,6 +56,7 @@ class BaseInputDevice:
         """
         self.name = name
         self.config = config or {}
+        self.data_interface = None
 
     def connect(self):
         """Connect to the input device."""
@@ -68,6 +69,11 @@ class BaseInputDevice:
     def get_input(self) -> Any:
         """Retrieve input data from the device."""
         return None
+
+    def save_data(self, **kwargs):
+        """Save data via the data interface."""
+        if self.data_interface is not None:
+            self.data_interface.save_data(**kwargs)
 
     def close(self):
         """Close the connection to the input device."""

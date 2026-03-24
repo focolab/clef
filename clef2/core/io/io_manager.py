@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from clef2.core.io.input_device.BaseInputDevice import BaseInputDevice
+from clef2.core.io.input_device.BaseDataInterface import BaseDataInterface
 from clef2.core.io.output_device.BaseOutputDevice import BaseOutputDevice
 from clef2.core.config.config_manager import ConfigManager
 
@@ -36,6 +37,7 @@ class IOManager:
 
         self.input_devices: Dict[str, BaseInputDevice] = {}
         self.output_devices: Dict[str, BaseOutputDevice] = {}
+        self.data_interfaces: Dict[str, BaseDataInterface] = {}
 
         self._discover_plugins()
         self._instantiate_devices()
@@ -78,9 +80,25 @@ class IOManager:
             device = self._create_input_device(dev_cfg)
             self.input_devices[device.name] = device
 
+            # Wire up data interface
+            di = self._create_data_interface(dev_cfg, device)
+            device.data_interface = di
+            self.data_interfaces[device.name] = di
+
         for dev_cfg in self.io_config.output_devices:
             device = self._create_output_device(dev_cfg)
             self.output_devices[device.name] = device
+
+    @staticmethod
+    def _create_data_interface(dev_cfg, device: BaseInputDevice) -> BaseDataInterface:
+        di_class_key = dev_cfg.data_interface_class
+        if not di_class_key:
+            logger.info(f"No data_interface_class for '{device.name}', using BaseDataInterface")
+            return BaseDataInterface(input_device=device)
+
+        cls = BaseDataInterface.get_class(di_class_key)
+        logger.info(f"Creating data interface for '{device.name}' (class={di_class_key})")
+        return cls(input_device=device)
 
     @staticmethod
     def _create_input_device(dev_cfg) -> BaseInputDevice:
@@ -127,6 +145,41 @@ class IOManager:
             available = list(self.output_devices.keys())
             raise KeyError(f"No output device named '{name}'. Available: {available}")
         return self.output_devices[name]
+
+    # ------------------------------------------------------------------
+    # Input / Output
+    # ------------------------------------------------------------------
+
+    def update_input(self):
+        """Poll all data interfaces: get_input then store_input."""
+        for di in self.data_interfaces.values():
+            sample = di.get_input()
+            di.store_input(sample)
+
+    @property
+    def input_stores(self) -> Dict[str, Any]:
+        """Collect input_store from each data interface, keyed by device name."""
+        return {name: di.input_store for name, di in self.data_interfaces.items()}
+
+    def update_output(self, **kwargs):
+        """Update output devices. Keys are device names, values are kwarg dicts.
+
+        Raises KeyError if a device name is not found.
+        """
+        for device_name, device_kwargs in kwargs.items():
+            dev = self.get_output_device(device_name)
+            dev.update_output(**device_kwargs)
+
+    def save_data(self, name: Optional[str] = None, **kwargs):
+        """Save data from input device(s). If name given, save only that one; otherwise all."""
+        if name is not None:
+            if name not in self.input_devices:
+                available = list(self.input_devices.keys())
+                raise KeyError(f"No input device named '{name}'. Available: {available}")
+            self.input_devices[name].save_data(**kwargs)
+            return
+        for dev in self.input_devices.values():
+            dev.save_data(**kwargs)
 
     # ------------------------------------------------------------------
     # Lifecycle

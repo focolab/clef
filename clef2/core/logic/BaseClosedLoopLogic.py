@@ -69,18 +69,23 @@ class BaseClosedLoopLogic:
         """Initialize the algorithm model. Called once before processing begins."""
         pass
 
-    def process_sample(self, sample: Any) -> Dict[str, Any]:
+    def process_sample(self, sample: Any):
         """
         Process a single data sample.
 
-        Returns:
-            Dict with at minimum {"triggered": bool, "trigger_value": float}
         """
-        return {"triggered": False, "trigger_value": 0.0}
+
+    def check_logic(self) -> Dict[str, Any]:
+        """Check the logic's internal state or conditions. Called periodically."""
+        return None
 
     def get_metadata(self) -> Dict[str, Any]:
         """Get metadata about the closed-loop logic."""
         return {"name": self.name, "logic_class": self.logic_class}
+
+    def save_data(self, **kwargs):
+        """Save any data produced by the logic algorithm."""
+        pass
 
     def close(self):
         """Clean up any resources used by the closed-loop logic."""
