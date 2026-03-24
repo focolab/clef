@@ -14,7 +14,7 @@ from typing import Dict, Optional
 
 from clef2.core.io.input_device.BaseInputDevice import BaseInputDevice
 from clef2.core.io.output_device.BaseOutputDevice import BaseOutputDevice
-from clef2.core.config.IOConfig import IOConfig
+from clef2.core.config.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,11 @@ class IOManager:
 
     def __init__(
         self,
-        io_config: IOConfig,
+        config_manager: ConfigManager,
         apps_io_dir: Optional[Path] = None,
     ):
-        self.io_config = io_config
+        self.config_manager = config_manager
+        self.io_config = config_manager.io_config
         self.apps_io_dir = Path(apps_io_dir) if apps_io_dir else APPS_IO_DIR
 
         self.input_devices: Dict[str, BaseInputDevice] = {}

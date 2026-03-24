@@ -9,8 +9,7 @@ import pytest
 import yaml
 from pathlib import Path
 
-from clef2.core.config.ClosedLoopLogicConfig import ClosedLoopLogicConfig
-from clef2.core.config.IOConfig import IOConfig
+from clef2.core.config.config_manager import ConfigManager
 from clef2.core.logic.BaseClosedLoopLogic import BaseClosedLoopLogic
 from clef2.core.logic.logic_manager import LogicManager
 from clef2.core.io.io_manager import IOManager
@@ -31,25 +30,25 @@ def logic_yaml():
 
 
 @pytest.fixture
-def logic_config(logic_yaml):
-    """ClosedLoopLogicConfig built from the default YAML."""
-    return ClosedLoopLogicConfig(**logic_yaml)
+def config_manager():
+    """ConfigManager with IO and logic configs loaded."""
+    cm = ConfigManager(defaults_dir=CONFIG_DIR)
+    cm.load_io_config()
+    cm.load_logic_config()
+    return cm
 
 
 @pytest.fixture
-def io_manager():
+def io_manager(config_manager):
     """Minimal IOManager with default config (no plugin scanning)."""
-    with open(CONFIG_DIR / "default_io_config.yaml") as f:
-        io_yaml = yaml.safe_load(f)
-    io_config = IOConfig(**io_yaml)
-    return IOManager(io_config=io_config, apps_io_dir=Path("__nonexistent__"))
+    return IOManager(config_manager=config_manager, apps_io_dir=Path("__nonexistent__"))
 
 
 @pytest.fixture
-def logic_manager(logic_config, io_manager):
+def logic_manager(config_manager, io_manager):
     """LogicManager built from default config (no apps/logic plugin scanning)."""
     return LogicManager(
-        logic_config=logic_config,
+        config_manager=config_manager,
         io_manager=io_manager,
         apps_logic_dir=Path("__nonexistent__"),
     )

@@ -164,7 +164,7 @@ class ConfigManager:
 
         try:
             self.logic_config = ClosedLoopLogicConfig(**config_data)
-            logger.info(f"Logic config loaded: algorithm={self.logic_config.logic_algorithm}")
+            logger.info(f"Logic config loaded: {len(self.logic_config.logic_algorithms)} algorithm(s)")
             return self.logic_config
         except ValidationError as e:
             logger.error(f"Logic config validation failed: {e}")
