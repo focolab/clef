@@ -1,0 +1,18 @@
+# Physical Hardware Demo Logic Configuration
+# Brainalyzer interactive GUI for closed-loop microscopy
+
+logic_algorithms:
+  - logic_algorithm_name: "brainalyzer"
+    logic_class: "brainalyzer_logic"
+    logic_parameters:
+      gui_mode: "neural_imaging"
+      stim_intensity: 0
+      zsize: 12
+      num_samples: 10000
+      input_device_name: "camera"
+      save_dir: "./output"
+      calibration_file: "clef2/apps/io/output_device/res/MightexPolygon1000/calibrations.json"
+    io_parameters:
+      output_device_names: ["polygon", "ldi"]
+    gui_parameters:
+      gui_screenshot_freq: 0

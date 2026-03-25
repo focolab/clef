@@ -1,0 +1,7 @@
+# Physical Hardware Demo Session Configuration
+# Innovation Core spinning disk microscope
+
+session:
+  name: "physical_hardware_demo"
+  duration_seconds: 300
+  save_dir: "./output"

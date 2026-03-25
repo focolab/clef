@@ -27,7 +27,7 @@ class Uint16DataInterface(BaseDataInterface):
     def get_sample_shape(self) -> tuple:
         if self.input_device is not None:
             return (self.input_device.height, self.input_device.width)
-        return (100, 100)
+        return None
 
     def get_sample_dtype(self) -> np.dtype:
         return np.dtype(np.uint16)
