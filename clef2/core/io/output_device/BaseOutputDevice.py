@@ -48,14 +48,16 @@ class BaseOutputDevice:
 
     # --- lifecycle -------------------------------------------------------
 
-    def __init__(self, name: str, config: Dict[str, Any] | None = None):
+    def __init__(self, name: str, config: Dict[str, Any] | None = None, io_manager: Any = None):
         """
         Args:
             name: Instance name from config (output_device_name).
             config: The output_device_parameters dict from config.
+            io_manager: Optional reference to the IOManager that owns this device.
         """
         self.name = name
         self.config = config or {}
+        self.io_manager = io_manager
 
     def connect(self):
         """Connect to the output device."""

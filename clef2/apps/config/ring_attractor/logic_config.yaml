@@ -1,0 +1,23 @@
+# Ring Attractor Demo Logic Configuration
+
+logic_algorithms:
+  - logic_algorithm_name: "ring_attractor"
+    logic_class: "ring_attractor_logic"
+    logic_parameters:
+      visualize_real_time: true
+      fading_trajectory_samples: 100
+      stim_cooldown_frames: 50
+      inner_radius: 6.0
+      outer_radius: 10.0
+      image_width: 100
+      image_height: 100
+      input_device_name: "ring_camera"
+      save_dir: "./demo_output/ring_attractor"
+    io_parameters:
+      output_device_names:
+        - "ring_stimulus"
+    gui_parameters:
+      enable_gui: false
+      gui_mode: "neural_imaging"
+      save_algorithm_plot: true
+      gui_screenshot_freq: 100

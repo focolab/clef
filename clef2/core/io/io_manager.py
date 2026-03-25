@@ -77,7 +77,7 @@ class IOManager:
     def _instantiate_devices(self):
         """Create device instances from config entries."""
         for dev_cfg in self.io_config.input_devices:
-            device = self._create_input_device(dev_cfg)
+            device = self._create_input_device(dev_cfg, io_manager=self)
             self.input_devices[device.name] = device
 
             # Wire up data interface
@@ -86,7 +86,7 @@ class IOManager:
             self.data_interfaces[device.name] = di
 
         for dev_cfg in self.io_config.output_devices:
-            device = self._create_output_device(dev_cfg)
+            device = self._create_output_device(dev_cfg, io_manager=self)
             self.output_devices[device.name] = device
 
     @staticmethod
@@ -101,32 +101,32 @@ class IOManager:
         return cls(input_device=device)
 
     @staticmethod
-    def _create_input_device(dev_cfg) -> BaseInputDevice:
+    def _create_input_device(dev_cfg, io_manager=None) -> BaseInputDevice:
         device_class_key = dev_cfg.input_device_class
         name = dev_cfg.input_device_name or "unnamed_input"
         params = dev_cfg.input_device_parameters
 
         if device_class_key is None:
             logger.info(f"No input_device_class for '{name}', using BaseInputDevice")
-            return BaseInputDevice(name=name, config=params)
+            return BaseInputDevice(name=name, config=params, io_manager=io_manager)
 
         cls = BaseInputDevice.get_class(device_class_key)
         logger.info(f"Creating input device '{name}' (class={device_class_key})")
-        return cls(name=name, config=params)
+        return cls(name=name, config=params, io_manager=io_manager)
 
     @staticmethod
-    def _create_output_device(dev_cfg) -> BaseOutputDevice:
+    def _create_output_device(dev_cfg, io_manager=None) -> BaseOutputDevice:
         device_class_key = dev_cfg.output_device_class
         name = dev_cfg.output_device_name or "unnamed_output"
         params = dev_cfg.output_device_parameters
 
         if device_class_key is None:
             logger.info(f"No output_device_class for '{name}', using BaseOutputDevice")
-            return BaseOutputDevice(name=name, config=params)
+            return BaseOutputDevice(name=name, config=params, io_manager=io_manager)
 
         cls = BaseOutputDevice.get_class(device_class_key)
         logger.info(f"Creating output device '{name}' (class={device_class_key})")
-        return cls(name=name, config=params)
+        return cls(name=name, config=params, io_manager=io_manager)
 
     # ------------------------------------------------------------------
     # Device access
