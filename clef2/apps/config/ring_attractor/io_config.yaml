@@ -1,0 +1,27 @@
+# Ring Attractor Demo IO Configuration
+
+input_devices:
+  - input_device_name: "ring_camera"
+    input_device_type: "demo"
+    input_device_class: "ring_attractor_input"
+    data_interface_class: "uint16_data_interface"
+    input_device_parameters:
+      inner_radius: 6.0
+      outer_radius: 10.0
+      k_radial: 2.0
+      omega: 1.0
+      dt: 0.01
+      initial_state: [0.0, 1]
+      image_width: 100
+      image_height: 100
+      noise_level: 0
+      puncta_brightness: 50.0
+      puncta_radius: 3.0
+      exposure_ms: 10.0
+
+output_devices:
+  - output_device_name: "ring_stimulus"
+    output_device_type: "demo"
+    output_device_class: "ring_attractor_output"
+    output_device_parameters:
+      linked_input_device: "ring_camera"

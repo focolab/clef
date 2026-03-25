@@ -16,8 +16,8 @@ class CountingInputDevice(BaseInputDevice):
     device_class: ClassVar[Optional[str]] = "counting_input"
     device_type: ClassVar[Optional[str]] = "test"
 
-    def __init__(self, name, config=None):
-        super().__init__(name, config)
+    def __init__(self, name, config=None, io_manager=None):
+        super().__init__(name, config, io_manager=io_manager)
         self.counter = 0
 
     def get_input(self):
@@ -29,8 +29,8 @@ class TrackingOutputDevice(BaseOutputDevice):
     device_class: ClassVar[Optional[str]] = "tracking_output"
     device_type: ClassVar[Optional[str]] = "test"
 
-    def __init__(self, name, config=None):
-        super().__init__(name, config)
+    def __init__(self, name, config=None, io_manager=None):
+        super().__init__(name, config, io_manager=io_manager)
         self.calls = []
 
     def update_output(self, **kwargs):
@@ -41,8 +41,8 @@ class SaveTrackingInputDevice(BaseInputDevice):
     device_class: ClassVar[Optional[str]] = "save_tracking_input"
     device_type: ClassVar[Optional[str]] = "test"
 
-    def __init__(self, name, config=None):
-        super().__init__(name, config)
+    def __init__(self, name, config=None, io_manager=None):
+        super().__init__(name, config, io_manager=io_manager)
         self.save_calls = []
 
     def get_input(self):
