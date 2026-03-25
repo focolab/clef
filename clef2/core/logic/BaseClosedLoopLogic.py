@@ -75,7 +75,7 @@ class BaseClosedLoopLogic:
 
         """
 
-    def check_logic(self) -> Dict[str, Any]:
+    def check_logic(self) -> Optional[Dict[str, Any]]:
         """Check the logic's internal state or conditions. Called periodically."""
         return None
 
