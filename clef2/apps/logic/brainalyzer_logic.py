@@ -256,7 +256,6 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             and self.sample_count >= self.active_pulse_stim_off
         ):
             updates = {
-                "polygon": {"action": "blank"},
                 "ldi": {"intensity": 0},
             }
             logger.info(
@@ -308,7 +307,6 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
 
         # Stop signal while stimulating
         elif self.stimulus_is_on and self.current_event is not None:
-            updates["polygon"] = {"action": "blank"}
             updates["ldi"] = {"intensity": 0}
             self.stimulus_is_on = False
 
