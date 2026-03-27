@@ -1,0 +1,14 @@
+# Recording Playback IO Configuration
+# Replays a TIFF recording through Brainalyzer
+
+input_devices:
+  - input_device_name: "camera"
+    input_device_type: "demo"
+    input_device_class: "recording_playback_input"
+    data_interface_class: "uint16_data_interface"
+    input_device_parameters:
+      input_file: "C:/Users/rldun/Desktop/temp_render/example_data/20221106-21-47-31/20221106-21-47-1_minified_8z_100t.tif"
+      exposure_ms: 5.0
+      loop: true
+
+output_devices: []

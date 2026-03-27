@@ -57,8 +57,6 @@ class BrainalyzerWorker(Process):
         self.ysize = self.vis_args.get("ysize", None)
         self.xsize = self.vis_args.get("xsize", None)
         self.zsize = self.vis_args.get("zsize", 1)
-        self.total_frames = self.vis_args.get("total_frames", 48)
-        self.total_vols = self.total_frames / self.zsize
         self.stim_diameter = self.vis_args.get("stim_diameter", 30)
         self.stim_intensity = self.vis_args.get("stim_intensity", 10)
         self.GUI_mode = self.vis_args.get("GUI_mode", "neural_imaging")
@@ -151,7 +149,7 @@ class BrainalyzerWorker(Process):
         # plots
         self.roi_plot_item = pg.PlotItem()
         self.roi_plot_item.disableAutoRange()
-        self.roi_plot_item.setRange(xRange=[0, self.total_vols // 2], yRange=[90, 180])
+        self.roi_plot_item.setRange(xRange=[0, 100], yRange=[90, 180])
         self.roi_plot_item.setLabel(axis="left", units="avg grey count")
         self.roi_plot_item.setLabel(axis="bottom", units="frame (vols)")
         self.roi_plot_item.setTitle("roi intensity")
@@ -240,9 +238,9 @@ class BrainalyzerWorker(Process):
 
         # add text for frame number
         self.text_layout = QtWidgets.QGridLayout()
-        self.vol_count_text = QtWidgets.QLabel(
-            "frames: {}/{}".format(0, self.total_vols)
-        )
+        self.vol_count_text = QtWidgets.QLabel("received vols:        0")
+        self.vol_count_text.setFont(QtGui.QFont("Monospace"))
+        self.vol_count_text.setMinimumWidth(200)
         self.text_layout.addWidget(self.vol_count_text, 0, 0)
 
         # add text for stim refractory period
@@ -305,12 +303,19 @@ class BrainalyzerWorker(Process):
             self.app.processEvents()
             self.image_count = self.shared_image_count[0]
 
-            # main loop
+            # main loop — runs until parent sends "close" on the pipe
             try:
-                while self.image_count < self.total_frames:
+                while True:
+                    # Check for close signal from parent
+                    if self.child_conn.poll():
+                        msg = self.child_conn.recv()
+                        if msg == "close":
+                            break
+
                     try:
-                        while self.image_count == self.shared_image_count[0]:
+                        if self.image_count == self.shared_image_count[0]:
                             self.app.processEvents()
+                            continue
                     except ValueError:
                         continue
 
@@ -477,7 +482,7 @@ class BrainalyzerWorker(Process):
     def update_display_text(self):
         if self.image_count % self.zsize == 0:
             self.vol_count_text.setText(
-                "received vols: {}/{}".format(self.image_count // self.zsize, self.total_vols)
+                "received vols: {:>8d}".format(self.image_count // self.zsize)
             )
             self.stim_refractory_text.setText(
                 "stim refractory vols: {}".format(self.stim_refractory_vols)
