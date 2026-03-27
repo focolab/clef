@@ -7,6 +7,7 @@ logic_algorithms:
     io_parameters:
       output_device_names:
         - "default_output"
+      input_device_names: []
     gui_parameters:
       enable_gui: false
       gui_mode: "none"

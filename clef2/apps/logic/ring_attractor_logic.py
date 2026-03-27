@@ -35,8 +35,15 @@ class RingAttractorLogic(BaseClosedLoopLogic):
         config: Dict[str, Any] | None = None,
         output_devices: Dict[str, Any] | None = None,
         gui_parameters: Dict[str, Any] | None = None,
+        input_devices: Dict[str, Any] | None = None,
+        io_manager: Any = None,
+        config_manager: Any = None,
     ):
-        super().__init__(name, config, output_devices, gui_parameters)
+        super().__init__(
+            name, config, output_devices, gui_parameters,
+            input_devices=input_devices, io_manager=io_manager,
+            config_manager=config_manager,
+        )
 
         cfg = self.config
         self.inner_radius = cfg.get("inner_radius", 3.0)
@@ -48,7 +55,7 @@ class RingAttractorLogic(BaseClosedLoopLogic):
         self.fading_trajectory_samples = cfg.get("fading_trajectory_samples", 100)
 
         # Which input device to read images from
-        self.input_device_name = cfg.get("input_device_name", None)
+        self.input_device_name = next(iter(self.input_devices), None)
 
         # Image center
         self.center_x = self.image_width / 2.0

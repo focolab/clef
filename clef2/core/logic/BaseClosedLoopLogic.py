@@ -52,18 +52,17 @@ class BaseClosedLoopLogic:
         config: Dict[str, Any] | None = None,
         output_devices: Dict[str, Any] | None = None,
         gui_parameters: Dict[str, Any] | None = None,
+        input_devices: Dict[str, Any] | None = None,
+        io_manager: Any = None,
+        config_manager: Any = None,
     ):
-        """
-        Args:
-            name: Instance name from config (logic_algorithm_name).
-            config: The logic_parameters dict from config.
-            output_devices: Resolved output device references from IOManager.
-            gui_parameters: GUI configuration for this logic instance.
-        """
         self.name = name
         self.config = config or {}
         self.output_devices = output_devices or {}
         self.gui_parameters = gui_parameters or {}
+        self.input_devices = input_devices or {}
+        self.io_manager = io_manager
+        self.config_manager = config_manager
 
     def initialize_model(self):
         """Initialize the algorithm model. Called once before processing begins."""
