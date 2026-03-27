@@ -2,9 +2,9 @@
 CLEF2 Command-Line Interface
 
 Usage:
-    python -m clef2.utils.clef_cli ring_attractor
-    python -m clef2.utils.clef_cli --session s.yaml --io io.yaml --logic l.yaml
-    python -m clef2.utils.clef_cli ring_attractor --validate-config
+    python -m clef2.core.utils.clef_cli ring_attractor
+    python -m clef2.core.utils.clef_cli --session s.yaml --io io.yaml --logic l.yaml
+    python -m clef2.core.utils.clef_cli ring_attractor --validate-config
 """
 
 import argparse
@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Where app configs live
-APPS_CONFIG_DIR = Path(__file__).resolve().parent.parent / "apps" / "config"
+APPS_CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "apps" / "config"
 
 # The three required config types and filename patterns used to classify them
 CONFIG_TYPES = {
@@ -136,7 +136,10 @@ def run(config_manager: ConfigManager) -> bool:
         logic_manager.initialize_model()
 
         num_samples = config_manager.session_config.session_parameters.get("num_samples", 1)
-        logger.info(f"Starting closed loop for {num_samples} samples...")
+        if num_samples == -1:
+            logger.warning("num_samples=-1: running indefinitely until Ctrl+C")
+        else:
+            logger.info(f"Starting closed loop for {num_samples} samples...")
         engine.loop(iterations=num_samples)
 
         logger.info("Loop complete.")
