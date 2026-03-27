@@ -10,6 +10,7 @@ Usage:
 import argparse
 import sys
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -143,6 +144,7 @@ def run(config_manager: ConfigManager) -> bool:
         engine.loop(iterations=num_samples)
 
         logger.info("Loop complete.")
+        engine.save_md()
         engine.save_data()
         return True
 
@@ -247,6 +249,11 @@ def main() -> int:
     if args.validate_config:
         print("All configs valid.")
         return 0
+
+    # Generate and inject session_id
+    session_id = datetime.now().strftime("%Y%m%d-%H-%M-%S")
+    config_manager.session_config.session_id = session_id
+    logger.info(f"Session ID: {session_id}")
 
     # Run
     success = run(config_manager)

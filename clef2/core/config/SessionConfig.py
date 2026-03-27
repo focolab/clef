@@ -18,6 +18,9 @@ class SessionConfig(BaseModel):
     user_name: str = "Unknown"
     sample_data_dir: str = "./data"
 
+    # Runtime session ID (set by CLI at launch, format: yyyymmdd-hh-mm-ss)
+    session_id: str = ""
+
     # Acquisition parameters
     session_parameters: Dict[str, Any] = Field(default_factory=dict)
 

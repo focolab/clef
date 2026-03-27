@@ -12,8 +12,8 @@ class TestEventLog:
         log.record("a")
         log.record("b")
         assert len(log.events) == 2
-        assert log.events[0][1] == "a"
-        assert log.events[1][1] == "b"
+        assert log.events[0] == (0, log.events[0][1], "a")
+        assert log.events[1] == (1, log.events[1][1], "b")
 
     def test_timestamps_increase(self):
         log = EventLog()
@@ -61,7 +61,14 @@ class TestEventLog:
     def test_none_payload_default(self):
         log = EventLog()
         log.record()
-        assert log.events[0][1] is None
+        assert log.events[0][2] is None
+
+    def test_sample_indices(self):
+        log = EventLog()
+        log.record("a")
+        log.record("b")
+        log.record("c")
+        assert log.sample_indices == [0, 1, 2]
 
 
 class TestEventLogOnBaseInputDevice:
@@ -97,8 +104,8 @@ class TestEventLogOnBaseOutputDevice:
         dev.update_output(x=1)
         dev.update_output(y=2)
         assert len(dev.event_log.events) == 2
-        assert dev.event_log.events[0][1] == {"x": 1}
-        assert dev.event_log.events[1][1] == {"y": 2}
+        assert dev.event_log.events[0][2] == {"x": 1}
+        assert dev.event_log.events[1][2] == {"y": 2}
 
     def test_event_log_in_metadata(self):
         from clef2.core.io.output_device.BaseOutputDevice import BaseOutputDevice

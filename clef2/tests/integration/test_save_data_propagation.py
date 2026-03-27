@@ -123,9 +123,9 @@ class TestSaveDataFromEngine:
     def test_kwargs_propagate_through_engine(self, engine, io_manager, logic_manager):
         engine.save_data(path="/tmp/out", fmt="tiff")
         for dev in io_manager.input_devices.values():
-            assert dev.save_calls[0] == {"path": "/tmp/out", "fmt": "tiff"}
+            assert dev.save_calls[0] == {"prefix": "", "path": "/tmp/out", "fmt": "tiff"}
         for logic in logic_manager.logic_instances.items():
-            assert logic[1].save_calls[0] == {"path": "/tmp/out", "fmt": "tiff"}
+            assert logic[1].save_calls[0] == {"prefix": "", "path": "/tmp/out", "fmt": "tiff"}
 
 
 # ---------------------------------------------------------------------------
