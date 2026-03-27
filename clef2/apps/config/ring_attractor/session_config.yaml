@@ -6,5 +6,5 @@ sample_data_dir: "./demo_output/ring_attractor"
 
 session_parameters:
   num_samples: 20000
-  save_images: false
+  save_samples: false
   save_metadata: true

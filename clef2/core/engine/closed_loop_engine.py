@@ -60,6 +60,12 @@ class ClosedLoopEngine:
 
     def save_data(self, **kwargs):
         """Save data from IO and logic managers."""
+        save_samples = self.config_manager.session_config.session_parameters.get(
+            "save_samples", False
+        )
+        if not save_samples:
+            logger.info("save_samples is false, skipping data save")
+            return
         self.io_manager.save_data(**kwargs)
         self.logic_manager.save_data(**kwargs)
 

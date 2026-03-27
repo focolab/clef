@@ -8,7 +8,7 @@ sample_data_dir: "./data"
 # Acquisition parameters
 session_parameters:
   num_samples: 1
-  save_data: false
+  save_samples: false
   save_metadata: false
 
 # Session subject metadata (generic, domain-agnostic)

@@ -21,14 +21,11 @@ from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 import pyqtgraph as pg
 
 from clef2.utils import numba_utils
+from clef2.utils.style.demo_stylization import DemoStyle
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 logger = logging.getLogger(__name__)
-
-# Pathing to resources
-ROOTDIR = Path(__file__).resolve().parents[2]  # clef2/
-CSS_PATH = ROOTDIR / "utils" / "style" / "css" / "Ubuntu.qss"
 
 
 class BrainalyzerWorker(Process):
@@ -38,9 +35,6 @@ class BrainalyzerWorker(Process):
 
         self.vis_args = vis_args
         self.child_conn = child_conn
-
-        # pathing
-        self.css_fname = CSS_PATH
 
         # general params
         self.initialization_t0 = time.time()
@@ -84,38 +78,26 @@ class BrainalyzerWorker(Process):
         self._polygon_shm = None
         self._polygon_mask_array = None
 
-        # convenience holder for coloring and stylizing params
-        self.color_dict = {
-            "red": "#DC143C",
-            "green": "#009900",
-            "grey": "#A9A9A9",
-            "orange": "#FFA500",
-        }
 
     def initialize_display(self):
 
         # initialize shared memory objects
         self.initialize_shm()
 
-        # app <- layout <- vbox <- image
         # initialize qt app
         self.app = pg.Qt.mkQApp(name="BrainalyzerWorker")
-        if self.css_fname.exists():
-            with open(self.css_fname, "r") as f:
-                self.app.setStyleSheet(f.read())
+        DemoStyle.load_qss(self.app)
 
-        # initialize image layout objects
+        # ── Image viewer ────────────────────────────────────────────
         self.graphics_layout_widget = pg.GraphicsLayoutWidget()
         self.image_vbox_list = []
         self.ii_list = []
         for z in range(self.zsize):
 
-            # add label above image
             lab = pg.LabelItem(text="z={}".format(z))
             self.vbox_z_label_list.append(lab)
             self.graphics_layout_widget.addItem(lab, row=0, col=z)
 
-            # link axes together
             if z == 0:
                 vb = pg.ViewBox(lockAspect=True, enableMouse=True, name="first_viewbox", border=None, enableMenu=True)
             else:
@@ -124,9 +106,8 @@ class BrainalyzerWorker(Process):
                 vb.linkView(vb.YAxis, "first_viewbox")
 
             vb.setLimits(xMin=0, xMax=self.ysize, yMin=0, yMax=self.xsize)
-            vb.setBorder({"color": self.color_dict["grey"], "width": 2})
+            vb.setBorder({"color": DemoStyle.COLOR_NEUTRAL, "width": 2})
 
-            # create imageitem
             ii = BrainalyzerImageItem(imageitem_id=z)
             ii.setImage(self.img_list[z])
 
@@ -135,18 +116,16 @@ class BrainalyzerWorker(Process):
             self.image_vbox_list.append(vb)
             self.ii_list.append(ii)
 
-        # add graphics layout click callback
         self.graphics_layout_widget.scene().sigMouseClicked.connect(self.graphics_layout_mouse_clicked_callback)
 
-        # histogram lut lookup
+        # histogram
         self.lut_histo = pg.HistogramLUTItem(image=self.ii_list[0], fillHistogram=False, orientation="vertical", levelMode="mono")
         self.histo_sig_proxy = pg.SignalProxy(self.lut_histo.sigLevelsChanged, rateLimit=3, slot=self.update_image_LUTs)
         self.lut_histo.setLevels(90, 150)
         self.lut_histo.setHistogramRange(60, 200)
         self.graphics_layout_widget.addItem(self.lut_histo, row=1, col=self.zsize)
 
-        ###########################################################
-        # plots
+        # ── ROI intensity plot ──────────────────────────────────────
         self.roi_plot_item = pg.PlotItem()
         self.roi_plot_item.disableAutoRange()
         self.roi_plot_item.setRange(xRange=[0, 100], yRange=[90, 180])
@@ -158,107 +137,122 @@ class BrainalyzerWorker(Process):
         if self.GUI_mode == "neural_imaging":
             self.graphics_layout_widget.addItem(self.roi_plot_item, row=2, col=0, rowspan=1, colspan=colspan)
 
-        ###########################################################
-        # command panel
-        self.command_panel_layout = QtWidgets.QGridLayout()
+        # ── Command panel — 3 grouped columns ──────────────────────
+        command_panel = QtWidgets.QHBoxLayout()
+        command_panel.setSpacing(8)
 
-        # button for intensity
-        self.enter_stimulus_intensity_button = QtWidgets.QPushButton(
-            "stim intensity (%): {}".format(self.stim_intensity)
-        )
+        # --- Stimulus Control group ---
+        stim_group = QtWidgets.QGroupBox("Stimulus Control")
+        stim_group.setStyleSheet(DemoStyle.GROUP_BOX_STYLE)
+        stim_layout = QtWidgets.QVBoxLayout()
+        stim_layout.setSpacing(4)
+
+        self.enter_stimulus_intensity_button = DemoStyle.make_action_button(
+            "stim intensity (%): {}".format(self.stim_intensity), QtWidgets)
         self.enter_stimulus_intensity_button.clicked.connect(self.my_get_stimulus_intensity)
+        stim_layout.addWidget(self.enter_stimulus_intensity_button)
 
-        # add button for adding/removing quant roi
-        self.add_quant_roi_button = QtWidgets.QPushButton("add quant roi to z-plane 0")
-        self.add_quant_roi_button.clicked.connect(self.add_quant_roi_to_image)
-        self.delete_quant_roi_button = QtWidgets.QPushButton("delete quant roi from z-plane 0")
-        self.delete_quant_roi_button.clicked.connect(self.delete_quant_roi_from_image)
+        self.enter_stim_duration_vols_button = DemoStyle.make_action_button(
+            "stimulus duration (vols): {}".format(self.stim_duration_vols), QtWidgets)
+        self.enter_stim_duration_vols_button.clicked.connect(self.my_get_stimulus_duration_in_vols)
+        stim_layout.addWidget(self.enter_stim_duration_vols_button)
 
-        # button for adding/removing stimulus roi
-        self.add_stim_roi_button = QtWidgets.QPushButton("add stim roi to z-plane 0")
-        self.add_stim_roi_button.clicked.connect(self.add_stim_roi_to_image)
-        self.delete_stim_roi_button = QtWidgets.QPushButton("remove stim roi from z-plane 0")
-        self.delete_stim_roi_button.clicked.connect(self.delete_stim_roi_from_image)
+        stim_layout.addWidget(DemoStyle.make_separator(QtWidgets))
 
-        # add quant roi combobox
+        stim_layout.addWidget(DemoStyle.make_heading("Pulse Stimulus", QtWidgets, style=DemoStyle.SUBHEADING_STYLE))
+
+        self.pulse_stimulus_rois_button = DemoStyle.make_action_button(
+            "pulse stimulate ROI(s)", QtWidgets, color=DemoStyle.COLOR_SUCCESS)
+        self.pulse_stimulus_rois_button.clicked.connect(self.pulse_stimulus_rois)
+        stim_layout.addWidget(self.pulse_stimulus_rois_button)
+
+        self.pulse_full_field_button = DemoStyle.make_action_button(
+            "pulse stimulate full-field", QtWidgets, color=DemoStyle.COLOR_SUCCESS)
+        self.pulse_full_field_button.clicked.connect(self.pulse_full_field)
+        stim_layout.addWidget(self.pulse_full_field_button)
+
+        stim_layout.addStretch()
+        stim_group.setLayout(stim_layout)
+        command_panel.addWidget(stim_group)
+
+        # --- Quantification ROIs group ---
+        quant_group = QtWidgets.QGroupBox("Quantification ROIs")
+        quant_group.setStyleSheet(DemoStyle.GROUP_BOX_STYLE)
+        quant_layout = QtWidgets.QVBoxLayout()
+        quant_layout.setSpacing(4)
+
         self.quant_roi_combobox = pg.ComboBox(items=[str(x) for x in range(self.zsize)])
         self.quant_roi_combobox.setEditable(True)
         self.quant_roi_combobox_lineEdit = self.quant_roi_combobox.lineEdit()
         self.quant_roi_combobox_lineEdit.setAlignment(QtCore.Qt.AlignCenter)
         self.quant_roi_combobox_lineEdit.setReadOnly(True)
         self.quant_roi_combobox.textActivated.connect(self.update_add_delete_quant_roi_button_text)
+        quant_layout.addWidget(self.quant_roi_combobox)
 
-        # combobox for selecting z-plane to add stim roi to
+        self.add_quant_roi_button = DemoStyle.make_action_button("add quant roi to z-plane 0", QtWidgets)
+        self.add_quant_roi_button.clicked.connect(self.add_quant_roi_to_image)
+        quant_layout.addWidget(self.add_quant_roi_button)
+
+        self.delete_quant_roi_button = DemoStyle.make_action_button("delete quant roi from z-plane 0", QtWidgets)
+        self.delete_quant_roi_button.clicked.connect(self.delete_quant_roi_from_image)
+        quant_layout.addWidget(self.delete_quant_roi_button)
+
+        quant_layout.addStretch()
+        quant_group.setLayout(quant_layout)
+        command_panel.addWidget(quant_group)
+
+        # --- Stimulation ROIs group ---
+        stim_roi_group = QtWidgets.QGroupBox("Stimulation ROIs")
+        stim_roi_group.setStyleSheet(DemoStyle.GROUP_BOX_STYLE)
+        stim_roi_layout = QtWidgets.QVBoxLayout()
+        stim_roi_layout.setSpacing(4)
+
         self.stim_roi_combobox = pg.ComboBox(items=[str(x) for x in range(self.zsize)])
         self.stim_roi_combobox.setEditable(True)
         self.stim_roi_combobox_lineEdit = self.stim_roi_combobox.lineEdit()
         self.stim_roi_combobox_lineEdit.setAlignment(QtCore.Qt.AlignCenter)
         self.stim_roi_combobox_lineEdit.setReadOnly(True)
         self.stim_roi_combobox.textActivated.connect(self.update_add_delete_stim_roi_button_text)
+        stim_roi_layout.addWidget(self.stim_roi_combobox)
 
-        # labels
-        self.quant_roi_label = QtWidgets.QLabel("Add/Remove Quant ROIs")
-        self.stim_label = QtWidgets.QLabel("Adjust Stimulus Params")
-        self.stim_roi_label = QtWidgets.QLabel("Add/Remove Stim ROIs")
-        self.pulse_stimulus_label = QtWidgets.QLabel("Pulse Stimulus")
+        self.add_stim_roi_button = DemoStyle.make_action_button("add stim roi to z-plane 0", QtWidgets)
+        self.add_stim_roi_button.clicked.connect(self.add_stim_roi_to_image)
+        stim_roi_layout.addWidget(self.add_stim_roi_button)
 
-        # pulse buttons
-        self.pulse_stimulus_rois_button = QtWidgets.QPushButton("pulse stimulate ROI(s)")
-        self.pulse_stimulus_rois_button.clicked.connect(self.pulse_stimulus_rois)
-        self.pulse_stimulus_rois_button.setStyleSheet("background-color: {}".format(self.color_dict["green"]))
-        self.pulse_full_field_button = QtWidgets.QPushButton("pulse stimulate full-field")
-        self.pulse_full_field_button.clicked.connect(self.pulse_full_field)
-        self.pulse_full_field_button.setStyleSheet("background-color: {}".format(self.color_dict["green"]))
+        self.delete_stim_roi_button = DemoStyle.make_action_button("remove stim roi from z-plane 0", QtWidgets)
+        self.delete_stim_roi_button.clicked.connect(self.delete_stim_roi_from_image)
+        stim_roi_layout.addWidget(self.delete_stim_roi_button)
 
-        # button for changing stim duration
-        self.enter_stim_duration_vols_button = QtWidgets.QPushButton(
-            "stimulus duration (vols): {}".format(self.stim_duration_vols)
-        )
-        self.enter_stim_duration_vols_button.clicked.connect(self.my_get_stimulus_duration_in_vols)
+        stim_roi_layout.addStretch()
+        stim_roi_group.setLayout(stim_roi_layout)
+        command_panel.addWidget(stim_roi_group)
 
-        # arrangement of command panel
-        self.command_panel_layout.addWidget(self.stim_label, 0, 0, alignment=QtCore.Qt.AlignCenter)
-        self.command_panel_layout.addWidget(self.enter_stimulus_intensity_button, 1, 0)
-        self.command_panel_layout.addWidget(self.enter_stim_duration_vols_button, 2, 0)
-        self.command_panel_layout.addWidget(self.pulse_stimulus_label, 3, 0, alignment=QtCore.Qt.AlignCenter)
-        self.command_panel_layout.addWidget(self.pulse_stimulus_rois_button, 4, 0)
-        self.command_panel_layout.addWidget(self.pulse_full_field_button, 5, 0)
+        # ── Status bar ──────────────────────────────────────────────
+        status_bar = QtWidgets.QHBoxLayout()
 
-        self.command_panel_layout.addWidget(self.quant_roi_label, 0, 1, alignment=QtCore.Qt.AlignCenter)
-        self.command_panel_layout.addWidget(self.quant_roi_combobox, 1, 1)
-        self.command_panel_layout.addWidget(self.add_quant_roi_button, 2, 1)
-        self.command_panel_layout.addWidget(self.delete_quant_roi_button, 3, 1)
-
-        self.command_panel_layout.addWidget(self.stim_roi_label, 0, 2, alignment=QtCore.Qt.AlignCenter)
-        self.command_panel_layout.addWidget(self.stim_roi_combobox, 1, 2)
-        self.command_panel_layout.addWidget(self.add_stim_roi_button, 2, 2)
-        self.command_panel_layout.addWidget(self.delete_stim_roi_button, 3, 2)
-
-        ###########################################################
-
-        # add text for frame number
-        self.text_layout = QtWidgets.QGridLayout()
         self.vol_count_text = QtWidgets.QLabel("received vols:        0")
         self.vol_count_text.setFont(QtGui.QFont("Monospace"))
         self.vol_count_text.setMinimumWidth(200)
-        self.text_layout.addWidget(self.vol_count_text, 0, 0)
+        status_bar.addWidget(self.vol_count_text)
 
-        # add text for stim refractory period
+        status_bar.addStretch()
+
         self.stim_refractory_text = QtWidgets.QLabel(
             "stim refractory period: {}".format(self.stim_refractory_vols)
         )
         self.stim_refractory_text.setAlignment(QtCore.Qt.AlignRight)
-        self.text_layout.addWidget(self.stim_refractory_text, 0, 1)
+        status_bar.addWidget(self.stim_refractory_text)
 
-        ###########################################################
+        status_widget = QtWidgets.QWidget()
+        status_widget.setLayout(status_bar)
+        status_widget.setStyleSheet(DemoStyle.INFO_BOX_STYLE)
 
-        # containerization
-        self.grid_layout = QtWidgets.QGridLayout()
-        self.grid_layout.addWidget(self.graphics_layout_widget, 0, 0)
-        self.grid_layout.addItem(self.command_panel_layout, 1, 0)
-        self.grid_layout.addItem(self.text_layout, 2, 0)
+        # ── Main layout ─────────────────────────────────────────────
+        self.grid_layout = QtWidgets.QVBoxLayout()
+        self.grid_layout.addWidget(self.graphics_layout_widget, stretch=1)
+        self.grid_layout.addLayout(command_panel)
+        self.grid_layout.addWidget(status_widget)
 
-        # add layout to window
         self.window = QtWidgets.QWidget()
         self.window.resize(1400, 800)
         self.window.setLayout(self.grid_layout)
@@ -645,15 +639,15 @@ class BrainalyzerWorker(Process):
             self.stim_refractory_vols = self.stim_duration_vols + self.refractory_constant
             self.check_stim_refractory_vols()
 
-    def change_stim_buttons_color(self, color):
-        self.pulse_stimulus_rois_button.setStyleSheet("background-color: {}".format(self.color_dict[color]))
-        self.pulse_full_field_button.setStyleSheet("background-color: {}".format(self.color_dict[color]))
+    def change_stim_buttons_color(self, active):
+        DemoStyle.set_button_state_color(self.pulse_stimulus_rois_button, active)
+        DemoStyle.set_button_state_color(self.pulse_full_field_button, active)
 
     def check_stim_refractory_vols(self):
         if self.stim_refractory_vols > 1:
-            self.change_stim_buttons_color("red")
+            self.change_stim_buttons_color(False)
         else:
-            self.change_stim_buttons_color("green")
+            self.change_stim_buttons_color(True)
 
     def update_quant_roi_plot(self):
         curr_vol = self.image_count // self.zsize
@@ -697,9 +691,9 @@ class BrainalyzerWorker(Process):
     def update_viewbox_border_color(self, selected_z):
         for z in range(self.zsize):
             if z == selected_z:
-                self.image_vbox_list[z].setBorder({"color": self.color_dict["orange"], "width": 2})
+                self.image_vbox_list[z].setBorder({"color": DemoStyle.COLOR_WARNING, "width": 2})
             else:
-                self.image_vbox_list[z].setBorder({"color": self.color_dict["grey"], "width": 2})
+                self.image_vbox_list[z].setBorder({"color": DemoStyle.COLOR_NEUTRAL, "width": 2})
             self.image_vbox_list[z].update()
 
     def delete_quant_roi_from_image(self, event):

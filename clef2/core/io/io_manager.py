@@ -164,11 +164,16 @@ class IOManager:
     def update_output(self, **kwargs):
         """Update output devices. Keys are device names, values are kwarg dicts.
 
-        Raises KeyError if a device name is not found.
+        Logs critical and skips if a device name is not found.
         """
         for device_name, device_kwargs in kwargs.items():
-            dev = self.get_output_device(device_name)
-            dev.update_output(**device_kwargs)
+            if device_name not in self.output_devices:
+                available = list(self.output_devices.keys())
+                logger.critical(
+                    f"No output device named '{device_name}'. Available: {available}"
+                )
+                continue
+            self.output_devices[device_name].update_output(**device_kwargs)
 
     def save_data(self, name: Optional[str] = None, **kwargs):
         """Save data from input device(s). If name given, save only that one; otherwise all."""
