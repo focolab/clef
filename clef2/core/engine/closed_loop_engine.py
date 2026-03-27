@@ -32,6 +32,9 @@ class ClosedLoopEngine:
     def loop(self, iterations: int = 1):
         """Run the closed loop for a given number of iterations.
 
+        Pass iterations=-1 to run indefinitely until stopped externally
+        (e.g. Ctrl+C or setting self.running = False).
+
         Each iteration:
         1. update_input — data interfaces poll devices and store samples
         2. process_sample — distribute input_stores to all logic algorithms
@@ -39,9 +42,11 @@ class ClosedLoopEngine:
         4. update_output — route logic updates to output devices
         """
         self.running = True
-        for _ in range(iterations):
-            if not self.running:
+        count = 0
+        while self.running:
+            if iterations >= 0 and count >= iterations:
                 break
+            count += 1
 
             self.io_manager.update_input()
             self.logic_manager.process_sample(self.io_manager.input_stores)
