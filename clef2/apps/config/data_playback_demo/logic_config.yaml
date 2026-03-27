@@ -1,0 +1,20 @@
+# Data Playback Demo Logic Configuration
+# Brainalyzer closed-loop analysis on replayed TIFF data
+
+logic_algorithms:
+  - logic_algorithm_name: "brainalyzer"
+    logic_class: "brainalyzer_logic"
+    logic_parameters:
+      gui_mode: "neural_imaging"
+      stim_intensity: 0
+      zsize: 8
+      num_samples: 800
+      input_device_name: "playback_camera"
+      save_dir: "./demo_output/data_playback"
+    io_parameters:
+      output_device_names: []
+    gui_parameters:
+      enable_gui: true
+      gui_mode: "neural_imaging"
+      save_algorithm_plot: true
+      gui_screenshot_freq: 0
