@@ -60,6 +60,7 @@ class ClosedLoopEngine:
     def get_metadata(self) -> Dict[str, Any]:
         """Aggregate metadata from all managers."""
         return {
+            "config": self.config_manager.get_metadata(),
             "engine": {"running": self.running},
             "io": self.io_manager.get_metadata(),
             "logic": self.logic_manager.get_metadata(),
