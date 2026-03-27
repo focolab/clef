@@ -188,3 +188,14 @@ class ConfigManager:
         self.load_logic_config(logic_path)
 
         logger.info("All configurations loaded successfully")
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Return current in-memory configs as a serializable dict."""
+        meta: Dict[str, Any] = {}
+        if self.session_config is not None:
+            meta["session"] = self.session_config.model_dump()
+        if self.io_config is not None:
+            meta["io"] = self.io_config.model_dump()
+        if self.logic_config is not None:
+            meta["logic"] = self.logic_config.model_dump()
+        return meta
