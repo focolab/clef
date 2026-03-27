@@ -87,7 +87,7 @@ class MicroManagerStageOutput(BaseOutputDevice):
             f"{len(z_positions)} planes from {z_start} to {z_end} um"
         )
 
-    def update_output(self, **kwargs):
+    def _update_output(self, **kwargs):
         """No-op. Stage runs autonomously via TTL triggering."""
         pass
 

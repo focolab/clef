@@ -69,7 +69,7 @@ class RecordingPlaybackInput(BaseInputDevice):
             f"shape={shape}, {self._total_frames} frames, {self.width}x{self.height}"
         )
 
-    def get_input(self) -> np.ndarray:
+    def _get_input(self) -> np.ndarray:
         """Return next frame from the recording."""
         if self.input_data is not None:
             shape = self.input_data.shape

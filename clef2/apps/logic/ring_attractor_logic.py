@@ -189,7 +189,7 @@ class RingAttractorLogic(BaseClosedLoopLogic):
         except Exception as err:
             logger.warning(f"Failed to save GUI screenshot: {err}")
 
-    def check_logic(self) -> Optional[Dict[str, Any]]:
+    def _check_logic(self) -> Optional[Dict[str, Any]]:
         """Check for manual or ROI-triggered stimulus."""
         if self.cooldown_counter > 0:
             self.cooldown_counter -= 1
@@ -260,8 +260,8 @@ class RingAttractorLogic(BaseClosedLoopLogic):
         self.manual_stim_pending = True
 
     def get_metadata(self) -> Dict[str, Any]:
-        return {
-            "logic_class": self.logic_class,
+        base = super().get_metadata()
+        base.update({
             "frames_processed": self.frame_count,
             "inner_radius": self.inner_radius,
             "outer_radius": self.outer_radius,
@@ -273,7 +273,8 @@ class RingAttractorLogic(BaseClosedLoopLogic):
             "stim_events": self.stim_events,
             "num_stim_events": len(self.stim_events),
             "num_transitions": self.transition_count,
-        }
+        })
+        return base
 
     def save_data(self, **kwargs):
         """Save trajectory plot via matplotlib."""

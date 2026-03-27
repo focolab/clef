@@ -20,7 +20,7 @@ class CountingInputDevice(BaseInputDevice):
         super().__init__(name, config, io_manager=io_manager)
         self.counter = 0
 
-    def get_input(self):
+    def _get_input(self):
         self.counter += 1
         return self.counter
 
@@ -33,7 +33,7 @@ class TrackingOutputDevice(BaseOutputDevice):
         super().__init__(name, config, io_manager=io_manager)
         self.calls = []
 
-    def update_output(self, **kwargs):
+    def _update_output(self, **kwargs):
         self.calls.append(kwargs)
 
 
@@ -45,7 +45,7 @@ class SaveTrackingInputDevice(BaseInputDevice):
         super().__init__(name, config, io_manager=io_manager)
         self.save_calls = []
 
-    def get_input(self):
+    def _get_input(self):
         return 0
 
     def save_data(self, **kwargs):
@@ -64,7 +64,7 @@ class PassthroughLogic(BaseClosedLoopLogic):
         self.process_sample_count += 1
         self.last_sample = sample
 
-    def check_logic(self):
+    def _check_logic(self):
         return None
 
 
@@ -85,7 +85,7 @@ class CyclingLogic(BaseClosedLoopLogic):
         self.process_sample_count += 1
         self.last_sample = sample
 
-    def check_logic(self):
+    def _check_logic(self):
         count = self.process_sample_count
         if count == 0 or count % 10 != 0:
             return None
