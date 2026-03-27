@@ -35,7 +35,7 @@ class RingAttractorOutputDevice(BaseOutputDevice):
         self._dynamics = input_dev.dynamics
         logger.info(f"Output device '{self.name}' linked to input device '{linked_name}'")
 
-    def update_output(self, **kwargs):
+    def _update_output(self, **kwargs):
         """Apply radial and angular perturbation to the ring attractor dynamics."""
         if self._dynamics is None:
             self._resolve_dynamics()

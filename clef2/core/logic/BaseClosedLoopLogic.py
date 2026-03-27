@@ -12,6 +12,8 @@ acting as a dummy algorithm by default.
 import logging
 from typing import Any, ClassVar, Dict, Optional, Type
 
+from clef2.core.utils.event_log import EventLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +65,7 @@ class BaseClosedLoopLogic:
         self.input_devices = input_devices or {}
         self.io_manager = io_manager
         self.config_manager = config_manager
+        self.event_log = EventLog()
 
     def initialize_model(self):
         """Initialize the algorithm model. Called once before processing begins."""
@@ -75,12 +78,26 @@ class BaseClosedLoopLogic:
         """
 
     def check_logic(self) -> Optional[Dict[str, Any]]:
-        """Check the logic's internal state or conditions. Called periodically."""
+        """Check logic state. Auto-records when a non-None event is emitted.
+
+        Subclasses should override ``_check_logic()`` instead of this method.
+        """
+        result = self._check_logic()
+        if result is not None:
+            self.event_log.record(result)
+        return result
+
+    def _check_logic(self) -> Optional[Dict[str, Any]]:
+        """Override this to implement logic checks. Called by ``check_logic()``."""
         return None
 
     def get_metadata(self) -> Dict[str, Any]:
         """Get metadata about the closed-loop logic."""
-        return {"name": self.name, "logic_class": self.logic_class}
+        return {
+            "name": self.name,
+            "logic_class": self.logic_class,
+            "event_log": self.event_log.to_dict(),
+        }
 
     def save_data(self, **kwargs):
         """Save any data produced by the logic algorithm."""

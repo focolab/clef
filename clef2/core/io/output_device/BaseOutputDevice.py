@@ -12,6 +12,8 @@ acting as a dummy device by default.
 import logging
 from typing import ClassVar, Dict, Optional, Type, Any
 
+from clef2.core.utils.event_log import EventLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +60,7 @@ class BaseOutputDevice:
         self.name = name
         self.config = config or {}
         self.io_manager = io_manager
+        self.event_log = EventLog()
 
     def connect(self):
         """Connect to the output device."""
@@ -68,8 +71,24 @@ class BaseOutputDevice:
         pass
 
     def update_output(self, **kwargs):
-        """Update the output device with new data or commands."""
+        """Update the output device, then auto-record the event.
+
+        Subclasses should override ``_update_output()`` instead of this method.
+        """
+        self._update_output(**kwargs)
+        self.event_log.record(kwargs)
+
+    def _update_output(self, **kwargs):
+        """Override this to handle output. Called by ``update_output()``."""
         pass
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Get metadata about this output device."""
+        return {
+            "name": self.name,
+            "device_class": self.device_class,
+            "event_log": self.event_log.to_dict(),
+        }
 
     def close(self):
         """Close the connection to the output device."""

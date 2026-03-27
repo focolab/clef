@@ -56,7 +56,7 @@ class LDI89NorthOutput(BaseOutputDevice):
             f"device={self._intensity_device}, property={self._intensity_property}"
         )
 
-    def update_output(self, **kwargs):
+    def _update_output(self, **kwargs):
         """Set LDI intensity.
 
         Keyword Args:

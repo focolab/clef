@@ -8,6 +8,7 @@ from pathlib import Path
 from clef2.core.config.config_manager import ConfigManager
 from clef2.core.config.IOConfig import IOConfig
 from clef2.core.config.ClosedLoopLogicConfig import ClosedLoopLogicConfig
+from clef2.core.config.SessionConfig import SessionConfig
 from clef2.core.io.io_manager import IOManager
 from clef2.core.logic.logic_manager import LogicManager
 from clef2.core.engine.closed_loop_engine import ClosedLoopEngine
@@ -74,6 +75,8 @@ def save_config():
             },
         ],
     })
+
+    cm.session_config = SessionConfig(session_parameters={"save_samples": True})
 
     return cm
 

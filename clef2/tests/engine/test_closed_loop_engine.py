@@ -26,6 +26,7 @@ def config_manager():
     cm = ConfigManager(defaults_dir=CONFIG_DIR)
     cm.load_io_config()
     cm.load_logic_config()
+    cm.load_session_config()
     return cm
 
 

@@ -12,6 +12,8 @@ acting as a dummy device by default.
 import logging
 from typing import ClassVar, Dict, Optional, Type, Any
 
+from clef2.core.utils.event_log import EventLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,6 +61,7 @@ class BaseInputDevice:
         self.config = config or {}
         self.data_interface = None
         self.io_manager = io_manager
+        self.event_log = EventLog()
 
     def connect(self):
         """Connect to the input device."""
@@ -69,8 +72,25 @@ class BaseInputDevice:
         pass
 
     def get_input(self) -> Any:
-        """Retrieve input data from the device."""
+        """Retrieve input data from the device, then auto-record a timestamp.
+
+        Subclasses should override ``_get_input()`` instead of this method.
+        """
+        result = self._get_input()
+        self.event_log.record()
+        return result
+
+    def _get_input(self) -> Any:
+        """Override this to supply input data. Called by ``get_input()``."""
         return None
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """Get metadata about this input device."""
+        return {
+            "name": self.name,
+            "device_class": self.device_class,
+            "event_log": self.event_log.to_dict(),
+        }
 
     def save_data(self, **kwargs):
         """Save data via the data interface."""

@@ -244,7 +244,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             logger.info(f"BrainalyzerLogic: received event: {data}")
             self.current_event = data
 
-    def check_logic(self) -> Optional[Dict[str, Any]]:
+    def _check_logic(self) -> Optional[Dict[str, Any]]:
         """Translate GUI events into output device updates.
 
         Returns dict like:
@@ -324,13 +324,13 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
 
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata including stimulus event log."""
-        return {
-            "name": self.name,
-            "logic_class": self.logic_class,
+        base = super().get_metadata()
+        base.update({
             "stim_param_list": self.stim_param_list,
             "total_events": len(self.events),
             "total_samples": self.sample_count,
-        }
+        })
+        return base
 
     def close(self):
         """Stop worker, then clean up shared memory."""

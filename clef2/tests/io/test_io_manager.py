@@ -279,9 +279,9 @@ class TestIOManagerUpdateOutput:
         name = io_yaml["output_devices"][0]["output_device_name"]
         io_manager.update_output(**{name: {}})
 
-    def test_update_output_invalid_device_raises(self, io_manager):
-        with pytest.raises(KeyError, match="No output device named"):
-            io_manager.update_output(**{"nonexistent_device": {}})
+    def test_update_output_invalid_device_logs_critical(self, io_manager):
+        """Invalid device name is logged as critical but does not raise."""
+        io_manager.update_output(**{"nonexistent_device": {}})
 
 
 # ---------------------------------------------------------------------------

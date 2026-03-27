@@ -156,7 +156,7 @@ class RingAttractorInputDevice(BaseInputDevice):
 
         logger.info(f"RingAttractorInputDevice '{name}' initialized: {width}x{height}")
 
-    def get_input(self) -> np.ndarray:
+    def _get_input(self) -> np.ndarray:
         """Advance dynamics and generate a uint16 image with puncta."""
         self.dynamics.step()
 

@@ -90,7 +90,7 @@ class MightexPolygonOutput(BaseOutputDevice):
         """Name of the shared memory buffer for external writers."""
         return self.SHM_NAME
 
-    def update_output(self, **kwargs):
+    def _update_output(self, **kwargs):
         """Read mask from shared memory and upload to SLM.
 
         Keyword Args:

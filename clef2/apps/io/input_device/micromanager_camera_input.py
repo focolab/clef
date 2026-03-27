@@ -90,7 +90,7 @@ class MicroManagerCameraInput(BaseInputDevice):
             self._acquiring = False
             logger.debug("Stopped acquisition")
 
-    def get_input(self) -> Optional[np.ndarray]:
+    def _get_input(self) -> Optional[np.ndarray]:
         """Pop next image from the circular buffer.
 
         Returns None if buffer is empty.
