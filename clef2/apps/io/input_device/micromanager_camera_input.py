@@ -49,10 +49,13 @@ class MicroManagerCameraInput(BaseInputDevice):
                 logger.warning(f"Could not set camera property {prop_name}={prop_value}: {e}")
 
         # Set exposure
-        exposure_ms = cfg.get("exposure_ms")
-        if exposure_ms is not None:
-            self.mmc.setExposure(float(exposure_ms))
-            logger.debug(f"Set exposure to {exposure_ms} ms")
+        # exposure_ms = cfg.get("exposure_ms")
+        # if exposure_ms is not None:
+        #     self.mmc.setExposure(float(exposure_ms))
+        #     logger.debug(f"Set exposure to {exposure_ms} ms")
+        # Set circular buffer
+        # buffer_mb = cfg.get("buffer_memory_mb", 10000)
+        # self.mmc.setCircularBufferMemoryFootprint(buffer_mb)
 
         # Set ROI if provided, otherwise query current
         roi = cfg.get("roi")
@@ -67,9 +70,7 @@ class MicroManagerCameraInput(BaseInputDevice):
         self.width = self._roi[2]
         self.height = self._roi[3]
 
-        # Set circular buffer
-        buffer_mb = cfg.get("buffer_memory_mb", 10000)
-        self.mmc.setCircularBufferMemoryFootprint(buffer_mb)
+
 
         logger.info(
             f"MicroManagerCameraInput '{self.name}' configured: "

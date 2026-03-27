@@ -93,23 +93,32 @@ class LogicManager:
         for device_name in output_device_names:
             output_devices[device_name] = self.io_manager.get_output_device(device_name)
 
-        if not logic_class_key:
-            logger.info(f"No logic_class for '{name}', using BaseClosedLoopLogic")
-            return BaseClosedLoopLogic(
-                name=name,
-                config=entry.logic_parameters,
-                output_devices=output_devices,
-                gui_parameters=entry.gui_parameters,
-            )
+        # Resolve input device references
+        input_devices = {}
+        input_device_names = entry.io_parameters.get("input_device_names", [])
+        for device_name in input_device_names:
+            try:
+                input_devices[device_name] = self.io_manager.get_input_device(device_name)
+            except KeyError:
+                logger.warning(f"Input device '{device_name}' not found, skipping")
 
-        cls = BaseClosedLoopLogic.get_class(logic_class_key)
-        logger.info(f"Creating logic '{name}' (class={logic_class_key})")
-        return cls(
+        kwargs = dict(
             name=name,
             config=entry.logic_parameters,
             output_devices=output_devices,
             gui_parameters=entry.gui_parameters,
+            input_devices=input_devices,
+            io_manager=self.io_manager,
+            config_manager=self.config_manager,
         )
+
+        if not logic_class_key:
+            logger.info(f"No logic_class for '{name}', using BaseClosedLoopLogic")
+            return BaseClosedLoopLogic(**kwargs)
+
+        cls = BaseClosedLoopLogic.get_class(logic_class_key)
+        logger.info(f"Creating logic '{name}' (class={logic_class_key})")
+        return cls(**kwargs)
 
     # ------------------------------------------------------------------
     # Logic access

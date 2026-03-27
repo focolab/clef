@@ -32,8 +32,15 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         config: Dict[str, Any] | None = None,
         output_devices: Dict[str, Any] | None = None,
         gui_parameters: Dict[str, Any] | None = None,
+        input_devices: Dict[str, Any] | None = None,
+        io_manager: Any = None,
+        config_manager: Any = None,
     ):
-        super().__init__(name, config, output_devices, gui_parameters)
+        super().__init__(
+            name, config, output_devices, gui_parameters,
+            input_devices=input_devices, io_manager=io_manager,
+            config_manager=config_manager,
+        )
 
         cfg = self.config
 
@@ -41,16 +48,11 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         self.gui_mode = cfg.get("gui_mode", "neural_imaging")
         self.stim_intensity = cfg.get("stim_intensity", 0)
         self.zsize = cfg.get("zsize", 1)
-        self.input_device_name = cfg.get("input_device_name", "camera")
+        self.input_device_name = next(iter(self.input_devices), "camera")
 
         # Calibration
         self.calibration_file = cfg.get("calibration_file", None)
         self.calibration_points = None
-
-        # Camera state (set during initialize_model via output_devices -> io_manager)
-        self.xsize = 0
-        self.ysize = 0
-        self.camera_roi = (0, 0, 0, 0)
 
         # Polygon state
         self.polygon_shm_name = None
@@ -97,25 +99,19 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
                 f"dims=({self.polygon_width}, {self.polygon_height})"
             )
 
-        # Resolve camera input device info via io_manager
-        # Output devices hold a reference to io_manager
-        io_manager = None
-        for dev in self.output_devices.values():
-            if hasattr(dev, "io_manager") and dev.io_manager is not None:
-                io_manager = dev.io_manager
-                break
+        # Resolve camera input device info
+        self.xsize = 0
+        self.ysize = 0
+        self.camera_roi = (0, 0, 0, 0)
 
-        if io_manager is not None:
-            try:
-                camera_dev = io_manager.get_input_device(self.input_device_name)
-                self.xsize = camera_dev.width
-                self.ysize = camera_dev.height
-                self.camera_roi = camera_dev.get_roi()
-                logger.info(f"Camera: {self.xsize}x{self.ysize}, ROI={self.camera_roi}")
-            except Exception as e:
-                logger.warning(f"Could not get camera info from io_manager: {e}")
+        camera_dev = self.input_devices.get(self.input_device_name)
+        if camera_dev is not None:
+            self.xsize = camera_dev.width
+            self.ysize = camera_dev.height
+            self.camera_roi = camera_dev.get_roi()
+            logger.info(f"Camera: {self.xsize}x{self.ysize}, ROI={self.camera_roi}")
 
-        # Fall back to config if io_manager didn't provide values
+        # Fall back to config if device didn't provide values
         if self.xsize == 0 or self.ysize == 0:
             self.xsize = self.config.get("xsize", 0)
             self.ysize = self.config.get("ysize", 0)

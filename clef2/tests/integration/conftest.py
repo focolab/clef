@@ -55,8 +55,8 @@ class SaveTrackingInputDevice(BaseInputDevice):
 class PassthroughLogic(BaseClosedLoopLogic):
     logic_class: ClassVar[Optional[str]] = "passthrough_logic"
 
-    def __init__(self, name, config=None, output_devices=None, gui_parameters=None):
-        super().__init__(name, config, output_devices, gui_parameters)
+    def __init__(self, name, config=None, output_devices=None, gui_parameters=None, **kwargs):
+        super().__init__(name, config, output_devices, gui_parameters, **kwargs)
         self.process_sample_count = 0
         self.last_sample = None
 
@@ -75,8 +75,8 @@ class CyclingLogic(BaseClosedLoopLogic):
     """
     logic_class: ClassVar[Optional[str]] = "cycling_logic"
 
-    def __init__(self, name, config=None, output_devices=None, gui_parameters=None):
-        super().__init__(name, config, output_devices, gui_parameters)
+    def __init__(self, name, config=None, output_devices=None, gui_parameters=None, **kwargs):
+        super().__init__(name, config, output_devices, gui_parameters, **kwargs)
         self.process_sample_count = 0
         self.last_sample = None
         self._device_names = sorted(self.output_devices.keys())
@@ -102,8 +102,8 @@ class CyclingLogic(BaseClosedLoopLogic):
 class SaveTrackingLogic(BaseClosedLoopLogic):
     logic_class: ClassVar[Optional[str]] = "save_tracking_logic"
 
-    def __init__(self, name, config=None, output_devices=None, gui_parameters=None):
-        super().__init__(name, config, output_devices, gui_parameters)
+    def __init__(self, name, config=None, output_devices=None, gui_parameters=None, **kwargs):
+        super().__init__(name, config, output_devices, gui_parameters, **kwargs)
         self.save_calls = []
 
     def save_data(self, **kwargs):

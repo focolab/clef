@@ -11,11 +11,12 @@ logic_algorithms:
       outer_radius: 10.0
       image_width: 100
       image_height: 100
-      input_device_name: "ring_camera"
       save_dir: "./demo_output/ring_attractor"
     io_parameters:
       output_device_names:
         - "ring_stimulus"
+      input_device_names:
+        - "ring_camera"
     gui_parameters:
       enable_gui: false
       gui_mode: "neural_imaging"
