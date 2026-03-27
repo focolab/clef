@@ -11,12 +11,9 @@ import numpy as np
 from typing import Any, ClassVar, Dict, Optional, Tuple
 
 from clef2.core.logic.BaseClosedLoopLogic import BaseClosedLoopLogic
+from clef2.utils.style.demo_stylization import DemoStyle
 
 logger = logging.getLogger(__name__)
-
-# Stylization for app
-ROOTDIR = Path(__file__).resolve().parents[3]
-CSS_PATH = ROOTDIR / "style" / "css" / "Ubuntu.qss"
 
 
 class RingAttractorLogic(BaseClosedLoopLogic):
@@ -400,9 +397,7 @@ class RingVisualizer:
         self._rois = []
 
         self.app = pg.mkQApp("RingVisualizer")
-        if CSS_PATH.exists():
-            with open(CSS_PATH, "r") as f:
-                self.app.setStyleSheet(f.read())
+        DemoStyle.load_qss(self.app)
 
         # --- Build _RotatedLabel using the actual Qt classes ---
         class RotatedLabel(QtWidgets.QLabel):
@@ -433,8 +428,7 @@ class RingVisualizer:
 
         # ── LEFT: Image column
         img_col = QtWidgets.QVBoxLayout()
-        img_heading = QtWidgets.QLabel("Raw 'Microscopy' Images")
-        img_heading.setStyleSheet("font-weight: bold; font-size: 13px; padding-bottom: 2px;")
+        img_heading = DemoStyle.make_heading("Raw 'Microscopy' Images", QtWidgets)
         img_col.addWidget(img_heading)
 
         eq_label = QtWidgets.QLabel(
@@ -442,7 +436,7 @@ class RingVisualizer:
             "<small>dr/dt = −k(r−r₁)(r−mid)(r−r₂) + u<br>"
             "dθ/dt = ω + u_ω</small>"
         )
-        eq_label.setStyleSheet("color: #555; padding-bottom: 4px;")
+        eq_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE)
         img_col.addWidget(eq_label)
 
         self.image_widget = pg.ImageView()
@@ -472,8 +466,7 @@ class RingVisualizer:
 
         # ── CENTER: State space
         plot_col = QtWidgets.QVBoxLayout()
-        plot_heading = QtWidgets.QLabel("Extracted Data — State Space")
-        plot_heading.setStyleSheet("font-weight: bold; font-size: 13px; padding-bottom: 2px;")
+        plot_heading = DemoStyle.make_heading("Extracted Data — State Space", QtWidgets)
         plot_col.addWidget(plot_heading)
 
         self.plot_widget = pg.PlotWidget()
@@ -508,7 +501,7 @@ class RingVisualizer:
         ctrl_col = QtWidgets.QVBoxLayout()
         ctrl_col.setSpacing(6)
 
-        instructions = QtWidgets.QLabel(
+        instructions = DemoStyle.make_info_box(
             "<b>Instructions</b><br>"
             "1. Watch the puncta orbit the ring attractors.<br>"
             "2. Use <i>Manual Stimulation</i> to push<br>"
@@ -516,12 +509,8 @@ class RingVisualizer:
             "3. Draw a <i>Closed-Loop ROI</i> on the state<br>"
             "&nbsp;&nbsp;&nbsp;space to trigger automatically<br>"
             "&nbsp;&nbsp;&nbsp;when the state enters that region.<br>"
-            "4. Adjust sliders to tune the perturbation."
-        )
-        instructions.setWordWrap(True)
-        instructions.setStyleSheet(
-            "QLabel { background: #f0f4f8; border: 1px solid #c8d0d8; "
-            "border-radius: 4px; padding: 8px; font-size: 11px; }"
+            "4. Adjust sliders to tune the perturbation.",
+            QtWidgets, style=DemoStyle.INSTRUCTIONS_BOX_STYLE,
         )
         ctrl_col.addWidget(instructions)
 
@@ -541,27 +530,19 @@ class RingVisualizer:
         roi_layout.addWidget(self.delete_rois_button)
         ctrl_col.addLayout(roi_layout)
 
-        cl_box = QtWidgets.QLabel(
+        cl_box = DemoStyle.make_info_box(
             "<b>Closed-Loop Trigger</b><br>"
             "When the system state (X, Y) enters a<br>"
             "drawn ROI, a stimulus is automatically<br>"
             "delivered (subject to cooldown).<br>"
-            "Drag corners to resize; drag body to move."
-        )
-        cl_box.setWordWrap(True)
-        cl_box.setStyleSheet(
-            "QLabel { background: #fff8e7; border: 1px solid #f0c040; "
-            "border-radius: 4px; padding: 8px; font-size: 11px; }"
+            "Drag corners to resize; drag body to move.",
+            QtWidgets, style=DemoStyle.CALLOUT_BOX_STYLE,
         )
         ctrl_col.addWidget(cl_box)
 
-        sep = QtWidgets.QFrame()
-        sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setStyleSheet("color: #ccc;")
-        ctrl_col.addWidget(sep)
+        ctrl_col.addWidget(DemoStyle.make_separator(QtWidgets))
 
-        stim_heading = QtWidgets.QLabel("Stimulus Parameters")
-        stim_heading.setStyleSheet("font-weight: bold; font-size: 12px;")
+        stim_heading = DemoStyle.make_heading("Stimulus Parameters", QtWidgets, style=DemoStyle.SUBHEADING_STYLE)
         ctrl_col.addWidget(stim_heading)
 
         # Radial slider
@@ -598,12 +579,10 @@ class RingVisualizer:
             "<small>r: + push out, − pull in (~±15 switches rings)<br>"
             "ω: + speed up, − slow down rotation (±30)</small>"
         )
-        slider_help.setStyleSheet("color: #666;")
+        slider_help.setStyleSheet(DemoStyle.HELP_TEXT_STYLE)
         ctrl_col.addWidget(slider_help)
 
-        sep2 = QtWidgets.QFrame()
-        sep2.setFrameShape(QtWidgets.QFrame.HLine)
-        sep2.setStyleSheet("color: #ccc;")
+        sep2 = DemoStyle.make_separator(QtWidgets)
         ctrl_col.addWidget(sep2)
 
         self.clear_markers_button = QtWidgets.QPushButton("Clear Stim Markers")
@@ -614,10 +593,7 @@ class RingVisualizer:
         self.info_text = QtWidgets.QLabel()
         self.info_text.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.info_text.setWordWrap(True)
-        self.info_text.setStyleSheet(
-            "QLabel { background: #f8f8f8; border: 1px solid #ddd; "
-            "border-radius: 4px; padding: 8px; font-size: 11px; }"
-        )
+        self.info_text.setStyleSheet(DemoStyle.INFO_BOX_STYLE)
         ctrl_col.addWidget(self.info_text)
         ctrl_col.addStretch()
 
