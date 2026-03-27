@@ -6,11 +6,13 @@ Orchestrates the real-time closed loop:
 """
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from clef2.core.config.config_manager import ConfigManager
 from clef2.core.io.io_manager import IOManager
 from clef2.core.logic.logic_manager import LogicManager
+from clef2.core.utils.metadata_io import save_metadata as _save_metadata_to_file
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,27 @@ class ClosedLoopEngine:
             "logic": self.logic_manager.get_metadata(),
         }
 
+    def _session_prefix(self) -> str:
+        """Return '{session_id}_' if set, else ''."""
+        session_cfg = self.config_manager.session_config
+        if session_cfg is None or not session_cfg.session_id:
+            return ""
+        return f"{session_cfg.session_id}_"
+
+    def save_md(self):
+        """Save session metadata to sample_data_dir, gated by save_metadata."""
+        session_cfg = self.config_manager.session_config
+        if session_cfg is None or session_cfg.session_parameters is None:
+            return
+        if not session_cfg.session_parameters.get("save_metadata", False):
+            logger.info("save_metadata is false, skipping metadata save")
+            return
+        metadata = self.get_metadata()
+        data_dir = Path(session_cfg.sample_data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        path = data_dir / f"{self._session_prefix()}metadata.json"
+        _save_metadata_to_file(path, metadata)
+
     def save_data(self, **kwargs):
         """Save data from IO and logic managers."""
         session_cfg = self.config_manager.session_config
@@ -73,8 +96,9 @@ class ClosedLoopEngine:
         if not save_samples:
             logger.info("save_samples is false, skipping data save")
             return
-        self.io_manager.save_data(**kwargs)
-        self.logic_manager.save_data(**kwargs)
+        prefix = self._session_prefix()
+        self.io_manager.save_data(prefix=prefix, **kwargs)
+        self.logic_manager.save_data(prefix=prefix, **kwargs)
 
     def close(self):
         """Close all managers."""

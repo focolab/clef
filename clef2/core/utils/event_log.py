@@ -22,7 +22,8 @@ class EventLog:
     def __init__(self):
         self._t0_perf: float = time.perf_counter()
         self._t0_wall: float = time.time()
-        self._events: List[Tuple[float, Any]] = []
+        self._events: List[Tuple[int, float, Any]] = []
+        self._call_count: int = 0
         self.enabled: bool = True
 
     def record(self, payload: Any = None) -> float:
@@ -30,15 +31,20 @@ class EventLog:
         if not self.enabled:
             return -1.0
         t = time.perf_counter() - self._t0_perf
-        self._events.append((t, payload))
+        self._events.append((self._call_count, t, payload))
+        self._call_count += 1
         return t
 
     @property
-    def events(self) -> List[Tuple[float, Any]]:
+    def events(self) -> List[Tuple[int, float, Any]]:
         return self._events
 
     @property
     def timestamps(self) -> List[float]:
+        return [e[1] for e in self._events]
+
+    @property
+    def sample_indices(self) -> List[int]:
         return [e[0] for e in self._events]
 
     def to_dict(self) -> dict:
