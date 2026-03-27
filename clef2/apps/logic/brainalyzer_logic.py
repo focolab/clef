@@ -41,7 +41,6 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         self.gui_mode = cfg.get("gui_mode", "neural_imaging")
         self.stim_intensity = cfg.get("stim_intensity", 0)
         self.zsize = cfg.get("zsize", 1)
-        self.num_samples = cfg.get("num_samples", 1000)
         self.input_device_name = cfg.get("input_device_name", "camera")
 
         # Calibration
@@ -70,6 +69,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         self.events = []
         self.current_event = None
         self.stimulus_is_on = False
+        self.active_pulse_stim_off = None  # frame index to turn off pulsed stim
         self.stim_param_list = []
         self.sample_count = 0
 
@@ -205,7 +205,6 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             "saveroot": self.saveroot,
             "ysize": self.ysize,
             "xsize": self.xsize,
-            "total_frames": self.num_samples,
             "zsize": self.zsize,
             "stim_intensity": self.stim_intensity,
             "GUI_mode": self.gui_mode,
@@ -255,6 +254,21 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         Returns dict like:
             {"polygon": {"action": "upload_mask"}, "ldi": {"intensity": N}}
         """
+        # Check for pulsed stim expiry first
+        if (
+            self.active_pulse_stim_off is not None
+            and self.sample_count >= self.active_pulse_stim_off
+        ):
+            updates = {
+                "polygon": {"action": "blank"},
+                "ldi": {"intensity": 0},
+            }
+            logger.info(
+                f"BrainalyzerLogic: pulse stim off at frame {self.sample_count}"
+            )
+            self.active_pulse_stim_off = None
+            return updates
+
         if self.current_event is None and not self.stimulus_is_on:
             return None
 
@@ -277,13 +291,14 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
                 stim_on = self.sample_count + self.zsize - zndx
                 stim_off = stim_on + stim_frames
 
-                if stim_off <= self.num_samples:
-                    self.stim_param_list.append({
-                        "stim_on": stim_on,
-                        "stim_off": stim_off,
-                        "stim_intensity": stim_intensity,
-                        "event": event,
-                    })
+                self.active_pulse_stim_off = stim_off
+
+                self.stim_param_list.append({
+                    "stim_on": stim_on,
+                    "stim_off": stim_off,
+                    "stim_intensity": stim_intensity,
+                    "event": event,
+                })
 
             elif event_type in ("stream-rect-roi-list", "stream-widefield"):
                 self.stimulus_is_on = True
@@ -322,8 +337,21 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         }
 
     def close(self):
-        """Clean up shared memory and stop worker."""
-        # Close shared frame memory
+        """Stop worker, then clean up shared memory."""
+        # Tell worker to close and wait for it to exit
+        if self.parent_conn:
+            try:
+                self.parent_conn.send("close")
+            except Exception as err:
+                logger.info(f"Error sending close to worker: {err}")
+
+        if self.proc is not None:
+            self.proc.join(timeout=5)
+            if self.proc.is_alive():
+                logger.warning("Worker did not exit in time, terminating")
+                self.proc.terminate()
+
+        # Now safe to unlink shared memory
         try:
             for shm in self.shared_frame_memory_list:
                 shm.close()
@@ -334,12 +362,5 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
                 self.shared_image_count.shm.unlink()
         except Exception as err:
             logger.info(f"Error unlinking shared memory: {err}")
-
-        # Tell worker to close
-        if self.parent_conn:
-            try:
-                self.parent_conn.send("close")
-            except Exception as err:
-                logger.info(f"Error closing worker: {err}")
 
         logger.info(f"BrainalyzerLogic '{self.name}' closed")

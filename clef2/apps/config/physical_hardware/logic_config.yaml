@@ -8,7 +8,6 @@ logic_algorithms:
       gui_mode: "neural_imaging"
       stim_intensity: 0
       zsize: 12
-      num_samples: 10000
       input_device_name: "camera"
       save_dir: "./output"
       calibration_file: "clef2/apps/io/output_device/res/MightexPolygon1000/calibrations.json"
