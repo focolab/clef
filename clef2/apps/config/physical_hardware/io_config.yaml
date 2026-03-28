@@ -7,7 +7,7 @@ input_devices:
     input_device_class: "micromanager_camera"
     data_interface_class: "shm_uint16_data_interface"
     data_interface_parameters:
-      shm_buffer_size: 12
+      shm_buffer_size: 8
       shm_name_prefix: "shared_frame_memory" # produces shared_frame_memory_0, ..., shared_frame_memory_image_count
     input_device_parameters:
       device_properties: null # No extra device properties to set
@@ -20,7 +20,7 @@ output_devices:
     output_device_class: "micromanager_stage"
     output_device_parameters:
       z_step_size_um: 2.5
-      num_z_planes: 12
+      num_z_planes: 8
       ttl_device: "TTL1-8"
       ttl_state: "18"
 
@@ -35,5 +35,5 @@ output_devices:
     output_device_class: "ldi_89north"
     output_device_parameters:
       intensity_device: "89 North Laser Diode Illuminator"
-      intensity_property: "640 Intensity"
+      intensity_property: "470 Intensity"
       shutter_device: "89 North Laser Diode Illuminator"
