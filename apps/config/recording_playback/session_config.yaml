@@ -1,0 +1,10 @@
+# Recording Playback Session Configuration
+
+session_name: "recording_playback"
+user_name: "CLEF_Demo"
+sample_data_dir: "./demo_output/recording_playback"
+
+session_parameters:
+  num_samples: 800
+  save_samples: false
+  save_metadata: true

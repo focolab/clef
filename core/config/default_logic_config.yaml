@@ -1,0 +1,13 @@
+# CLEF Minimal Closed-Loop Logic Configuration
+
+logic_algorithms:
+  - logic_algorithm_name: "default_logic"
+    logic_class: "base_closed_loop_logic"
+    logic_parameters: {}
+    io_parameters:
+      output_device_names:
+        - "default_output"
+      input_device_names: []
+    gui_parameters:
+      enable_gui: false
+      gui_mode: "none"

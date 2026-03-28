@@ -1,0 +1,11 @@
+# Physical Hardware Demo Session Configuration
+# Innovation Core spinning disk microscope
+
+session_name: "physical_hardware_demo"
+user_name: "CLEF_Demo"
+sample_data_dir: "./demo_output/physical_hardware"
+
+session_parameters:
+  num_samples: 800
+  save_samples: true
+  save_metadata: true
