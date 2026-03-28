@@ -50,14 +50,15 @@ class MicroManagerCameraInput(BaseInputDevice):
         # Set device properties first (e.g. Binning)
         device_properties = cfg.get("device_properties", {})
         cam = self.mmc.getCameraDevice()
-        for prop_name, prop_value in device_properties.items():
-            try:
-                self.mmc.setProperty(cam, prop_name, prop_value)
-                logger.debug(f"Set {cam}.{prop_name} = {prop_value}")
-            except Exception as e:
-                logger.warning(
-                    f"Could not set camera property {prop_name}={prop_value}: {e}"
-                )
+        if device_properties:
+            for prop_name, prop_value in device_properties.items():
+                try:
+                    self.mmc.setProperty(cam, prop_name, prop_value)
+                    logger.debug(f"Set {cam}.{prop_name} = {prop_value}")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not set camera property {prop_name}={prop_value}: {e}"
+                    )
 
         # Set exposure
         # exposure_ms = cfg.get("exposure_ms")
