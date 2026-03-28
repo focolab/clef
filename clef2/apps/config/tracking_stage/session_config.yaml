@@ -1,0 +1,10 @@
+# XY Tracking Stage Session Configuration
+
+session_name: "tracking_stage"
+user_name: "CLEF_Demo"
+sample_data_dir: "./demo_output/tracking_stage"
+
+session_parameters:
+  num_samples: 800
+  save_samples: true
+  save_metadata: true

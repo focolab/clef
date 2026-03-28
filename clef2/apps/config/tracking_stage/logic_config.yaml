@@ -1,0 +1,16 @@
+# XY Tracking Stage Logic Configuration
+# Centroid-based stage tracking via GUI subprocess
+
+logic_algorithms:
+  - logic_algorithm_name: "xy_tracking"
+    logic_class: "xy_tracking_logic"
+    logic_parameters:
+      input_device_name: "camera"
+      stage_output_name: "xy_stage_output"
+      micron_to_pix_ratio: 1.3514  # 100/74
+      stage_dampening_factor: 0.5
+    io_parameters:
+      output_device_names: ["xy_stage_output"]
+      input_device_names: ["camera"]
+    gui_parameters:
+      gui_screenshot_freq: 0
