@@ -15,6 +15,7 @@ class InputDeviceConfig(BaseModel):
     input_device_class: Optional[str] = None
     data_interface_class: Optional[str] = None
     input_device_parameters: Dict[str, Any] = Field(default_factory=dict)
+    data_interface_parameters: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="allow")
 

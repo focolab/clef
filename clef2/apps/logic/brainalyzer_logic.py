@@ -2,8 +2,9 @@
 Brainalyzer Logic for CLEF2.
 
 Orchestrates the BrainalyzerWorker GUI subprocess for interactive
-closed-loop microscopy. Manages shared memory for frame transfer,
-relays stimulus events from the GUI to output devices (polygon, LDI).
+closed-loop microscopy. Relays stimulus events from the GUI to
+output devices (polygon, LDI). Frame shared memory is managed by
+SharedMemoryUint16DataInterface.
 
 The BrainalyzerWorker generates polygon masks directly and writes
 them into the polygon output device's shared memory buffer.
@@ -12,7 +13,7 @@ them into the polygon output device's shared memory buffer.
 import json
 import logging
 import numpy as np
-from multiprocessing import Pipe, shared_memory
+from multiprocessing import Pipe
 from pathlib import Path
 from typing import Any, ClassVar, Dict, Optional
 
@@ -37,8 +38,12 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         config_manager: Any = None,
     ):
         super().__init__(
-            name, config, output_devices, gui_parameters,
-            input_devices=input_devices, io_manager=io_manager,
+            name,
+            config,
+            output_devices,
+            gui_parameters,
+            input_devices=input_devices,
+            io_manager=io_manager,
             config_manager=config_manager,
         )
 
@@ -47,7 +52,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         # Core experiment params
         self.gui_mode = cfg.get("gui_mode", "neural_imaging")
         self.stim_intensity = cfg.get("stim_intensity", 0)
-        self.zsize = cfg.get("zsize", 1)
+        self.num_z_planes = cfg.get("num_z_planes", cfg.get("zsize", 1))
         self.input_device_name = next(iter(self.input_devices), "camera")
 
         # Calibration
@@ -62,9 +67,6 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         # IPC
         self.parent_conn = None
         self.child_conn = None
-        self.shared_frame_memory_list = []
-        self.shared_ndarray_list = []
-        self.shared_image_count = None
         self.proc = None
 
         # Stimulus state
@@ -82,7 +84,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         self.gui_screenshot_freq = self.gui_parameters.get("gui_screenshot_freq", 0)
 
     def initialize_model(self):
-        """Load calibration, resolve hardware info, create shared memory, start worker."""
+        """Load calibration, resolve hardware info, start worker."""
 
         # Load calibration points
         self._load_calibration()
@@ -122,6 +124,18 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         if self.xsize == 0 or self.ysize == 0:
             logger.warning("xsize/ysize not set — worker may fail.")
 
+        # Read shm metadata from data interface (single source of truth)
+        self.shm_names = []
+        if camera_dev is not None and hasattr(camera_dev, "data_interface"):
+            di = camera_dev.data_interface
+            di_nz = di.config.get("shm_buffer_size", 0) if hasattr(di, "config") else 0
+            if di_nz > 0:
+                self.num_z_planes = di_nz
+            if hasattr(di, "shm_names"):
+                self.shm_names = di.shm_names
+            if hasattr(di, "image_count_shm_name"):
+                self.image_count_shm_name = di.image_count_shm_name
+
         # Start worker subprocess
         self._start_worker()
 
@@ -155,45 +169,14 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         logger.info(f"Loaded calibration from {calib.get('datetime', 'unknown')}")
 
     def _start_worker(self):
-        """Create shared memory buffers, Pipe, and start BrainalyzerWorker."""
+        """Create Pipe and start BrainalyzerWorker.
+
+        Frame shared memory is owned by the data interface; we just read
+        the shm names to pass to the worker.
+        """
         from clef2.apps.logic.brainalyzer_worker import BrainalyzerWorker
 
         self.parent_conn, self.child_conn = Pipe()
-
-        # Create shared memory for each z-plane
-        for z in range(self.zsize):
-            buf_size = self.ysize * self.xsize * 2  # uint16
-            try:
-                shm = shared_memory.SharedMemory(
-                    create=True,
-                    size=buf_size,
-                    name=f"shared_frame_memory_{z}",
-                )
-            except FileExistsError:
-                shm = shared_memory.SharedMemory(
-                    name=f"shared_frame_memory_{z}",
-                    create=False,
-                    size=buf_size,
-                )
-
-            shared_ndarray = np.ndarray(
-                shape=(self.ysize, self.xsize),
-                buffer=shm.buf,
-                dtype=np.uint16,
-            )
-
-            self.shared_frame_memory_list.append(shm)
-            self.shared_ndarray_list.append(shared_ndarray)
-
-        # Shared image counter
-        try:
-            self.shared_image_count = shared_memory.ShareableList(
-                [0], name="shared_image_count"
-            )
-        except FileExistsError:
-            self.shared_image_count = shared_memory.ShareableList(
-                None, name="shared_image_count"
-            )
 
         # Build vis_args for worker
         vis_args = {
@@ -201,7 +184,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             "saveroot": self.saveroot,
             "ysize": self.ysize,
             "xsize": self.xsize,
-            "zsize": self.zsize,
+            "zsize": self.num_z_planes,
             "stim_intensity": self.stim_intensity,
             "GUI_mode": self.gui_mode,
             "dtype": np.uint16,
@@ -212,6 +195,8 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             "polygon_height": self.polygon_height,
             "camera_roi": self.camera_roi,
             "calibration_points": self.calibration_points,
+            "shm_names": self.shm_names,
+            "image_count_shm_name": self.image_count_shm_name,
         }
 
         self.proc = BrainalyzerWorker(self.child_conn, vis_args)
@@ -219,21 +204,12 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         logger.info("BrainalyzerWorker subprocess started")
 
     def process_sample(self, sample: Any):
-        """Write camera frame to shared memory, poll for GUI events."""
+        """Poll for GUI events. Frame shm is handled by the data interface."""
         img = sample.get(self.input_device_name)
         if img is None:
             return
 
-        zndx = self.sample_count % self.zsize
-
-        # Store frame in shared memory
-        self.shared_ndarray_list[zndx][:] = img[:]
-
-        # Update shared image count
         self.sample_count += 1
-        self.shared_image_count[0] = self.sample_count
-
-        # Poll for events from GUI
         self._poll_events()
 
     def _poll_events(self):
@@ -281,27 +257,31 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
 
             if event_type in ("pulse-rect-roi-list", "full-field-button"):
                 stim_duration_vols = event.get("stim_duration_vols", 4)
-                stim_frames = stim_duration_vols * self.zsize
-                zndx = self.sample_count % self.zsize
-                stim_on = self.sample_count + self.zsize - zndx
+                stim_frames = stim_duration_vols * self.num_z_planes
+                zndx = self.sample_count % self.num_z_planes
+                stim_on = self.sample_count + self.num_z_planes - zndx
                 stim_off = stim_on + stim_frames
 
                 self.active_pulse_stim_off = stim_off
 
-                self.stim_param_list.append({
-                    "stim_on": stim_on,
-                    "stim_off": stim_off,
-                    "stim_intensity": stim_intensity,
-                    "event": event,
-                })
+                self.stim_param_list.append(
+                    {
+                        "stim_on": stim_on,
+                        "stim_off": stim_off,
+                        "stim_intensity": stim_intensity,
+                        "event": event,
+                    }
+                )
 
             elif event_type in ("stream-rect-roi-list", "stream-widefield"):
                 self.stimulus_is_on = True
-                self.stim_param_list.append({
-                    "stim_on": self.sample_count,
-                    "stim_intensity": stim_intensity,
-                    "event": event,
-                })
+                self.stim_param_list.append(
+                    {
+                        "stim_on": self.sample_count,
+                        "stim_intensity": stim_intensity,
+                        "event": event,
+                    }
+                )
 
             self.current_event = None
 
@@ -323,16 +303,17 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata including stimulus event log."""
         base = super().get_metadata()
-        base.update({
-            "stim_param_list": self.stim_param_list,
-            "total_events": len(self.events),
-            "total_samples": self.sample_count,
-        })
+        base.update(
+            {
+                "stim_param_list": self.stim_param_list,
+                "total_events": len(self.events),
+                "total_samples": self.sample_count,
+            }
+        )
         return base
 
     def close(self):
-        """Stop worker, then clean up shared memory."""
-        # Tell worker to close and wait for it to exit
+        """Stop worker. Frame shared memory is cleaned up by the data interface."""
         if self.parent_conn:
             try:
                 self.parent_conn.send("close")
@@ -344,17 +325,5 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             if self.proc.is_alive():
                 logger.warning("Worker did not exit in time, terminating")
                 self.proc.terminate()
-
-        # Now safe to unlink shared memory
-        try:
-            for shm in self.shared_frame_memory_list:
-                shm.close()
-                shm.unlink()
-
-            if self.shared_image_count:
-                self.shared_image_count.shm.close()
-                self.shared_image_count.shm.unlink()
-        except Exception as err:
-            logger.info(f"Error unlinking shared memory: {err}")
 
         logger.info(f"BrainalyzerLogic '{self.name}' closed")

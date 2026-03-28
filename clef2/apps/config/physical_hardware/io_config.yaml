@@ -5,7 +5,11 @@ input_devices:
   - input_device_name: "camera"
     input_device_type: "camera"
     input_device_class: "micromanager_camera"
-    data_interface_class: "uint16_data_interface"
+    # data_interface_class: "uint16_data_interface"
+    data_interface_class: "shm_uint16_data_interface"
+    data_interface_parameters:
+      shm_buffer_size: 12
+      shm_name_prefix: "shared_frame_memory" # produces shared_frame_memory_0, ..., shared_frame_memory_image_count
     input_device_parameters:
       device_properties: null # No extra device properties to set
 
@@ -23,7 +27,7 @@ output_devices:
     output_device_type: "dmd"
     output_device_class: "mightex_polygon"
     output_device_parameters:
-      slm_device: null  # will query from Micro-Manager
+      slm_device: null # will query from Micro-Manager
 
   - output_device_name: "ldi"
     output_device_type: "lightsource"

@@ -34,6 +34,7 @@ class RecordingPlaybackInput(BaseInputDevice):
         self._frame_count = 0
         self.width = 0
         self.height = 0
+        self.num_z_planes = 1
 
         if self.input_file:
             self._load_tiff(self.input_file)
@@ -54,10 +55,12 @@ class RecordingPlaybackInput(BaseInputDevice):
         if len(shape) == 4:  # TZYX
             self.height = shape[2]
             self.width = shape[3]
+            self.num_z_planes = shape[1]
             self._total_frames = shape[0] * shape[1]
         elif len(shape) == 3:  # TYX
             self.height = shape[1]
             self.width = shape[2]
+            self.num_z_planes = 1
             self._total_frames = shape[0]
         else:
             logger.error(f"Unsupported TIFF shape: {shape}")

@@ -16,7 +16,7 @@ from clef2.core.io.output_device.BaseOutputDevice import BaseOutputDevice
 from clef2.core.io.io_manager import IOManager
 
 # Path to the default config directory
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "core" / "config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "core" / "config"
 
 
 # ---------------------------------------------------------------------------

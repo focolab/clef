@@ -16,14 +16,14 @@ from clef2.core.logic.logic_manager import LogicManager
 from clef2.core.engine.closed_loop_engine import ClosedLoopEngine
 
 # Import to trigger __init_subclass__ registration
-from clef2.tests.integration.conftest import (  # noqa: F401
+from clef2.tests.core.integration.conftest import (  # noqa: F401
     CountingInputDevice,
     TrackingOutputDevice,
     PassthroughLogic,
     CyclingLogic,
 )
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "core" / "config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "core" / "config"
 NONEXISTENT = Path("__nonexistent__")
 
 

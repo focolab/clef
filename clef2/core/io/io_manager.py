@@ -10,7 +10,7 @@ Responsible for:
 import importlib
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from clef2.core.io.input_device.BaseInputDevice import BaseInputDevice
 from clef2.core.io.input_device.BaseDataInterface import BaseDataInterface
@@ -97,8 +97,9 @@ class IOManager:
             return BaseDataInterface(input_device=device)
 
         cls = BaseDataInterface.get_class(di_class_key)
+        config = dev_cfg.data_interface_parameters if dev_cfg.data_interface_parameters else {}
         logger.info(f"Creating data interface for '{device.name}' (class={di_class_key})")
-        return cls(input_device=device)
+        return cls(input_device=device, config=config)
 
     @staticmethod
     def _create_input_device(dev_cfg, io_manager=None) -> BaseInputDevice:
@@ -199,6 +200,22 @@ class IOManager:
             dev.connect()
         for dev in self.output_devices.values():
             dev.connect()
+
+        # Configure data interfaces after all devices are connected
+        self._configure_data_interfaces()
+
+    def _configure_data_interfaces(self):
+        """Call configure_sampling on each data interface with session parameters."""
+        session_cfg = self.config_manager.session_config
+        session_params = {}
+        if session_cfg is not None:
+            session_params = getattr(session_cfg, "session_parameters", {}) or {}
+
+        num_samples = session_params.get("num_samples", 0)
+        save_samples = session_params.get("save_samples", False)
+
+        for name, di in self.data_interfaces.items():
+            di.configure_sampling(num_samples=num_samples, save_samples=save_samples)
 
     def close(self, name: Optional[str] = None):
         """Close devices. If name is given, close only that device; otherwise close all."""

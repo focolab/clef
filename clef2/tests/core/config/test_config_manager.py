@@ -16,7 +16,7 @@ from clef2.core.config.IOConfig import IOConfig, InputDeviceConfig, OutputDevice
 from clef2.core.config.ClosedLoopLogicConfig import ClosedLoopLogicConfig
 
 # Path to the default config directory
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "core" / "config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "core" / "config"
 
 
 # ---------------------------------------------------------------------------
