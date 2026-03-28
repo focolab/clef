@@ -4,9 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clef"
-version = "0.1.0"
+version = "2.0.0"
 description = "Closed-Loop Experimental Framework for real-time microscopy and stimulus control"
-readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
@@ -23,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
-# Core dependencies - absolutely required
+# Core dependencies
 dependencies = [
     "numpy>=1.24",
     "pydantic>=2.0",
@@ -31,7 +30,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# GUI demos (Lorenz, RingAttractor, DisplayRGB)
 demos = [
     "scipy>=1.11",
     "tifffile>=2023.7.0",
@@ -39,10 +37,9 @@ demos = [
     "pyside6>=6.5",
     "pyopengl>=3.1",
     "matplotlib>=3.7",
-    "pyopengl-accelerate>=3.1"
+    "pyopengl-accelerate>=3.1",
 ]
 
-# Everything: microscope support + image processing + performance + dev tools
 all = [
     "clef[demos]",
     "pycromanager>=0.45",
@@ -54,39 +51,24 @@ all = [
 ]
 
 [project.scripts]
-clef = "cli.clef_cli:main"
+clef = "core.utils.clef_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/focolab/clef"
 Repository = "https://github.com/focolab/clef"
 Issues = "https://github.com/focolab/clef/issues"
 
-[tool.setuptools]
-# Use find to discover all packages automatically
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["algorithms*", "cli*", "config*", "demo*", "engine*", "hardware*", "utils*", "style*"]
-exclude = ["tests*", "build*", "dist*", "*.egg-info"]
+include = ["core*", "apps*", "demo*", "utils*"]
+exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-config = ["**/*.yaml", "**/*.yml"]
-style = ["**/*.qss"]
+"*" = ["**/*.yaml", "**/*.yml", "**/*.qss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--ignore=tests/hardware_physical -v"
-
-# Custom markers for optional dependency testing
-markers = [
-    "demos: tests requiring demo dependencies (scipy, tifffile, matplotlib, GUI libs)",
-    "microscope: tests requiring real microscope hardware and pycromanager",
-    "imaging: tests requiring opencv, scikit-image, scikit-learn",
-    "performance: tests requiring numba or other performance libs",
-    "physical: tests requiring physical hardware (microscope connected)",
-]
-
-# Skip tests marked with these markers if dependencies not available
-# Users can run: pytest -m "not demos" to skip demo tests
+addopts = "-v"
