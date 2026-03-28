@@ -7,7 +7,6 @@ logic_algorithms:
     logic_parameters:
       gui_mode: "neural_imaging"
       stim_intensity: 0
-      zsize: 8
       save_dir: "./demo_output/recording_playback"
     io_parameters:
       output_device_names: []

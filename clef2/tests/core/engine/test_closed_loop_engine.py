@@ -14,7 +14,7 @@ from clef2.core.logic.logic_manager import LogicManager
 from clef2.core.engine.closed_loop_engine import ClosedLoopEngine
 
 # Path to the default config directory
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "core" / "config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "core" / "config"
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ from clef2.core.logic.logic_manager import LogicManager
 from clef2.core.io.io_manager import IOManager
 
 # Path to the default config directory
-CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "core" / "config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "core" / "config"
 
 
 # ---------------------------------------------------------------------------

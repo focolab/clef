@@ -70,6 +70,10 @@ class BrainalyzerWorker(Process):
         self.polygon_width = self.vis_args.get("polygon_width", None)
         self.polygon_height = self.vis_args.get("polygon_height", None)
         self.camera_roi = self.vis_args.get("camera_roi", (0, 0, 0, 0))
+        if self.polygon_height and self.polygon_width:
+            self.blank_mask = np.zeros(
+                (self.polygon_height, self.polygon_width), dtype=np.uint8
+            )
 
         # Calibration
         self.calibration_points = self.vis_args.get("calibration_points", None)
@@ -77,7 +81,6 @@ class BrainalyzerWorker(Process):
         # Polygon shared memory (attached in initialize_shm)
         self._polygon_shm = None
         self._polygon_mask_array = None
-
 
     def initialize_display(self):
 
@@ -99,9 +102,17 @@ class BrainalyzerWorker(Process):
             self.graphics_layout_widget.addItem(lab, row=0, col=z)
 
             if z == 0:
-                vb = pg.ViewBox(lockAspect=True, enableMouse=True, name="first_viewbox", border=None, enableMenu=True)
+                vb = pg.ViewBox(
+                    lockAspect=True,
+                    enableMouse=True,
+                    name="first_viewbox",
+                    border=None,
+                    enableMenu=True,
+                )
             else:
-                vb = pg.ViewBox(lockAspect=True, enableMouse=True, border=None, enableMenu=True)
+                vb = pg.ViewBox(
+                    lockAspect=True, enableMouse=True, border=None, enableMenu=True
+                )
                 vb.linkView(vb.XAxis, "first_viewbox")
                 vb.linkView(vb.YAxis, "first_viewbox")
 
@@ -116,11 +127,20 @@ class BrainalyzerWorker(Process):
             self.image_vbox_list.append(vb)
             self.ii_list.append(ii)
 
-        self.graphics_layout_widget.scene().sigMouseClicked.connect(self.graphics_layout_mouse_clicked_callback)
+        self.graphics_layout_widget.scene().sigMouseClicked.connect(
+            self.graphics_layout_mouse_clicked_callback
+        )
 
         # histogram
-        self.lut_histo = pg.HistogramLUTItem(image=self.ii_list[0], fillHistogram=False, orientation="vertical", levelMode="mono")
-        self.histo_sig_proxy = pg.SignalProxy(self.lut_histo.sigLevelsChanged, rateLimit=3, slot=self.update_image_LUTs)
+        self.lut_histo = pg.HistogramLUTItem(
+            image=self.ii_list[0],
+            fillHistogram=False,
+            orientation="vertical",
+            levelMode="mono",
+        )
+        self.histo_sig_proxy = pg.SignalProxy(
+            self.lut_histo.sigLevelsChanged, rateLimit=3, slot=self.update_image_LUTs
+        )
         self.lut_histo.setLevels(90, 150)
         self.lut_histo.setHistogramRange(60, 200)
         self.graphics_layout_widget.addItem(self.lut_histo, row=1, col=self.zsize)
@@ -135,7 +155,9 @@ class BrainalyzerWorker(Process):
 
         colspan = (self.zsize + 1) // 2
         if self.GUI_mode == "neural_imaging":
-            self.graphics_layout_widget.addItem(self.roi_plot_item, row=2, col=0, rowspan=1, colspan=colspan)
+            self.graphics_layout_widget.addItem(
+                self.roi_plot_item, row=2, col=0, rowspan=1, colspan=colspan
+            )
 
         # ── Command panel — 3 grouped columns ──────────────────────
         command_panel = QtWidgets.QHBoxLayout()
@@ -148,26 +170,38 @@ class BrainalyzerWorker(Process):
         stim_layout.setSpacing(4)
 
         self.enter_stimulus_intensity_button = DemoStyle.make_action_button(
-            "stim intensity (%): {}".format(self.stim_intensity), QtWidgets)
-        self.enter_stimulus_intensity_button.clicked.connect(self.my_get_stimulus_intensity)
+            "stim intensity (%): {}".format(self.stim_intensity), QtWidgets
+        )
+        self.enter_stimulus_intensity_button.clicked.connect(
+            self.my_get_stimulus_intensity
+        )
         stim_layout.addWidget(self.enter_stimulus_intensity_button)
 
         self.enter_stim_duration_vols_button = DemoStyle.make_action_button(
-            "stimulus duration (vols): {}".format(self.stim_duration_vols), QtWidgets)
-        self.enter_stim_duration_vols_button.clicked.connect(self.my_get_stimulus_duration_in_vols)
+            "stimulus duration (vols): {}".format(self.stim_duration_vols), QtWidgets
+        )
+        self.enter_stim_duration_vols_button.clicked.connect(
+            self.my_get_stimulus_duration_in_vols
+        )
         stim_layout.addWidget(self.enter_stim_duration_vols_button)
 
         stim_layout.addWidget(DemoStyle.make_separator(QtWidgets))
 
-        stim_layout.addWidget(DemoStyle.make_heading("Pulse Stimulus", QtWidgets, style=DemoStyle.SUBHEADING_STYLE))
+        stim_layout.addWidget(
+            DemoStyle.make_heading(
+                "Pulse Stimulus", QtWidgets, style=DemoStyle.SUBHEADING_STYLE
+            )
+        )
 
         self.pulse_stimulus_rois_button = DemoStyle.make_action_button(
-            "pulse stimulate ROI(s)", QtWidgets, color=DemoStyle.COLOR_SUCCESS)
+            "pulse stimulate ROI(s)", QtWidgets, color=DemoStyle.COLOR_SUCCESS
+        )
         self.pulse_stimulus_rois_button.clicked.connect(self.pulse_stimulus_rois)
         stim_layout.addWidget(self.pulse_stimulus_rois_button)
 
         self.pulse_full_field_button = DemoStyle.make_action_button(
-            "pulse stimulate full-field", QtWidgets, color=DemoStyle.COLOR_SUCCESS)
+            "pulse stimulate full-field", QtWidgets, color=DemoStyle.COLOR_SUCCESS
+        )
         self.pulse_full_field_button.clicked.connect(self.pulse_full_field)
         stim_layout.addWidget(self.pulse_full_field_button)
 
@@ -186,14 +220,20 @@ class BrainalyzerWorker(Process):
         self.quant_roi_combobox_lineEdit = self.quant_roi_combobox.lineEdit()
         self.quant_roi_combobox_lineEdit.setAlignment(QtCore.Qt.AlignCenter)
         self.quant_roi_combobox_lineEdit.setReadOnly(True)
-        self.quant_roi_combobox.textActivated.connect(self.update_add_delete_quant_roi_button_text)
+        self.quant_roi_combobox.textActivated.connect(
+            self.update_add_delete_quant_roi_button_text
+        )
         quant_layout.addWidget(self.quant_roi_combobox)
 
-        self.add_quant_roi_button = DemoStyle.make_action_button("add quant roi to z-plane 0", QtWidgets)
+        self.add_quant_roi_button = DemoStyle.make_action_button(
+            "add quant roi to z-plane 0", QtWidgets
+        )
         self.add_quant_roi_button.clicked.connect(self.add_quant_roi_to_image)
         quant_layout.addWidget(self.add_quant_roi_button)
 
-        self.delete_quant_roi_button = DemoStyle.make_action_button("delete quant roi from z-plane 0", QtWidgets)
+        self.delete_quant_roi_button = DemoStyle.make_action_button(
+            "delete quant roi from z-plane 0", QtWidgets
+        )
         self.delete_quant_roi_button.clicked.connect(self.delete_quant_roi_from_image)
         quant_layout.addWidget(self.delete_quant_roi_button)
 
@@ -212,14 +252,20 @@ class BrainalyzerWorker(Process):
         self.stim_roi_combobox_lineEdit = self.stim_roi_combobox.lineEdit()
         self.stim_roi_combobox_lineEdit.setAlignment(QtCore.Qt.AlignCenter)
         self.stim_roi_combobox_lineEdit.setReadOnly(True)
-        self.stim_roi_combobox.textActivated.connect(self.update_add_delete_stim_roi_button_text)
+        self.stim_roi_combobox.textActivated.connect(
+            self.update_add_delete_stim_roi_button_text
+        )
         stim_roi_layout.addWidget(self.stim_roi_combobox)
 
-        self.add_stim_roi_button = DemoStyle.make_action_button("add stim roi to z-plane 0", QtWidgets)
+        self.add_stim_roi_button = DemoStyle.make_action_button(
+            "add stim roi to z-plane 0", QtWidgets
+        )
         self.add_stim_roi_button.clicked.connect(self.add_stim_roi_to_image)
         stim_roi_layout.addWidget(self.add_stim_roi_button)
 
-        self.delete_stim_roi_button = DemoStyle.make_action_button("remove stim roi from z-plane 0", QtWidgets)
+        self.delete_stim_roi_button = DemoStyle.make_action_button(
+            "remove stim roi from z-plane 0", QtWidgets
+        )
         self.delete_stim_roi_button.clicked.connect(self.delete_stim_roi_from_image)
         stim_roi_layout.addWidget(self.delete_stim_roi_button)
 
@@ -260,16 +306,19 @@ class BrainalyzerWorker(Process):
 
     def initialize_shm(self):
         """Attach to frame shared memory buffers and polygon mask buffer."""
-        # Frame buffers (created by BrainalyzerLogic)
+        # Frame buffers (created by data interface)
+        shm_names = self.vis_args.get("shm_names", [])
         for z in range(self.zsize):
-            shm = shared_memory.SharedMemory(name="shared_frame_memory_{}".format(z))
+            name = shm_names[z] if z < len(shm_names) else f"shared_frame_memory_{z}"
+            shm = shared_memory.SharedMemory(name=name)
             self.shared_frame_memory_list.append(shm)
             self.img_list.append(
                 np.ndarray((self.ysize, self.xsize), dtype=self.dtype, buffer=shm.buf)
             )
 
         # Shared image count
-        self.shared_image_count = shared_memory.ShareableList(name="shared_image_count")
+        image_count_name = self.vis_args.get("image_count_shm_name", "shared_frame_memory_image_count")
+        self.shared_image_count = shared_memory.ShareableList(name=image_count_name)
 
         # Polygon mask buffer (created by MightexPolygonOutput)
         if self.polygon_shm_name and self.polygon_width and self.polygon_height:
@@ -326,9 +375,13 @@ class BrainalyzerWorker(Process):
                 logging.error("Error while running BrainalyzerWorker: {}".format(err))
                 raise
         except EOFError as err:
-            logging.warning("Visualization multiprocess socket closed EOF {}".format(err))
+            logging.warning(
+                "Visualization multiprocess socket closed EOF {}".format(err)
+            )
         except BrokenPipeError as err:
-            logging.warning("Visualization multiprocess socket closed BrokenPipe {}".format(err))
+            logging.warning(
+                "Visualization multiprocess socket closed BrokenPipe {}".format(err)
+            )
         except Exception as err:
             logging.error("Unknown error in BrainalyzerWorker: {}".format(err))
         finally:
@@ -375,8 +428,7 @@ class BrainalyzerWorker(Process):
             diameter = int(event.get("stim_diameter", 20))
 
             mask = numba_utils.generate_pg_ellipse_mask(
-                cx, cy, pcx, pcy, icx, icy,
-                diameter, xoffset, yoffset, width, height
+                cx, cy, pcx, pcy, icx, icy, diameter, xoffset, yoffset, width, height
             )
             mask = mask * 255
 
@@ -388,9 +440,18 @@ class BrainalyzerWorker(Process):
             height_list = np.array(stim_rect_roi_list.get("height", []))
 
             mask = numba_utils.generate_pg_multi_rectangle_mask(
-                x_list, y_list, width_list, height_list,
-                pcx, pcy, icx, icy,
-                xoffset, yoffset, width, height
+                x_list,
+                y_list,
+                width_list,
+                height_list,
+                pcx,
+                pcy,
+                icx,
+                icy,
+                xoffset,
+                yoffset,
+                width,
+                height,
             )
             mask = mask * 255
 
@@ -434,7 +495,9 @@ class BrainalyzerWorker(Process):
         self.stimulus_intensity_dialog.setInputMode(QtWidgets.QInputDialog.IntInput)
         self.stimulus_intensity_dialog.setIntMinimum(0)
         self.stimulus_intensity_dialog.setIntMaximum(100)
-        self.stimulus_intensity_dialog.intValueSelected.connect(self.set_stimulus_intensity)
+        self.stimulus_intensity_dialog.intValueSelected.connect(
+            self.set_stimulus_intensity
+        )
         self.stimulus_intensity_dialog.show()
 
     def set_stimulus_intensity(self, intensity):
@@ -454,7 +517,10 @@ class BrainalyzerWorker(Process):
         self._maybe_save_screenshot()
 
     def _maybe_save_screenshot(self):
-        if not self.gui_screenshot_freq or self.image_count % self.gui_screenshot_freq != 0:
+        if (
+            not self.gui_screenshot_freq
+            or self.image_count % self.gui_screenshot_freq != 0
+        ):
             return
         try:
             screenshot_dir = Path(self.saveroot) / "gui_screenshot"
@@ -464,7 +530,9 @@ class BrainalyzerWorker(Process):
             pixmap.save(str(path), "PNG")
             logger.debug(f"Saved GUI screenshot: {path}")
         except Exception as err:
-            logger.warning(f"Failed to save GUI screenshot at frame {self.image_count}: {err}")
+            logger.warning(
+                f"Failed to save GUI screenshot at frame {self.image_count}: {err}"
+            )
 
     def update_refractory_counter(self):
         if self.image_count % self.zsize == 0:
@@ -493,7 +561,9 @@ class BrainalyzerWorker(Process):
 
         if not self.stop_rendering_image:
             self.ii_list[z_ndx].setImage(
-                self.img_list[z_ndx][::self.image_downsample, ::self.image_downsample],
+                self.img_list[z_ndx][
+                    :: self.image_downsample, :: self.image_downsample
+                ],
                 autoLevels=auto_levels,
             )
 
@@ -533,7 +603,9 @@ class BrainalyzerWorker(Process):
             "quant_roi": quant_roi,
             "z_ndx": z_ndx,
             "color": pen_color,
-            "roi_dataitem": self.roi_plot_item.plot([], pen=pg.mkPen(pen_color, width=2)),
+            "roi_dataitem": self.roi_plot_item.plot(
+                [], pen=pg.mkPen(pen_color, width=2)
+            ),
             "xvals": [],
             "yvals": [],
             "yvals_derivs": [],
@@ -550,7 +622,9 @@ class BrainalyzerWorker(Process):
         z_ndx = int(z_ndx)
 
         roi_id = hash(datetime.now())
-        pen_color = self.stim_cmap_list[len(self.stim_roi_dict_list) % len(self.stim_cmap_list)]
+        pen_color = self.stim_cmap_list[
+            len(self.stim_roi_dict_list) % len(self.stim_cmap_list)
+        ]
         stim_roi = pg.RectROI(
             [self.ysize // 2, self.xsize // 2],
             [40, 40],
@@ -636,7 +710,9 @@ class BrainalyzerWorker(Process):
 
         # visual aid if stim is on — fixed duration update refractory counter
         if event_type in ("pulse-rect-roi-list", "full-field-button"):
-            self.stim_refractory_vols = self.stim_duration_vols + self.refractory_constant
+            self.stim_refractory_vols = (
+                self.stim_duration_vols + self.refractory_constant
+            )
             self.check_stim_refractory_vols()
 
     def change_stim_buttons_color(self, active):
@@ -658,9 +734,11 @@ class BrainalyzerWorker(Process):
                 continue
 
             try:
-                arr_mean = roi_dict["quant_roi"].getArrayRegion(
-                    self.img_list[roi_z_ndx], self.ii_list[roi_z_ndx]
-                ).mean()
+                arr_mean = (
+                    roi_dict["quant_roi"]
+                    .getArrayRegion(self.img_list[roi_z_ndx], self.ii_list[roi_z_ndx])
+                    .mean()
+                )
 
                 roi_dict["xvals"].append(curr_vol)
                 roi_dict["yvals"].append(arr_mean)
@@ -668,7 +746,9 @@ class BrainalyzerWorker(Process):
                 if len(roi_dict["yvals"]) == 1:
                     roi_dict["yvals_derivs"].append(0)
                 else:
-                    roi_dict["yvals_derivs"].append(roi_dict["yvals"][-1] - roi_dict["yvals"][-2])
+                    roi_dict["yvals_derivs"].append(
+                        roi_dict["yvals"][-1] - roi_dict["yvals"][-2]
+                    )
 
                 roi_dict["roi_dataitem"].setData(roi_dict["xvals"], roi_dict["yvals"])
 
@@ -679,21 +759,33 @@ class BrainalyzerWorker(Process):
         self.roi_plot_item.setRange(xRange=[xstart, curr_vol + 1])
 
     def update_add_delete_quant_roi_button_text(self, event):
-        self.add_quant_roi_button.setText("add quant roi to z-plane: {}".format(self.quant_roi_combobox.value()))
-        self.delete_quant_roi_button.setText("delete quant roi from z-plane: {}".format(self.quant_roi_combobox.value()))
+        self.add_quant_roi_button.setText(
+            "add quant roi to z-plane: {}".format(self.quant_roi_combobox.value())
+        )
+        self.delete_quant_roi_button.setText(
+            "delete quant roi from z-plane: {}".format(self.quant_roi_combobox.value())
+        )
         self.update_viewbox_border_color(int(self.quant_roi_combobox.value()))
 
     def update_add_delete_stim_roi_button_text(self, event):
-        self.add_stim_roi_button.setText("add stim roi to z-plane: {}".format(self.stim_roi_combobox.value()))
-        self.delete_stim_roi_button.setText("delete stim roi from z-plane: {}".format(self.stim_roi_combobox.value()))
+        self.add_stim_roi_button.setText(
+            "add stim roi to z-plane: {}".format(self.stim_roi_combobox.value())
+        )
+        self.delete_stim_roi_button.setText(
+            "delete stim roi from z-plane: {}".format(self.stim_roi_combobox.value())
+        )
         self.update_viewbox_border_color(int(self.stim_roi_combobox.value()))
 
     def update_viewbox_border_color(self, selected_z):
         for z in range(self.zsize):
             if z == selected_z:
-                self.image_vbox_list[z].setBorder({"color": DemoStyle.COLOR_WARNING, "width": 2})
+                self.image_vbox_list[z].setBorder(
+                    {"color": DemoStyle.COLOR_WARNING, "width": 2}
+                )
             else:
-                self.image_vbox_list[z].setBorder({"color": DemoStyle.COLOR_NEUTRAL, "width": 2})
+                self.image_vbox_list[z].setBorder(
+                    {"color": DemoStyle.COLOR_NEUTRAL, "width": 2}
+                )
             self.image_vbox_list[z].update()
 
     def delete_quant_roi_from_image(self, event):
@@ -728,7 +820,9 @@ class BrainalyzerWorker(Process):
     def my_get_stimulus_duration_in_vols(self):
         self.stimulus_duration_vols_dialog = QtWidgets.QInputDialog()
         self.stimulus_duration_vols_dialog.setInputMode(QtWidgets.QInputDialog.IntInput)
-        self.stimulus_duration_vols_dialog.intValueSelected.connect(self.set_stim_delay_volumes)
+        self.stimulus_duration_vols_dialog.intValueSelected.connect(
+            self.set_stim_delay_volumes
+        )
         self.stimulus_duration_vols_dialog.show()
 
     def set_stim_delay_volumes(self, dur):

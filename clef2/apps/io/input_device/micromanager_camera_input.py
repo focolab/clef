@@ -20,7 +20,9 @@ class MicroManagerCameraInput(BaseInputDevice):
     device_class: ClassVar[Optional[str]] = "micromanager_camera"
     device_type: ClassVar[Optional[str]] = "hardware"
 
-    def __init__(self, name: str, config: Dict[str, Any] | None = None, io_manager: Any = None):
+    def __init__(
+        self, name: str, config: Dict[str, Any] | None = None, io_manager: Any = None
+    ):
         super().__init__(name, config, io_manager=io_manager)
         self.mmc = None
         self._roi = None
@@ -31,8 +33,11 @@ class MicroManagerCameraInput(BaseInputDevice):
     def connect(self):
         """Instantiate pycromanager Core connection."""
         from pycromanager import Core
+
         self.mmc = Core(convert_camel_case=False)
-        logger.info(f"MicroManagerCameraInput '{self.name}' connected to pycromanager Core")
+        logger.info(
+            f"MicroManagerCameraInput '{self.name}' connected to pycromanager Core"
+        )
 
     def configure(self):
         """Configure camera: ROI, exposure, binning, device properties, buffer."""
@@ -46,7 +51,9 @@ class MicroManagerCameraInput(BaseInputDevice):
                 self.mmc.setProperty(cam, prop_name, prop_value)
                 logger.debug(f"Set {cam}.{prop_name} = {prop_value}")
             except Exception as e:
-                logger.warning(f"Could not set camera property {prop_name}={prop_value}: {e}")
+                logger.warning(
+                    f"Could not set camera property {prop_name}={prop_value}: {e}"
+                )
 
         # Set exposure
         # exposure_ms = cfg.get("exposure_ms")
@@ -64,13 +71,15 @@ class MicroManagerCameraInput(BaseInputDevice):
             self._roi = tuple(roi)
         else:
             roi_obj = self.mmc.getROI()
-            self._roi = (roi_obj.getX(), roi_obj.getY(),
-                         roi_obj.getWidth(), roi_obj.getHeight())
+            self._roi = (
+                roi_obj.getX(),
+                roi_obj.getY(),
+                roi_obj.getWidth(),
+                roi_obj.getHeight(),
+            )
 
         self.width = self._roi[2]
         self.height = self._roi[3]
-
-
 
         logger.info(
             f"MicroManagerCameraInput '{self.name}' configured: "
