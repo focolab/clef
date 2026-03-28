@@ -1,0 +1,30 @@
+# Screenshot IO Configuration
+# Screen capture as RGB camera input
+
+input_devices:
+  - input_device_name: "camera"
+    input_device_type: "camera"
+    input_device_class: "screenshot_camera"
+    data_interface_class: "rgb_data_interface"
+    input_device_parameters:
+      x: 0
+      y: 0
+      width: 1920
+      height: 1080
+      monitor: 1
+      backend: "mss"
+
+output_devices:
+  - output_device_name: "mouse_keyboard"
+    output_device_type: "software"
+    output_device_class: "mouse_keyboard"
+    output_device_parameters:
+      default_key_sequence: ["space"]
+      default_mouse_button: "left"
+      mouse_curvature: 0.3
+      mouse_overshoot: 0.2
+      mouse_randomness: 0.9
+      mouse_arc_points: 20
+      mouse_scaling_factor: 1.0
+      mouse_step_delay: 0.04
+      pre_click_delay_range: [0.2, 1.5]

@@ -1,0 +1,24 @@
+# CLEF Minimal Session Configuration
+
+# Session metadata
+session_name: "test_experiment"
+user_name: "Unknown"
+sample_data_dir: "./data"
+
+# Acquisition parameters
+session_parameters:
+  num_samples: 1
+  save_samples: false
+  save_metadata: false
+
+# Session subject metadata (generic, domain-agnostic)
+subject:
+  subject_id: null
+  subject_type: null
+  subject_details:
+    treatment: null
+    treatment_details: null
+  notes: null
+
+# Development options
+dev_options: null
