@@ -198,8 +198,10 @@ class IOManager:
             return
         for dev in self.input_devices.values():
             dev.connect()
+            dev.configure()
         for dev in self.output_devices.values():
             dev.connect()
+            dev.configure()
 
         # Configure data interfaces after all devices are connected
         self._configure_data_interfaces()
