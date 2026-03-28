@@ -6,6 +6,7 @@ Instantiates its own pycromanager Core object.
 """
 
 import logging
+import time
 import numpy as np
 from typing import Any, ClassVar, Dict, Optional
 
@@ -29,6 +30,9 @@ class MicroManagerCameraInput(BaseInputDevice):
         self.width = 0
         self.height = 0
         self._acquiring = False
+        self._strobed = False
+        self._strobe_interval_s = 0.0
+        self._next_snap_time = 0.0
 
     def connect(self):
         """Instantiate pycromanager Core connection."""
@@ -81,34 +85,64 @@ class MicroManagerCameraInput(BaseInputDevice):
         self.width = self._roi[2]
         self.height = self._roi[3]
 
+        # Strobed acquisition config
+        self._strobed = bool(cfg.get("use_strobed_acquisition", False))
+        self._strobe_interval_s = cfg.get("strobe_inter_frame_interval_ms") / 1000.0
+
         logger.info(
             f"MicroManagerCameraInput '{self.name}' configured: "
-            f"ROI={self._roi}, exposure={self.mmc.getExposure()} ms"
+            f"ROI={self._roi}, exposure={self.mmc.getExposure()} ms, "
+            f"strobed={self._strobed}"
         )
 
     def start_acquisition(self):
-        """Start continuous sequence acquisition."""
-        self.mmc.startContinuousSequenceAcquisition(0)
+        """Start acquisition (continuous or strobed)."""
+        if self._strobed:
+            self._next_snap_time = time.perf_counter()
+            logger.debug("Started strobed acquisition")
+        else:
+            self.mmc.stopSequenceAcquisition()
+            self.mmc.clearCircularBuffer()
+            self.mmc.startContinuousSequenceAcquisition(0)
+            logger.debug("Started continuous acquisition")
         self._acquiring = True
-        logger.debug("Started continuous acquisition")
 
     def stop_acquisition(self):
-        """Stop continuous sequence acquisition."""
+        """Stop acquisition."""
         if self._acquiring:
-            self.mmc.stopSequenceAcquisition()
+            if not self._strobed:
+                self.mmc.stopSequenceAcquisition()
             self._acquiring = False
             logger.debug("Stopped acquisition")
 
     def _get_input(self) -> Optional[np.ndarray]:
-        """Pop next image from the circular buffer.
+        """Grab next frame. Auto-starts acquisition if not running."""
+        if not self._acquiring:
+            self.start_acquisition()
 
-        Returns None if buffer is empty.
-        """
-        if self.mmc.getRemainingImageCount() > 0:
-            img = self.mmc.popNextImage().astype(np.uint16)
+        if self._strobed:
+            # Wait until next snap time
+            now = time.perf_counter()
+            delay = self._next_snap_time - now
+            if delay > 0:
+                time.sleep(delay)
+            elif delay < -0.001:
+                logger.warning(f"Strobe: missed interval by {-delay*1000:.1f} ms")
+
+            # Trigger exposure and grab result
+            self.mmc.snapImage()
+            img = self.mmc.getImage().astype(np.uint16)
             img = img.reshape((self.height, self.width))
+
+            self._next_snap_time += self._strobe_interval_s
             return img
-        return None
+
+        # Continuous mode: spin-wait until buffer has an image
+        while self.mmc.getRemainingImageCount() == 0:
+            time.sleep(0.0001)  # fast poll
+        img = self.mmc.popNextImage().astype(np.uint16)
+        img = img.reshape((self.height, self.width))
+        return img
 
     def get_roi(self) -> tuple:
         """Return current ROI as (x, y, width, height)."""
