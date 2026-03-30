@@ -178,14 +178,21 @@ class IOManager:
 
     def save_data(self, name: Optional[str] = None, **kwargs):
         """Save data from input device(s). If name given, save only that one; otherwise all."""
+        session_cfg = self.config_manager.session_config
+        data_dir = Path(session_cfg.sample_data_dir) if session_cfg else Path("./data")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        prefix = kwargs.pop("prefix", "")
+
         if name is not None:
             if name not in self.input_devices:
                 available = list(self.input_devices.keys())
                 raise KeyError(f"No input device named '{name}'. Available: {available}")
-            self.input_devices[name].save_data(**kwargs)
+            filepath = data_dir / f"{prefix}{name}"
+            self.input_devices[name].save_data(filepath=filepath, **kwargs)
             return
-        for dev in self.input_devices.values():
-            dev.save_data(**kwargs)
+        for dev_name, dev in self.input_devices.items():
+            filepath = data_dir / f"{prefix}{dev_name}"
+            dev.save_data(filepath=filepath, **kwargs)
 
     # ------------------------------------------------------------------
     # Lifecycle
