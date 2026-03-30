@@ -577,8 +577,8 @@ class RingVisualizer:
         ctrl_col.addLayout(omega_layout)
 
         slider_help = QtWidgets.QLabel(
-            "<small>r: + push out, − pull in (~±15 switches rings)<br>"
-            "ω: + speed up, − slow down rotation (±30)</small>"
+            "<small>r: + push out, − pull in (~±20 switches rings)<br>"
+            "ω: + speed up, − slow down rotation (±10)</small>"
         )
         slider_help.setStyleSheet(DemoStyle.HELP_TEXT_STYLE)
         ctrl_col.addWidget(slider_help)

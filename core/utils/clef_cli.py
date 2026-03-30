@@ -255,6 +255,12 @@ def main() -> int:
     config_manager.session_config.session_id = session_id
     logger.info(f"Session ID: {session_id}")
 
+    # Create session directory inside sample_data_dir
+    session_dir = Path(config_manager.session_config.sample_data_dir) / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    config_manager.session_config.sample_data_dir = str(session_dir)
+    logger.info(f"Session data dir: {session_dir}")
+
     # Run
     success = run(config_manager)
     return 0 if success else 1

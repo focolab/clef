@@ -340,9 +340,39 @@ class BrainalyzerWorker(Process):
                 self._polygon_shm = None
                 self._polygon_mask_array = None
 
+    def spool(self) -> None:
+        """Pre-compile numba JIT functions with dummy data for faster first-call performance."""
+        if not (self.polygon_width and self.polygon_height and self.calibration_points):
+            logger.debug("Skipping polygon spool: missing polygon dims or calibration points")
+            return
+
+        tstart = time.time()
+        logger.info("Spooling polygon mask generation functions...")
+        try:
+            calib = self.calibration_points
+            pcx = np.array(calib["pcx"])
+            pcy = np.array(calib["pcy"])
+            icx = np.array(calib["icx"])
+            icy = np.array(calib["icy"])
+            ix_arr = np.array([600, 700, 800, 900])
+            iy_arr = np.array([100, 200, 300, 400])
+            width_arr = np.array([20, 50, 20, 50])
+            height_arr = np.array([20, 30, 40, 50])
+            xoffset, yoffset = self.camera_roi[0], self.camera_roi[1]
+            numba_utils.generate_pg_multi_rectangle_mask(
+                ix_arr, iy_arr, width_arr, height_arr,
+                pcx, pcy, icx, icy,
+                xoffset, yoffset,
+                self.polygon_width, self.polygon_height,
+            )
+            logger.info(f"Spooling polygon functions took {time.time() - tstart:.3f}s")
+        except Exception as e:
+            logger.warning(f"Could not spool polygon functions: {e}")
+
     def run(self):
         try:
             self.initialize_display()
+            self.spool()
             self.app.processEvents()
             self.image_count = self.shared_image_count[0]
 

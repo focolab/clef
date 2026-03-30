@@ -201,11 +201,19 @@ class LogicManager:
 
     def save_data(self, name: Optional[str] = None, **kwargs):
         """Save data from logic instance(s). If name given, save only that one; otherwise all."""
+        from pathlib import Path
+        session_cfg = self.config_manager.session_config
+        data_dir = Path(session_cfg.sample_data_dir) if session_cfg else Path("./data")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        prefix = kwargs.pop("prefix", "")
+
         if name is not None:
-            self.get_logic(name).save_data(**kwargs)
+            savefilename = str(data_dir / f"{prefix}{name}")
+            self.get_logic(name).save_data(savefilename=savefilename, **kwargs)
             return
-        for logic in self.logic_instances.values():
-            logic.save_data(**kwargs)
+        for logic_name, logic in self.logic_instances.items():
+            savefilename = str(data_dir / f"{prefix}{logic_name}")
+            logic.save_data(savefilename=savefilename, **kwargs)
 
     def close(self, name: Optional[str] = None):
         """Close logic instance(s). If name given, close only that one; otherwise all."""
