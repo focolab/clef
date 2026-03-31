@@ -1,0 +1,14 @@
+# Speech BCI Decoder Demo IO Configuration
+
+input_devices:
+  - input_device_name: "speech_bci"
+    input_device_type: "bci"
+    input_device_class: "speech_bci_input"
+    input_device_parameters:
+      dataset_path: "/home/raymonddunn/data/speechBCI/ptDecoder_ctc"
+      partition: "test"
+      decoder_python: "/home/raymonddunn/miniconda3/envs/speech/bin/python"
+      playback_rate_hz: 50
+      inter_trial_pause_s: 3.0
+
+output_devices: []

@@ -1,0 +1,12 @@
+# Speech BCI Decoder Demo Logic Configuration
+
+logic_algorithms:
+  - logic_algorithm_name: "bci_visualization"
+    logic_class: "bci_visualization_logic"
+    logic_parameters:
+      rolling_window: 200
+      channel_step: 8
+    io_parameters:
+      input_device_names:
+        - "speech_bci"
+    gui_parameters: {}

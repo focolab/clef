@@ -1,0 +1,10 @@
+# Speech BCI Decoder Demo Session Configuration
+
+session_name: "speech_bci_demo"
+user_name: "CLEF_Demo"
+sample_data_dir: "./demo_output/speech_bci"
+
+session_parameters:
+  num_samples: 100000
+  save_samples: false
+  save_metadata: true
