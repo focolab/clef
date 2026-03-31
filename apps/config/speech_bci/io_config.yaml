@@ -10,5 +10,7 @@ input_devices:
       decoder_python: "/home/raymonddunn/miniconda3/envs/speech/bin/python"
       playback_rate_hz: 50
       inter_trial_pause_s: 3.0
+      decode_interval_bins: 10
+      min_decode_bins: 32
 
 output_devices: []

@@ -47,6 +47,8 @@ class SpeechBCIInputDevice(BaseInputDevice):
         self.day_indices = config.get("day_indices", None)
         self.playback_rate_hz = config.get("playback_rate_hz", 50)
         self.inter_trial_pause_s = config.get("inter_trial_pause_s", 3.0)
+        self.decode_interval_bins = config.get("decode_interval_bins", 10)
+        self.min_decode_bins = config.get("min_decode_bins", 32)
         self.decoder_load_timeout_s = config.get("decoder_load_timeout_s", 200)
         self.decoder_python = config.get("decoder_python")
         if not self.decoder_python:
@@ -107,14 +109,14 @@ class SpeechBCIInputDevice(BaseInputDevice):
         )
         self._neural_buf[:] = 0
 
-        # meta: [bin_count, trial_ready_flag, day_idx, trial_idx, decoder_ready]
-        self._neural_shm_meta = ShareableList([0, 0, 0, 0, 0], name="neural_shm_meta")
+        # meta: [bin_count, trial_ready_flag, day_idx, trial_idx, decoder_ready, last_decoded_bin_count, trial_seq]
+        self._neural_shm_meta = ShareableList([0, 0, 0, 0, 0, 0, 0], name="neural_shm_meta")
 
         # decoded text: single string slot
         self._decoded_shm_text = ShareableList([" " * DECODED_TEXT_MAX_LEN], name="decoded_shm_text")
 
-        # decoded meta: [decoded_ready_flag]
-        self._decoded_shm_meta = ShareableList([0], name="decoded_shm_meta")
+        # decoded meta: [decoded_ready_flag, is_final]
+        self._decoded_shm_meta = ShareableList([0, 0], name="decoded_shm_meta")
 
         # Spawn decoder subprocess
         decoder_script = str(Path(__file__).resolve().parent.parent.parent / "subprocess" / "speech_bci_decoder.py")
@@ -124,6 +126,8 @@ class SpeechBCIInputDevice(BaseInputDevice):
             "--neural-meta-name", "neural_shm_meta",
             "--decoded-text-name", "decoded_shm_text",
             "--decoded-meta-name", "decoded_shm_meta",
+            "--decode-interval-bins", str(self.decode_interval_bins),
+            "--min-decode-bins", str(self.min_decode_bins),
         ]
         logger.info(f"Spawning decoder subprocess: {' '.join(cmd)}")
         self._decoder_proc = subprocess.Popen(
@@ -184,6 +188,9 @@ class SpeechBCIInputDevice(BaseInputDevice):
         self._neural_shm_meta[2] = day_idx
         self._neural_shm_meta[3] = trial_idx
         self._decoded_shm_meta[0] = 0
+        self._decoded_shm_meta[1] = 0
+        self._neural_shm_meta[5] = 0  # last_decoded_bin_count
+        self._neural_shm_meta[6] = trial_list_idx  # trial_seq
 
         logger.info(
             f"Trial {trial_list_idx + 1}/{len(self.trials)}: "
@@ -232,13 +239,14 @@ class SpeechBCIInputDevice(BaseInputDevice):
 
         return bin_data
 
-    def get_decoded_text(self) -> Optional[str]:
+    def get_decoded_text(self) -> Optional[tuple[str, bool]]:
         if self._decoded_shm_meta is None:
             return None
         if self._decoded_shm_meta[0] == 1:
             text = self._decoded_shm_text[0].strip()
+            is_final = self._decoded_shm_meta[1] == 1
             self._decoded_shm_meta[0] = 0
-            return text
+            return (text, is_final)
         return None
 
     def close(self):

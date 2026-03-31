@@ -6,11 +6,13 @@ and decoded predictions using PyQtGraph.
 """
 
 import logging
+import time
 from typing import Any, ClassVar, Dict, Optional
 
 import numpy as np
 
 from core.logic.BaseClosedLoopLogic import BaseClosedLoopLogic
+from utils.style.demo_stylization import DemoStyle
 
 logger = logging.getLogger(__name__)
 
@@ -42,74 +44,108 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         self.win = None
         self.trace_plot = None
         self.curves = []
-        self.ground_truth_label = None
         self.decoded_label = None
+        self.ground_truth_label = None
         self.progress_label = None
         self.trial_info_label = None
+        self.speed_label = None
 
-        self.trial_buf = None  # (total_bins, 256) allocated per trial
+        self.trial_buf = None
         self.bin_count = 0
         self.current_transcription = ""
         self.input_device = None
 
+        # Timing for speed calculation
+        self.trial_start_wall_time = 0.0
+        self.trial_start_bin_idx = 0
+
     def initialize_model(self):
         import pyqtgraph as pg
-        from pyqtgraph.Qt import QtWidgets
+        from pyqtgraph.Qt import QtCore, QtWidgets
 
         self.app = QtWidgets.QApplication.instance()
         if self.app is None:
             self.app = QtWidgets.QApplication([])
 
+        DemoStyle.load_qss(self.app)
+
         self.win = QtWidgets.QWidget()
         self.win.setWindowTitle("BCI Speech Decoder - CLEF")
-        self.win.resize(1200, 800)
+        self.win.resize(1000, 600)
 
-        layout = QtWidgets.QVBoxLayout()
-        self.win.setLayout(layout)
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setSpacing(8)
+        self.win.setLayout(main_layout)
 
-        # Trial info
+        # ── Header row: trial info + speed ──
+        header_layout = QtWidgets.QHBoxLayout()
         self.trial_info_label = QtWidgets.QLabel("Waiting for decoder to load...")
-        self.trial_info_label.setStyleSheet("font-size: 14px; color: #888;")
-        layout.addWidget(self.trial_info_label)
+        self.trial_info_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE)
+        header_layout.addWidget(self.trial_info_label)
+        header_layout.addStretch()
+        self.speed_label = QtWidgets.QLabel("")
+        self.speed_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE)
+        header_layout.addWidget(self.speed_label)
+        main_layout.addLayout(header_layout)
 
-        # Ground truth
-        self.ground_truth_label = QtWidgets.QLabel("Ground truth: -")
-        self.ground_truth_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2196F3;")
+        # ── Text display: decoded (top) + ground truth (bottom) ──
+        text_group = QtWidgets.QGroupBox("Speech Decoding")
+        text_group.setStyleSheet(DemoStyle.GROUP_BOX_STYLE)
+        text_layout = QtWidgets.QVBoxLayout()
+        text_layout.setSpacing(6)
+
+        pred_heading = DemoStyle.make_heading("Predicted", QtWidgets)
+        text_layout.addWidget(pred_heading)
+        self.decoded_label = QtWidgets.QLabel("(waiting for data)")
+        self.decoded_label.setWordWrap(True)
+        self.decoded_label.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #FFC107; "
+            "padding: 8px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;"
+        )
+        self.decoded_label.setMinimumHeight(50)
+        text_layout.addWidget(self.decoded_label)
+
+        truth_heading = DemoStyle.make_heading("Ground Truth", QtWidgets)
+        text_layout.addWidget(truth_heading)
+        self.ground_truth_label = QtWidgets.QLabel("-")
         self.ground_truth_label.setWordWrap(True)
-        layout.addWidget(self.ground_truth_label)
+        self.ground_truth_label.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #2196F3; "
+            "padding: 8px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;"
+        )
+        self.ground_truth_label.setMinimumHeight(50)
+        text_layout.addWidget(self.ground_truth_label)
 
-        # Progress
+        text_group.setLayout(text_layout)
+        main_layout.addWidget(text_group)
+
+        # ── Progress bar ──
         self.progress_label = QtWidgets.QLabel("Progress: -")
-        self.progress_label.setStyleSheet("font-size: 14px; color: #aaa;")
-        layout.addWidget(self.progress_label)
+        self.progress_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE)
+        main_layout.addWidget(self.progress_label)
 
-        # Neural traces plot - fixed x-axis per trial
-        self.trace_plot = pg.PlotWidget(title="Neural Activity (256 channels, subsampled)")
+        main_layout.addWidget(DemoStyle.make_separator(QtWidgets))
+
+        # ── Neural traces plot (compact) ──
+        self.trace_plot = pg.PlotWidget(title="Neural Activity (subsampled)")
         self.trace_plot.setLabel("bottom", "Time bin")
         self.trace_plot.setLabel("left", "Channel")
         self.trace_plot.showGrid(x=True, y=True, alpha=0.3)
-        layout.addWidget(self.trace_plot, stretch=3)
+        main_layout.addWidget(self.trace_plot, stretch=1)
 
-        # Create curves for subsampled channels
         n_display = N_CHANNELS // self.channel_step
-        colors_broca = pg.mkColor(100, 180, 255, 150)    # blue for Area 44
-        colors_premotor = pg.mkColor(255, 150, 100, 150)  # orange for Area 6v
+        colors_broca = pg.mkColor(100, 180, 255, 150)
+        colors_premotor = pg.mkColor(255, 150, 100, 150)
         for i in range(n_display):
             ch = i * self.channel_step
             color = colors_broca if ch < 128 else colors_premotor
             curve = self.trace_plot.plot(pen=pg.mkPen(color, width=1))
             self.curves.append(curve)
 
-        # Decoded text
-        self.decoded_label = QtWidgets.QLabel("Decoded: (waiting for trial to complete)")
-        self.decoded_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50;")
-        self.decoded_label.setWordWrap(True)
-        layout.addWidget(self.decoded_label)
-
         self.win.show()
         self.app.processEvents()
 
-        # Get reference to input device
         if self.input_device_name and self.io_manager:
             self.input_device = self.io_manager.get_input_device(self.input_device_name)
 
@@ -119,9 +155,9 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         total_bins = self.input_device.total_bins
         self.trial_buf = np.zeros((total_bins, N_CHANNELS), dtype=np.float32)
         self.bin_count = 0
-        # Fix x-axis to full trial length
+        self.trial_start_wall_time = time.time()
+        self.trial_start_bin_idx = 0
         self.trace_plot.setXRange(0, total_bins, padding=0)
-        # Clear curves
         for curve in self.curves:
             curve.setData([], [])
 
@@ -129,7 +165,6 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         if self.input_device is None:
             return
 
-        # Get neural frame from input_stores
         frame = None
         if isinstance(sample, dict) and self.input_device_name:
             frame = sample.get(self.input_device_name)
@@ -137,11 +172,15 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         # Detect trial change
         if self.input_device.current_transcription != self.current_transcription:
             self.current_transcription = self.input_device.current_transcription
-            self.ground_truth_label.setText(f"Ground truth: \"{self.current_transcription}\"")
-            self.decoded_label.setText("Decoded: (waiting for trial to complete)")
+            self.ground_truth_label.setText(self.current_transcription)
+            self.decoded_label.setText("(waiting for data)")
+            self.decoded_label.setStyleSheet(
+                "font-size: 16px; font-weight: bold; color: #FFC107; "
+                "padding: 8px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;"
+            )
             self._reset_for_trial()
 
-        # Update progress
+        # Update progress + speed
         if self.input_device.total_bins > 0:
             trial_num = self.input_device.current_trial_list_idx + 1
             total_trials = len(self.input_device.trials)
@@ -158,13 +197,19 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
                 f"Trial {trial_num}/{total_trials} | Day {self.input_device.current_day_idx}"
             )
 
+            # Speed: bins are 20ms each in real time
+            elapsed_wall = time.time() - self.trial_start_wall_time
+            if elapsed_wall > 0.1 and bin_idx > 0:
+                simulated_time_s = bin_idx * 0.020  # 20ms per bin
+                speed_ratio = simulated_time_s / elapsed_wall
+                self.speed_label.setText(f"Speed: {speed_ratio:.1f}x realtime")
+
         # Accumulate into trial buffer and update traces
         if frame is not None and frame.shape == (N_CHANNELS,) and self.trial_buf is not None:
             if self.bin_count < self.trial_buf.shape[0]:
                 self.trial_buf[self.bin_count] = frame
                 self.bin_count += 1
 
-                # Update traces up to current bin
                 x = np.arange(self.bin_count)
                 data = self.trial_buf[:self.bin_count]
                 for i, curve in enumerate(self.curves):
@@ -172,10 +217,22 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
                     curve.setData(x, data[:, ch] + i * 2.0)
 
         # Check for decoded text
-        decoded = self.input_device.get_decoded_text()
-        if decoded is not None:
-            self.decoded_label.setText(f"Decoded: \"{decoded}\"")
-            logger.info(f"Decoded: '{decoded}'")
+        result = self.input_device.get_decoded_text()
+        if result is not None:
+            decoded, is_final = result
+            if is_final:
+                self.decoded_label.setText(decoded)
+                self.decoded_label.setStyleSheet(
+                    "font-size: 16px; font-weight: bold; color: #009900; "
+                    "padding: 8px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;"
+                )
+                logger.info(f"Final decoded: '{decoded}'")
+            else:
+                self.decoded_label.setText(f"{decoded} ...")
+                self.decoded_label.setStyleSheet(
+                    "font-size: 16px; font-weight: bold; color: #FFC107; "
+                    "padding: 8px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;"
+                )
 
         self.app.processEvents()
 

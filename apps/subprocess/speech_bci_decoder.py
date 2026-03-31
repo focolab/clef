@@ -23,7 +23,7 @@ sys.path.insert(0, "/home/raymonddunn/code/neural_seq_decoder/src")
 from neural_decoder.neural_decoder_trainer import loadModel
 import utils.rld_lmDecoderUtils as lmDecoderUtils
 
-logging.basicConfig(level=logging.INFO, format="[decoder] %(message)s")
+logging.basicConfig(level=logging.INFO, format="[decoder] %(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 MODEL_PATH = "/home/raymonddunn/data/speechBCI/ouput_dir/speechBaseline4"
@@ -39,6 +39,8 @@ def main():
     parser.add_argument("--neural-meta-name", default="neural_shm_meta")
     parser.add_argument("--decoded-text-name", default="decoded_shm_text")
     parser.add_argument("--decoded-meta-name", default="decoded_shm_meta")
+    parser.add_argument("--decode-interval-bins", type=int, default=10)
+    parser.add_argument("--min-decode-bins", type=int, default=32)
     args = parser.parse_args()
 
     # Load model
@@ -68,29 +70,51 @@ def main():
     neural_meta[4] = 1
     logger.info("Decoder ready. Polling for trials...")
 
+    last_decoded_bin_count = 0
+    last_trial_seq = -1
+
     try:
         while True:
-            # Poll for trial_ready_flag
-            if neural_meta[1] != 1:
-                time.sleep(0.01)
-                continue
+            # Detect new trial via sequence counter
+            trial_seq = neural_meta[6]
+            if trial_seq != last_trial_seq:
+                last_decoded_bin_count = 0
+                last_trial_seq = trial_seq
 
             bin_count = neural_meta[0]
-            day_idx = neural_meta[2]
+            trial_complete = neural_meta[1] == 1
 
-            logger.info(f"Trial received: {bin_count} bins, day_idx={day_idx}")
+            should_decode = False
+            if bin_count < args.min_decode_bins:
+                if trial_complete:
+                    logger.info(f"Trial too short ({bin_count} bins < {args.min_decode_bins}), skipping")
+                    neural_meta[1] = 0
+                time.sleep(0.005)
+                continue
+            elif trial_complete and bin_count > last_decoded_bin_count:
+                should_decode = True
+            elif (bin_count - last_decoded_bin_count) >= args.decode_interval_bins:
+                should_decode = True
+
+            if not should_decode:
+                time.sleep(0.005)
+                continue
+
+            day_idx = neural_meta[2]
+            logger.info(f"{'Final' if trial_complete else 'Partial'} decode: {bin_count} bins, day_idx={day_idx}")
 
             # Read neural data
             X = neural_buf[:bin_count].copy()  # (T, 256)
-            X_tensor = torch.tensor(X, dtype=torch.float32).unsqueeze(0).to(device)  # (1, T, 256)
-            X_len = torch.tensor([bin_count], dtype=torch.int64)
+            X_tensor = torch.tensor(X, dtype=torch.float32).unsqueeze(0).to(device)
             day_tensor = torch.tensor([day_idx], dtype=torch.int64).to(device)
 
             # Forward pass
             with torch.no_grad():
-                pred = model.forward(X_tensor, day_tensor)  # (1, T', n_classes)
+                pred = model.forward(X_tensor, day_tensor)
 
-            logits = pred[0].cpu().numpy()  # (T', n_classes)
+            # Slice to valid output frames only
+            valid_T_prime = (bin_count - 32) // 4 + 1
+            logits = pred[0, :valid_T_prime].cpu().numpy()
 
             # Rearrange logits for LM decoder (blank token reordering)
             logits_rearranged = np.concatenate(
@@ -115,9 +139,12 @@ def main():
             padded = decoded.ljust(DECODED_TEXT_MAX_LEN)[:DECODED_TEXT_MAX_LEN]
             decoded_text[0] = padded
             decoded_meta[0] = 1
+            decoded_meta[1] = 1 if trial_complete else 0
+            neural_meta[5] = bin_count
+            last_decoded_bin_count = bin_count
 
-            # Clear trial_ready_flag
-            neural_meta[1] = 0
+            if trial_complete:
+                neural_meta[1] = 0
 
     except KeyboardInterrupt:
         logger.info("Decoder subprocess interrupted")
