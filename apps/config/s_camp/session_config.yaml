@@ -1,25 +1,26 @@
 # Physical Hardware Demo Session Configuration
 # Innovation Core spinning disk microscope
 
-session_name: "physical_hardware_demo"
-user_name: "CLEF_Demo"
-sample_data_dir: "./demo_output/physical_hardware"
+session_name: "SCaMP"
+user_name: "RLD"
+sample_data_dir: "E:/Kato lab/RLD/20260401_RLD_1"
 
 session_parameters:
-  num_samples: 800
+  num_samples: 3600
   save_samples: true
   save_metadata: true
 
+
 # Subject metadata
 subject:
-  subject_id: "FC145.1"
+  subject_id: "FC143"
   subject_type: "C. elegans"
-  genotype: "FC145.1"
+  genotype: "FC143"
   treatment: "ATR"
+  condition: "561+488"
   treatment_details:
-    condition: "AT"
     atr_concentration_uM: "0"
   orientation:
     nose: "right"
     vnc: "down"
-  notes: "test"
+  notes: "dual 561 + 488"
