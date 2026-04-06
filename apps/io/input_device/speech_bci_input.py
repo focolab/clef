@@ -6,7 +6,9 @@ from the BCI speech decoding dataset. Owns shared memory for communicating
 with a GRU decoder subprocess.
 """
 
+import json
 import logging
+import os
 import pickle
 import re
 import subprocess
@@ -49,9 +51,11 @@ class SpeechBCIInputDevice(BaseInputDevice):
         self.inter_trial_pause_s = config.get("inter_trial_pause_s", 3.0)
         self.decode_interval_bins = config.get("decode_interval_bins", 10)
         self.min_decode_bins = config.get("min_decode_bins", 32)
-        self.decoder_load_timeout_s = config.get("decoder_load_timeout_s", 200)
+        self.decoder_load_timeout_s = config.get("decoder_load_timeout_s", 300)
+        self.decoder_mode = config.get("decoder_mode", "local")  # "local" or "cloud"
+        self.decoder_url = config.get("decoder_url", "ws://localhost:8765/ws")
         self.decoder_python = config.get("decoder_python")
-        if not self.decoder_python:
+        if self.decoder_mode == "local" and not self.decoder_python:
             raise ValueError("decoder_python must be set in config (path to the speech env's python binary)")
 
         self.loaded_data = None
@@ -72,9 +76,20 @@ class SpeechBCIInputDevice(BaseInputDevice):
         self._decoded_shm_meta = None
         self._neural_buf = None
 
-        # Subprocess
+        # Subprocess (local mode)
         self._decoder_proc = None
         self._last_tick_time = 0.0
+
+        # Cloud mode state
+        self._ws = None
+        self._ws_loop = None
+        self._ws_thread = None
+        self._cloud_decoded_text = None  # (text, is_final) or None
+        self._cloud_lock = threading.Lock()
+        self._cloud_send_queue = []
+        self.last_decode_latency_ms = None  # server-side decode time
+        self.last_roundtrip_ms = None  # client round-trip time
+        self._pending_send_time = None
 
     def connect(self):
         # Load dataset
@@ -99,6 +114,56 @@ class SpeechBCIInputDevice(BaseInputDevice):
 
         logger.info(f"Loaded {len(self.trials)} trials from partition '{self.partition}'")
 
+        if self.decoder_mode == "cloud":
+            self._connect_cloud()
+        else:
+            self._connect_local()
+
+        # Load first trial
+        self._load_trial(0)
+
+    def _connect_cloud(self):
+        """Connect to cloud WebSocket decoder server."""
+        import websockets.sync.client as ws_sync
+
+        logger.info(f"Connecting to cloud decoder at {self.decoder_url}")
+        self._ws = ws_sync.connect(self.decoder_url)
+        logger.info("Connected to cloud decoder")
+
+        # Start background thread to receive decoded results
+        self._ws_recv_running = True
+        self._ws_recv_thread = threading.Thread(target=self._ws_recv_loop, daemon=True)
+        self._ws_recv_thread.start()
+
+    def _ws_recv_loop(self):
+        """Background thread: receive decoded results from WebSocket."""
+        while self._ws_recv_running:
+            try:
+                raw = self._ws.recv(timeout=0.1)
+                msg = json.loads(raw)
+                if msg["type"] == "decode":
+                    roundtrip_ms = None
+                    if self._pending_send_time is not None:
+                        roundtrip_ms = (time.time() - self._pending_send_time) * 1000
+                    with self._cloud_lock:
+                        self._cloud_decoded_text = (msg["text"], msg["is_final"])
+                        self.last_decode_latency_ms = msg.get("decode_latency_ms")
+                        self.last_roundtrip_ms = roundtrip_ms
+                    logger.info(
+                        f"{'Final' if msg['is_final'] else 'Partial'} decode received: "
+                        f"'{msg['text']}' (server={msg.get('decode_latency_ms', '?')}ms, "
+                        f"roundtrip={roundtrip_ms:.1f}ms)" if roundtrip_ms else
+                        f"'{msg['text']}' (server={msg.get('decode_latency_ms', '?')}ms)"
+                    )
+            except TimeoutError:
+                continue
+            except Exception as e:
+                if self._ws_recv_running:
+                    logger.warning(f"WebSocket recv error: {e}")
+                break
+
+    def _connect_local(self):
+        """Set up shared memory and spawn local decoder subprocess."""
         # Create shared memory
         neural_nbytes = MAX_TRIAL_BINS * N_CHANNELS * 4  # float32
         self._neural_shm = shared_memory.SharedMemory(
@@ -130,8 +195,10 @@ class SpeechBCIInputDevice(BaseInputDevice):
             "--min-decode-bins", str(self.min_decode_bins),
         ]
         logger.info(f"Spawning decoder subprocess: {' '.join(cmd)}")
+        repo_root = str(Path(__file__).resolve().parent.parent.parent.parent)
         self._decoder_proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={**os.environ, "PYTHONPATH": repo_root},
         )
 
         # Stream subprocess output to logger in background threads
@@ -164,9 +231,6 @@ class SpeechBCIInputDevice(BaseInputDevice):
                 f"Decoder subprocess did not become ready within {self.decoder_load_timeout_s}s"
             )
 
-        # Load first trial
-        self._load_trial(0)
-
     def _load_trial(self, trial_list_idx: int):
         if trial_list_idx >= len(self.trials):
             self.all_trials_done = True
@@ -181,16 +245,17 @@ class SpeechBCIInputDevice(BaseInputDevice):
         self.current_transcription = transcription
         self.trial_finished = False
 
-        # Clear shm
-        self._neural_buf[:] = 0
-        self._neural_shm_meta[0] = 0  # bin_count
-        self._neural_shm_meta[1] = 0  # trial_ready_flag
-        self._neural_shm_meta[2] = day_idx
-        self._neural_shm_meta[3] = trial_idx
-        self._decoded_shm_meta[0] = 0
-        self._decoded_shm_meta[1] = 0
-        self._neural_shm_meta[5] = 0  # last_decoded_bin_count
-        self._neural_shm_meta[6] = trial_list_idx  # trial_seq
+        # Clear state
+        if self.decoder_mode == "local" and self._neural_buf is not None:
+            self._neural_buf[:] = 0
+            self._neural_shm_meta[0] = 0  # bin_count
+            self._neural_shm_meta[1] = 0  # trial_ready_flag
+            self._neural_shm_meta[2] = day_idx
+            self._neural_shm_meta[3] = trial_idx
+            self._decoded_shm_meta[0] = 0
+            self._decoded_shm_meta[1] = 0
+            self._neural_shm_meta[5] = 0  # last_decoded_bin_count
+            self._neural_shm_meta[6] = trial_list_idx  # trial_seq
 
         logger.info(
             f"Trial {trial_list_idx + 1}/{len(self.trials)}: "
@@ -227,46 +292,83 @@ class SpeechBCIInputDevice(BaseInputDevice):
         # Stream one bin
         _, _, sentence_dat, _ = self.trials[self.current_trial_list_idx]
         bin_data = sentence_dat[self.current_bin_idx]  # shape (256,)
-        self._neural_buf[self.current_bin_idx] = bin_data
         self.current_bin_idx += 1
-        self._neural_shm_meta[0] = self.current_bin_idx  # bin_count
 
-        if self.current_bin_idx >= self.total_bins:
-            # Signal trial ready for decoding
-            self._neural_shm_meta[1] = 1  # trial_ready_flag
-            self.trial_finished = True
-            logger.info(f"Trial ready for decoding ({self.total_bins} bins)")
+        if self.decoder_mode == "cloud":
+            self._pending_send_time = time.time()
+            self._ws.send(json.dumps({
+                "type": "bin",
+                "data": bin_data.tolist(),
+                "bin_index": self.current_bin_idx - 1,
+                "day_idx": self.current_day_idx,
+                "trial_seq": self.current_trial_list_idx,
+            }))
+            if self.current_bin_idx >= self.total_bins:
+                self._ws.send(json.dumps({
+                    "type": "trial_complete",
+                    "trial_seq": self.current_trial_list_idx,
+                    "day_idx": self.current_day_idx,
+                }))
+                self.trial_finished = True
+                logger.info(f"Trial complete signal sent ({self.total_bins} bins)")
+        else:
+            self._neural_buf[self.current_bin_idx - 1] = bin_data
+            self._neural_shm_meta[0] = self.current_bin_idx  # bin_count
+            if self.current_bin_idx >= self.total_bins:
+                self._neural_shm_meta[1] = 1  # trial_ready_flag
+                self.trial_finished = True
+                logger.info(f"Trial ready for decoding ({self.total_bins} bins)")
 
         return bin_data
 
+    def send_cloud_config(self, config: dict):
+        """Send a config update message to the cloud decoder server."""
+        if self._ws is not None:
+            msg = {"type": "config", **config}
+            self._ws.send(json.dumps(msg))
+            logger.info(f"Sent cloud config: {config}")
+
     def get_decoded_text(self) -> Optional[tuple[str, bool]]:
-        if self._decoded_shm_meta is None:
+        if self.decoder_mode == "cloud":
+            with self._cloud_lock:
+                result = self._cloud_decoded_text
+                self._cloud_decoded_text = None
+            return result
+        else:
+            if self._decoded_shm_meta is None:
+                return None
+            if self._decoded_shm_meta[0] == 1:
+                text = self._decoded_shm_text[0].strip()
+                is_final = self._decoded_shm_meta[1] == 1
+                self._decoded_shm_meta[0] = 0
+                return (text, is_final)
             return None
-        if self._decoded_shm_meta[0] == 1:
-            text = self._decoded_shm_text[0].strip()
-            is_final = self._decoded_shm_meta[1] == 1
-            self._decoded_shm_meta[0] = 0
-            return (text, is_final)
-        return None
 
     def close(self):
-        if self._decoder_proc is not None:
-            logger.info("Terminating decoder subprocess")
-            self._decoder_proc.terminate()
-            try:
-                self._decoder_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self._decoder_proc.kill()
-            self._decoder_proc = None
+        if self.decoder_mode == "cloud":
+            self._ws_recv_running = False
+            if self._ws is not None:
+                self._ws.close()
+                self._ws = None
+            logger.info("Cloud WebSocket connection closed")
+        else:
+            if self._decoder_proc is not None:
+                logger.info("Terminating decoder subprocess")
+                self._decoder_proc.terminate()
+                try:
+                    self._decoder_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._decoder_proc.kill()
+                self._decoder_proc = None
 
-        for shm in [self._neural_shm]:
-            if shm is not None:
-                shm.close()
-                shm.unlink()
+            for shm in [self._neural_shm]:
+                if shm is not None:
+                    shm.close()
+                    shm.unlink()
 
-        for sl in [self._neural_shm_meta, self._decoded_shm_text, self._decoded_shm_meta]:
-            if sl is not None:
-                sl.shm.close()
-                sl.shm.unlink()
+            for sl in [self._neural_shm_meta, self._decoded_shm_text, self._decoded_shm_meta]:
+                if sl is not None:
+                    sl.shm.close()
+                    sl.shm.unlink()
 
         logger.info("SpeechBCIInputDevice closed")
