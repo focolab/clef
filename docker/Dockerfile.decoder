@@ -1,0 +1,56 @@
+# Stage 1: Build lm_decoder C++ extension (pybind11 + Kaldi FST + libtorch)
+# CMake auto-fetches: openfst, libtorch 1.13.1, gflags, glog, boost, pybind11
+FROM python:3.9-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=lm-decoder-src / /build/lm-src/
+# Remove cached CMake artifacts from host build (contain hardcoded local paths)
+RUN rm -rf /build/lm-src/runtime/server/x86/fc_base \
+           /build/lm-src/runtime/server/x86/build \
+           /build/lm-src/runtime/server/x86/lm_decoder.egg-info
+WORKDIR /build/build
+RUN cmake /build/lm-src/runtime/server/x86 && cmake --build . --target lm_decoder -j$(nproc)
+
+# Stage 2: Runtime image
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Python deps
+RUN pip install --no-cache-dir \
+    torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir \
+    fastapi uvicorn[standard] websockets "numpy<2" scipy tqdm edit_distance hydra-core
+
+# Copy built lm_decoder extension + its native dependencies from builder
+COPY --from=builder /build/build/lm_decoder*.so /usr/local/lib/python3.9/site-packages/
+# openfst shared libs
+COPY --from=builder /build/lm-src/runtime/server/x86/fc_base/openfst-subbuild/openfst-populate-prefix/lib/ /usr/local/lib/lm_decoder_deps/openfst/
+
+# Copy CLEF code
+COPY apps/subprocess/ /app/apps/subprocess/
+
+# Copy external decoder dependencies (vendored subsets of upstream repos)
+COPY docker/vendor/neuralDecoder/ /app/neuralDecoder/
+COPY docker/vendor/neural_seq_decoder/ /app/neural_seq_decoder/
+
+# Copy model weights (passed as extra build contexts to resolve symlinks)
+# GRU model ~200MB, n-gram LM files on disk (expands to ~60GB in memory)
+COPY --from=model-gru / /app/model/speechBaseline4/
+COPY --from=model-lm / /app/model/languageModel/
+
+ENV PYTHONUNBUFFERED=1 \
+    LD_LIBRARY_PATH=/usr/local/lib/lm_decoder_deps/openfst \
+    PYTHONPATH=/app/neural_seq_decoder/src:/app/neuralDecoder:/app \
+    BCI_MODEL_PATH=/app/model/speechBaseline4 \
+    BCI_LM_DIR=/app/model/languageModel
+
+EXPOSE 8765
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')" || exit 1
+
+CMD ["uvicorn", "apps.subprocess.speech_bci_server:app", "--host", "0.0.0.0", "--port", "8765"]
