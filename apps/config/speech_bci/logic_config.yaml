@@ -9,4 +9,6 @@ logic_algorithms:
     io_parameters:
       input_device_names:
         - "speech_bci"
+      output_device_names:
+        - "speech_bci_control"
     gui_parameters: {}

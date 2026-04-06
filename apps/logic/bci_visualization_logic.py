@@ -6,6 +6,7 @@ and decoded predictions using PyQtGraph.
 """
 
 import logging
+import math
 import time
 from typing import Any, ClassVar, Dict, Optional
 
@@ -59,6 +60,14 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         self.trial_start_wall_time = 0.0
         self.trial_start_bin_idx = 0
 
+        # Adaptive decode interval state
+        self._latency_ema = None
+        self._last_emitted_interval = None
+        self._last_emitted_pause = None
+        self._last_adaptive_emit_time = None
+        self._min_decode_interval = None  # set from config on first use
+        self._min_inter_trial_pause = None
+
     def initialize_model(self):
         import pyqtgraph as pg
         from pyqtgraph.Qt import QtCore, QtWidgets
@@ -87,6 +96,9 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
         self.speed_label = QtWidgets.QLabel("")
         self.speed_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE)
         header_layout.addWidget(self.speed_label)
+        self.latency_label = QtWidgets.QLabel("")
+        self.latency_label.setStyleSheet(DemoStyle.MUTED_TEXT_STYLE + " font-family: monospace;")
+        header_layout.addWidget(self.latency_label)
         main_layout.addLayout(header_layout)
 
         # ── Text display: decoded (top) + ground truth (bottom) ──
@@ -216,6 +228,18 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
                     ch = i * self.channel_step
                     curve.setData(x, data[:, ch] + i * 2.0)
 
+        # Update latency display
+        if hasattr(self.input_device, 'decoder_mode') and self.input_device.decoder_mode == "cloud":
+            decode_ms = self.input_device.last_decode_latency_ms
+            rt_ms = self.input_device.last_roundtrip_ms
+            d = f"{decode_ms:6.0f}" if decode_ms is not None else "     -"
+            r = f"{rt_ms:6.0f}" if rt_ms is not None else "     -"
+            n = f"{rt_ms - decode_ms:6.0f}" if (rt_ms is not None and decode_ms is not None) else "     -"
+            self.latency_label.setText(f"Cloud | decode:{d}ms | roundtrip:{r}ms | network:{n}ms")
+        else:
+            if hasattr(self, 'latency_label'):
+                self.latency_label.setText("Local (SHM)")
+
         # Check for decoded text
         result = self.input_device.get_decoded_text()
         if result is not None:
@@ -235,6 +259,70 @@ class BCIVisualizationLogic(BaseClosedLoopLogic):
                 )
 
         self.app.processEvents()
+
+    def _get_output_device_name(self) -> Optional[str]:
+        if self.output_devices:
+            return next(iter(self.output_devices.keys()))
+        return None
+
+    def _check_logic(self) -> Optional[Dict[str, Any]]:
+        """Adaptively adjust decode_interval_bins based on observed decode latency."""
+        if self.input_device is None:
+            return None
+        if not hasattr(self.input_device, 'decoder_mode') or self.input_device.decoder_mode != "cloud":
+            return None
+
+        decode_ms = self.input_device.last_decode_latency_ms
+        if decode_ms is None:
+            return None
+
+        # Capture config values as minimums on first use
+        if self._min_decode_interval is None:
+            self._min_decode_interval = self.input_device.decode_interval_bins
+            self._min_inter_trial_pause = self.input_device.inter_trial_pause_s
+
+        # EMA smoothing
+        if self._latency_ema is None:
+            self._latency_ema = decode_ms
+        else:
+            self._latency_ema = 0.5 * decode_ms + 0.5 * self._latency_ema
+
+        # Each bin = 1000/playback_rate_hz ms. Need interval >= decode_time / bin_period
+        bin_period_ms = 1000.0 / self.input_device.playback_rate_hz
+        target_interval = int(math.ceil(self._latency_ema / bin_period_ms * 1.2))
+        target_interval = max(target_interval, self._min_decode_interval)
+
+        # Inter-trial pause: enough for one final decode
+        target_pause = max(self._latency_ema / 1000.0 * 1.5, self._min_inter_trial_pause)
+
+        # Throttle: emit at most once per decode cycle
+        now = time.time()
+        if self._last_adaptive_emit_time is not None:
+            elapsed = now - self._last_adaptive_emit_time
+            if elapsed < self._latency_ema / 1000.0:
+                return None
+
+        # Only emit when values change
+        interval_changed = self._last_emitted_interval != target_interval
+        pause_changed = self._last_emitted_pause is None or abs(target_pause - self._last_emitted_pause) > 0.5
+
+        if interval_changed or pause_changed:
+            self._last_emitted_interval = target_interval
+            self._last_emitted_pause = target_pause
+            self._last_adaptive_emit_time = now
+            output_name = self._get_output_device_name()
+            if output_name:
+                logger.info(
+                    f"Adaptive: decode_interval_bins={target_interval}, "
+                    f"inter_trial_pause_s={target_pause:.1f} (latency_ema={self._latency_ema:.0f}ms)"
+                )
+                return {
+                    output_name: {
+                        "decode_interval_bins": target_interval,
+                        "inter_trial_pause_s": target_pause,
+                    }
+                }
+        return None
 
     def close(self):
         if self.win is not None:

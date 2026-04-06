@@ -1,3 +1,7 @@
+# Model weights and vendored build sources (symlinks, copied into Docker)
+model/
+docker/vendor/lm_decoder_src
+
 # Demo data and output
 *.pdf
 *.log
