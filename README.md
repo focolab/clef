@@ -1,6 +1,10 @@
 # CLEF
 
-Closed-Loop Experimental Framework for real-time neuroscience experiments.
+Closed-Loop Experimental Framework
+
+## What's it for
+
+
 
 ---
 
