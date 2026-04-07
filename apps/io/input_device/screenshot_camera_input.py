@@ -1,5 +1,5 @@
 """
-Screenshot Camera Input Device for CLEF2.
+Screenshot Camera Input Device for CLEF.
 
 Captures screen regions as uint8 RGB frames using mss or PIL.
 """

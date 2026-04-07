@@ -1,5 +1,5 @@
 """
-XYTrackingWorker for CLEF2.
+XYTrackingWorker for CLEF.
 
 GUI subprocess for real-time centroid-based XY stage tracking.
 Reads camera frames from shared memory, computes centroid,

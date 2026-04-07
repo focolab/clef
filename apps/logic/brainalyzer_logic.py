@@ -1,5 +1,5 @@
 """
-Brainalyzer Logic for CLEF2.
+Brainalyzer Logic for CLEF.
 
 Orchestrates the BrainalyzerWorker GUI subprocess for interactive
 closed-loop microscopy. Relays stimulus events from the GUI to

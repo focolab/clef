@@ -1,7 +1,7 @@
 """
-CLEF2 Configuration Manager
+CLEF Configuration Manager
 
-Centralized configuration loading, validation, and merging for the CLEF2 platform.
+Centralized configuration loading, validation, and merging for the CLEF platform.
 Loads YAML configs, merges defaults with user overrides, validates with Pydantic models.
 """
 
@@ -24,7 +24,7 @@ DEFAULTS_DIR = Path(__file__).parent
 
 class ConfigManager:
     """
-    Centralized configuration management for CLEF2.
+    Centralized configuration management for CLEF.
 
     Loads YAML configs, validates with Pydantic, merges defaults with user overrides.
     """

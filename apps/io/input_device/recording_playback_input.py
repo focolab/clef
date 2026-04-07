@@ -1,5 +1,5 @@
 """
-Recording Playback Input Device for CLEF2.
+Recording Playback Input Device for CLEF.
 
 Reads frames from a TIFF file and serves them sequentially as if
 acquired from a live camera. Supports TYX and TZYX layouts, looping

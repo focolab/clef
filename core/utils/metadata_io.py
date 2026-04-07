@@ -1,5 +1,5 @@
 """
-Metadata I/O utilities for CLEF2.
+Metadata I/O utilities for CLEF.
 
 Provides save_metadata for writing session metadata to JSON,
 and lazy_serialize for pickle-based serialization to/from base64 strings.

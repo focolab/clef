@@ -1,5 +1,5 @@
 """
-XY Tracking Stage Output Device for CLEF2.
+XY Tracking Stage Output Device for CLEF.
 
 Exposes a SharedMemory list with two elements (offset_x, offset_y).
 On each update_output call, reads the offsets, and if nonzero,

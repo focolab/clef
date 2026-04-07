@@ -1,5 +1,5 @@
 """
-XY Tracking Logic for CLEF2.
+XY Tracking Logic for CLEF.
 
 Orchestrates the XYTrackingWorker GUI subprocess for centroid-based
 stage tracking. The worker writes stage offsets directly into shared

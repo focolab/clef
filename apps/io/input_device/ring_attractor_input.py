@@ -1,5 +1,5 @@
 """
-Ring Attractor Input Device for CLEF2.
+Ring Attractor Input Device for CLEF.
 
 Simulates a camera observing a ring attractor system with dual concentric rings.
 Generates 100x100 uint16 images with a Gaussian blob puncta whose position

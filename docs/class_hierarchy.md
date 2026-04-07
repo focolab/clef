@@ -1,4 +1,4 @@
-# CLEF2 Class Hierarchy
+# CLEF Class Hierarchy
 
 # All boxes are **classes**. Arrows show **inheritance** or **composition** (labeled with the held reference). No data flow is shown here — see `system_overview.md`.
 

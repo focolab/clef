@@ -1,5 +1,5 @@
 """
-RGB Data Interface for CLEF2.
+RGB Data Interface for CLEF.
 
 Stores uint8 RGB image data (height x width x 3) from any input device into a
 preallocated numpy buffer and saves as PNG image sequences.

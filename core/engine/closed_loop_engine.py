@@ -1,5 +1,5 @@
 """
-ClosedLoopEngine for CLEF2.
+ClosedLoopEngine for CLEF.
 
 Orchestrates the real-time closed loop:
   update_input -> process_sample -> check_logic -> update_output

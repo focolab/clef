@@ -17,7 +17,7 @@ subject:
   genotype: "FC145.1"
   treatment: "ATR"
   treatment_details:
-    condition: "AT"
+    condition: "ATR"
     atr_concentration_uM: "0"
   orientation:
     nose: "right"
