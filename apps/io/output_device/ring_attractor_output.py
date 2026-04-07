@@ -1,5 +1,5 @@
 """
-Ring Attractor Output Device for CLEF2.
+Ring Attractor Output Device for CLEF.
 
 Applies radial and angular perturbations to the ring attractor dynamics
 owned by the linked input device.

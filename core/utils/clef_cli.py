@@ -1,5 +1,5 @@
 """
-CLEF2 Command-Line Interface
+CLEF Command-Line Interface
 
 Usage:
     python -m core.utils.clef_cli ring_attractor
@@ -164,7 +164,7 @@ def run(config_manager: ConfigManager) -> bool:
 def setup_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='clef',
-        description='CLEF2 - Closed-Loop Experiment Framework',
+        description='CLEF - Closed-Loop Experiment Framework',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

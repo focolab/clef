@@ -1,5 +1,5 @@
 """
-Uint16 Data Interface for CLEF2.
+Uint16 Data Interface for CLEF.
 
 Stores uint16 image data (height x width) from any input device into a
 preallocated numpy buffer and saves as TIFF stacks.

@@ -1,4 +1,4 @@
-# CLEF2 System Overview
+# CLEF System Overview
 
 All boxes are **runtime instances**. Arrows show **data flow** (labeled) or **control flow** (unlabeled). Inheritance is not shown here — see `class_hierarchy.md`.
 

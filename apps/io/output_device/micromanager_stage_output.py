@@ -1,5 +1,5 @@
 """
-Micro-Manager Stage Output Device for CLEF2.
+Micro-Manager Stage Output Device for CLEF.
 
 Uploads a z-position buffer to an ASI stage at configure-time.
 The stage free-runs via TTL triggering during acquisition;

@@ -1,5 +1,5 @@
 """
-Centralized styling constants and widget factories for CLEF2 demo GUIs.
+Centralized styling constants and widget factories for CLEF demo GUIs.
 
 Both BrainalyzerWorker and RingVisualizer pull shared colors, stylesheet
 fragments, and pre-configured widget builders from this module so that
@@ -12,7 +12,7 @@ CSS_PATH = Path(__file__).resolve().parent / "css" / "Ubuntu.qss"
 
 
 class DemoStyle:
-    """Shared styling constants and widget factory methods for CLEF2 demo GUIs."""
+    """Shared styling constants and widget factory methods for CLEF demo GUIs."""
 
     # ── Semantic color palette ──────────────────────────────────────────
     COLOR_SUCCESS = "#009900"       # green — active/ready pulse buttons

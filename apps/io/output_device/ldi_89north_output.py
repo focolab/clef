@@ -1,5 +1,5 @@
 """
-89 North LDI (Laser Diode Illuminator) Output Device for CLEF2.
+89 North LDI (Laser Diode Illuminator) Output Device for CLEF.
 
 Controls the 89 North LDI light source intensity and shutter via Micro-Manager.
 This is the excitation light source for the Mightex Polygon DMD.

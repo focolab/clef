@@ -1,5 +1,5 @@
 """
-Mouse and Keyboard Output Device for CLEF2.
+Mouse and Keyboard Output Device for CLEF.
 
 Delivers keyboard presses and mouse clicks/movements via pynput.
 Supports smooth arc trajectories for mouse movement.

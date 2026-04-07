@@ -1,5 +1,5 @@
 """
-Mightex Polygon (DMD/SLM) Output Device for CLEF2.
+Mightex Polygon (DMD/SLM) Output Device for CLEF.
 
 Manages a Mightex Polygon SLM via Micro-Manager. Creates a shared memory
 buffer at configure-time so that external processes (e.g. BrainalyzerWorker)

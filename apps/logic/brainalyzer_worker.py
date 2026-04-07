@@ -1,5 +1,5 @@
 """
-BrainalyzerWorker for CLEF2.
+BrainalyzerWorker for CLEF.
 
 GUI subprocess for real-time visualization and interactive stimulus control.
 Reads camera frames from shared memory, displays them, and sends stimulus

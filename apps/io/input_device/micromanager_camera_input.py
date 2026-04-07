@@ -1,5 +1,5 @@
 """
-Micro-Manager Camera Input Device for CLEF2.
+Micro-Manager Camera Input Device for CLEF.
 
 Acquires uint16 frames from a Micro-Manager-controlled camera via pycromanager.
 Instantiates its own pycromanager Core object.

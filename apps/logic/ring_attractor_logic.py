@@ -1,5 +1,5 @@
 """
-Ring Attractor Logic for CLEF2.
+Ring Attractor Logic for CLEF.
 
 Extracts puncta position from uint16 images, tracks XY/theta/ring state,
 provides interactive GUI with manual and closed-loop stimulus control.

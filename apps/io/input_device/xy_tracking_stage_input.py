@@ -1,5 +1,5 @@
 """
-XY Tracking Stage Input Device for CLEF2.
+XY Tracking Stage Input Device for CLEF.
 
 Reads XY stage position from Micro-Manager via pycromanager.
 Accumulates position history for metadata/saving.
