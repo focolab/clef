@@ -7,12 +7,12 @@ input_devices:
     input_device_class: "micromanager_camera"
     data_interface_class: "shm_uint16_data_interface"
     data_interface_parameters:
-      shm_buffer_size: 6
+      shm_buffer_size: 6 # should be same as stage output device zsize
       shm_name_prefix: "shared_frame_memory" # produces shared_frame_memory_0, ..., shared_frame_memory_image_count
     input_device_parameters:
       device_properties: null # No extra device properties to set
-      use_strobed_acquisition: false
-      strobe_inter_frame_interval_ms: 100.0
+      use_strobed_acquisition: true
+      strobe_inter_frame_interval_ms: 160.0
 
 output_devices:
   - output_device_name: "z_stage"
