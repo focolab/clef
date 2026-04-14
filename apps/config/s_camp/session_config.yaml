@@ -3,7 +3,7 @@
 
 session_name: "SCaMP"
 user_name: "RLD"
-sample_data_dir: "E:/Kato lab/RLD/20260401_RLD_1"
+sample_data_dir: "E:/Kato lab/RLD/20260413_RLD_1"
 
 session_parameters:
   num_samples: 3600
