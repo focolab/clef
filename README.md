@@ -6,6 +6,13 @@ CLEF is a customizable software platform to specify and run "closed-loop" experi
 
 ## Basic concepts/terminology
 
+**session**
+
+**logic**
+
+
+
+#
 
 
 ## Installation
