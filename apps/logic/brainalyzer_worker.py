@@ -78,6 +78,14 @@ class BrainalyzerWorker(Process):
         # Calibration
         self.calibration_points = self.vis_args.get("calibration_points", None)
 
+        # Light sources
+        self.light_sources = self.vis_args.get("light_sources", []) or []
+        default_ls = self.vis_args.get("default_light_source")
+        if default_ls is None and self.light_sources:
+            default_ls = self.light_sources[0].get("name")
+        self.current_light_source = default_ls
+        self._light_source_map = {ls["name"]: ls for ls in self.light_sources}
+
         # Polygon shared memory (attached in initialize_shm)
         self._polygon_shm = None
         self._polygon_mask_array = None
@@ -169,13 +177,36 @@ class BrainalyzerWorker(Process):
         stim_layout = QtWidgets.QVBoxLayout()
         stim_layout.setSpacing(4)
 
+        # Light source dropdown (built first but connected after the intensity
+        # button exists, so the signal handler can safely relabel the button).
+        self.light_source_combobox = None
+        if self.light_sources:
+            self.light_source_combobox = pg.ComboBox(
+                items=[ls["name"] for ls in self.light_sources]
+            )
+            if self.current_light_source is not None:
+                self.light_source_combobox.blockSignals(True)
+                self.light_source_combobox.setValue(self.current_light_source)
+                self.light_source_combobox.blockSignals(False)
+            stim_layout.addWidget(
+                DemoStyle.make_heading(
+                    "Light Source", QtWidgets, style=DemoStyle.SUBHEADING_STYLE
+                )
+            )
+            stim_layout.addWidget(self.light_source_combobox)
+
         self.enter_stimulus_intensity_button = DemoStyle.make_action_button(
-            "stim intensity (%): {}".format(self.stim_intensity), QtWidgets
+            self._intensity_button_label(), QtWidgets
         )
         self.enter_stimulus_intensity_button.clicked.connect(
             self.my_get_stimulus_intensity
         )
         stim_layout.addWidget(self.enter_stimulus_intensity_button)
+
+        if self.light_source_combobox is not None:
+            self.light_source_combobox.currentIndexChanged.connect(
+                self.on_light_source_changed
+            )
 
         self.enter_stim_duration_vols_button = DemoStyle.make_action_button(
             "stimulus duration (vols): {}".format(self.stim_duration_vols), QtWidgets
@@ -520,21 +551,53 @@ class BrainalyzerWorker(Process):
         if selected_z is not None:
             self.update_viewbox_border_color(selected_z)
 
+    def _current_light_source_meta(self):
+        if self.current_light_source and self.current_light_source in self._light_source_map:
+            return self._light_source_map[self.current_light_source]
+        return {"intensity_type": "int", "intensity_min": 0, "intensity_max": 100, "units": "%"}
+
+    def _intensity_button_label(self):
+        meta = self._current_light_source_meta()
+        units = meta.get("units", "%")
+        return "stim intensity ({}): {}".format(units, self.stim_intensity)
+
+    def on_light_source_changed(self, _index):
+        self.current_light_source = self.light_source_combobox.value()
+        meta = self._current_light_source_meta()
+        lo = meta.get("intensity_min", 0)
+        hi = meta.get("intensity_max", 100)
+        # Clamp current intensity into the new source's range
+        try:
+            val = float(self.stim_intensity)
+        except (TypeError, ValueError):
+            val = lo
+        val = max(lo, min(val, hi))
+        self.stim_intensity = int(val) if meta.get("intensity_type") == "int" else val
+        self.enter_stimulus_intensity_button.setText(self._intensity_button_label())
+
     def my_get_stimulus_intensity(self, event):
-        self.stimulus_intensity_dialog = QtWidgets.QInputDialog()
-        self.stimulus_intensity_dialog.setInputMode(QtWidgets.QInputDialog.IntInput)
-        self.stimulus_intensity_dialog.setIntMinimum(0)
-        self.stimulus_intensity_dialog.setIntMaximum(100)
-        self.stimulus_intensity_dialog.intValueSelected.connect(
-            self.set_stimulus_intensity
-        )
-        self.stimulus_intensity_dialog.show()
+        meta = self._current_light_source_meta()
+        dialog = QtWidgets.QInputDialog()
+        if meta.get("intensity_type") == "float":
+            dialog.setInputMode(QtWidgets.QInputDialog.DoubleInput)
+            dialog.setDoubleMinimum(float(meta.get("intensity_min", 0.0)))
+            dialog.setDoubleMaximum(float(meta.get("intensity_max", 1.0)))
+            dialog.setDoubleDecimals(2)
+            dialog.setDoubleValue(float(self.stim_intensity or 0.0))
+            dialog.doubleValueSelected.connect(self.set_stimulus_intensity)
+        else:
+            dialog.setInputMode(QtWidgets.QInputDialog.IntInput)
+            dialog.setIntMinimum(int(meta.get("intensity_min", 0)))
+            dialog.setIntMaximum(int(meta.get("intensity_max", 100)))
+            dialog.setIntValue(int(self.stim_intensity or 0))
+            dialog.intValueSelected.connect(self.set_stimulus_intensity)
+        dialog.finished.connect(dialog.deleteLater)
+        self.stimulus_intensity_dialog = dialog
+        dialog.show()
 
     def set_stimulus_intensity(self, intensity):
         self.stim_intensity = intensity
-        self.enter_stimulus_intensity_button.setText(
-            "stim intensity (%): {}".format(intensity)
-        )
+        self.enter_stimulus_intensity_button.setText(self._intensity_button_label())
 
     def update_dashboard(self):
         self.update_display_images()
@@ -724,6 +787,7 @@ class BrainalyzerWorker(Process):
             "ts": time.time(),
             "event_type": event_type,
             "stim_intensity": self.stim_intensity,
+            "light_source": self.current_light_source,
         }
 
         if event_type in ("pulse-rect-roi-list", "full-field-button"):

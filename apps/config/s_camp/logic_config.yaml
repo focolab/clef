@@ -9,8 +9,25 @@ logic_algorithms:
       stim_intensity: 0
       save_dir: "./output"
       calibration_file: "apps/io/output_device/res/MightexPolygon1000/calibrations.json"
+      default_light_source: "ldi-470"
+      light_sources:
+        - name: "ldi-470"
+          intensity_type: "int"
+          intensity_min: 0
+          intensity_max: 100
+          units: "%"
+        - name: "ldi-450"
+          intensity_type: "int"
+          intensity_min: 0
+          intensity_max: 100
+          units: "%"
+        - name: "widefield_488"
+          intensity_type: "float"
+          intensity_min: 0.0
+          intensity_max: 3.5
+          units: "V"
     io_parameters:
-      output_device_names: ["polygon", "ldi"]
+      output_device_names: ["polygon", "ldi-470", "ldi-450", "widefield_488"]
       input_device_names: ["camera"]
     gui_parameters:
       gui_screenshot_freq: 0

@@ -30,10 +30,26 @@ output_devices:
     output_device_parameters:
       slm_device: null # will query from Micro-Manager
 
-  - output_device_name: "ldi"
+  - output_device_name: "ldi-470"
     output_device_type: "lightsource"
     output_device_class: "ldi_89north"
     output_device_parameters:
       intensity_device: "89 North Laser Diode Illuminator"
       intensity_property: "470 Intensity"
       shutter_device: "89 North Laser Diode Illuminator"
+
+  - output_device_name: "ldi-450"
+    output_device_type: "lightsource"
+    output_device_class: "ldi_89north"
+    output_device_parameters:
+      intensity_device: "89 North Laser Diode Illuminator"
+      intensity_property: "450 Intensity"
+      shutter_device: "89 North Laser Diode Illuminator"
+
+  - output_device_name: "widefield_488"
+    output_device_type: "lightsource"
+    output_device_class: "mm_dac_lightsource"
+    output_device_parameters:
+      dac_device: "DAC488"
+      dac_property: "Volts"
+      max_volts: 3.5
