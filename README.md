@@ -104,7 +104,7 @@ The loop runs for `num_samples` iterations (or indefinitely if set to `-1`).
 
 ---
 
-## How do I use CLEF for my experiments?
+## How do I set up CLEF for my experiments?
 
 Drop your application-specific code in the appropriate folder under `apps/`:
 
