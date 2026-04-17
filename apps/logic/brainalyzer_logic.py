@@ -55,6 +55,13 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         self.num_z_planes = cfg.get("num_z_planes", cfg.get("zsize", 1))
         self.input_device_name = next(iter(self.input_devices), "camera")
 
+        # Light source selection
+        self.light_sources = cfg.get("light_sources", [])
+        self.default_light_source = cfg.get("default_light_source")
+        if self.default_light_source is None and self.light_sources:
+            self.default_light_source = self.light_sources[0].get("name")
+        self.active_light_source = None
+
         # Calibration
         self.calibration_file = cfg.get("calibration_file", None)
         self.calibration_points = None
@@ -197,6 +204,8 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             "calibration_points": self.calibration_points,
             "shm_names": self.shm_names,
             "image_count_shm_name": self.image_count_shm_name,
+            "light_sources": self.light_sources,
+            "default_light_source": self.default_light_source,
         }
 
         self.proc = BrainalyzerWorker(self.child_conn, vis_args)
@@ -224,21 +233,23 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
         """Translate GUI events into output device updates.
 
         Returns dict like:
-            {"polygon": {"action": "upload_mask"}, "ldi": {"intensity": N}}
+            {"polygon": {"action": "upload_mask"}, "<light_source>": {"intensity": N}}
         """
         # Check for pulsed stim expiry first
         if (
             self.active_pulse_stim_off is not None
             and self.sample_count >= self.active_pulse_stim_off
         ):
-            updates = {
-                "ldi": {"intensity": 0},
-            }
+            updates = {}
+            if self.active_light_source is not None:
+                updates[self.active_light_source] = {"intensity": 0}
             logger.info(
-                f"BrainalyzerLogic: pulse stim off at frame {self.sample_count}"
+                f"BrainalyzerLogic: pulse stim off at frame {self.sample_count} "
+                f"(source={self.active_light_source})"
             )
             self.active_pulse_stim_off = None
-            return updates
+            self.active_light_source = None
+            return updates if updates else None
 
         if self.current_event is None and not self.stimulus_is_on:
             return None
@@ -250,10 +261,23 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
             event = self.current_event
             event_type = event.get("event_type")
             stim_intensity = event.get("stim_intensity", 0)
+            light_source = event.get("light_source", self.default_light_source)
+
+            # If a previous pulse is still active on a different source, turn
+            # it off explicitly so we don't orphan the old device at nonzero
+            # intensity when overwriting active_pulse_stim_off below.
+            if (
+                self.active_pulse_stim_off is not None
+                and self.active_light_source is not None
+                and self.active_light_source != light_source
+            ):
+                updates[self.active_light_source] = {"intensity": 0}
 
             # Mask was already written by BrainalyzerWorker, just tell polygon to upload
             updates["polygon"] = {"action": "upload_mask"}
-            updates["ldi"] = {"intensity": stim_intensity}
+            if light_source:
+                updates[light_source] = {"intensity": stim_intensity}
+                self.active_light_source = light_source
 
             if event_type in ("pulse-rect-roi-list", "full-field-button"):
                 stim_duration_vols = event.get("stim_duration_vols", 4)
@@ -269,6 +293,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
                         "stim_on": stim_on,
                         "stim_off": stim_off,
                         "stim_intensity": stim_intensity,
+                        "light_source": light_source,
                         "event": event,
                     }
                 )
@@ -279,6 +304,7 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
                     {
                         "stim_on": self.sample_count,
                         "stim_intensity": stim_intensity,
+                        "light_source": light_source,
                         "event": event,
                     }
                 )
@@ -287,8 +313,10 @@ class BrainalyzerLogic(BaseClosedLoopLogic):
 
         # Stop signal while stimulating
         elif self.stimulus_is_on and self.current_event is not None:
-            updates["ldi"] = {"intensity": 0}
+            if self.active_light_source is not None:
+                updates[self.active_light_source] = {"intensity": 0}
             self.stimulus_is_on = False
+            self.active_light_source = None
 
             if self.stim_param_list:
                 self.stim_param_list[-1]["stim_off"] = self.sample_count
