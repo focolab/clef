@@ -2,9 +2,7 @@
 
 Closed-Loop Experimental Framework
 
-## What's it for
-
-
+CLEF is a customizable software platform to specify and run "closed-loop" experiments in neuroscience, biology or other physical sciences. It provides tooling for interfacing with input (data acquisition, such as microscopes or electrodes) and output (control and perturbation, such as optogenetic lasers or stimulus delivery) hardware systems, for design of on-the-fly computational analysis and logic that that executes during experimental sessions, and for GUI-based interactive human monitoring and control of live experimental sessions. 
 
 ---
 
