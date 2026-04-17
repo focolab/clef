@@ -48,7 +48,7 @@ pip install -e ".[all]"
 
 ---
 
-## Quickstart: demos
+## Quickstart: play with the demos
 
 Install with the `demos` extra (see above), then run:
 
@@ -56,10 +56,17 @@ Install with the `demos` extra (see above), then run:
 clef ring_attractor
 ```
 
-`clef <name>` searches `apps/config/` for a directory named `ring_attractor`, finds the three config files inside it (`session_config.yaml`, `io_config.yaml`, `logic_config.yaml`), validates them, and prompts before starting the loop. Other available demos:
+[the command `clef <name>` searches `apps/config/` for a directory named `ring_attractor`, finds the three config files inside it (`session_config.yaml`, `io_config.yaml`, `logic_config.yaml`), validates them, and prompts before starting the loop.]
+
+**ring_attractor** is a demonstration of CLEF that does not require any actual hardware, replacing it with virtual device interfaces and a virtual "living system" to be interrogated. It launches a live experimental session GUI. In this case, the living system is a nested two-ring attractor with intrinsically driven dynamics.
+
+There are two other demos:
 
 ```bash
 clef recording_playback # playback an existing .tiff recording you already have, for model workflow development
+```
+
+```bash
 clef speech_bci # have a ML model from brain2text? visualize it here (requires setting up your own model first)
 ```
 
