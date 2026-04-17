@@ -58,7 +58,7 @@ clef ring_attractor
 
 [the command `clef <name>` searches `apps/config/` for a directory named `ring_attractor`, finds the three config files inside it (`session_config.yaml`, `io_config.yaml`, `logic_config.yaml`), validates them, and prompts before starting the loop.]
 
-**ring_attractor** is a demonstration of CLEF that does not require any actual hardware, replacing it with virtual device interfaces and a virtual "living system" to be interrogated. It launches a live experimental session GUI. In this case, the living system is a nested two-ring attractor with intrinsically driven dynamics.
+**ring_attractor** is a demonstration of CLEF that does not require any actual hardware hooked up to your computer, substituting with virtual device interfaces and a virtual "living system" to be interrogated. It launches a live experimental session GUI. In this case, the living system is a nested two-ring attractor with intrinsically driven dynamics.
 
 There are two other demos:
 
