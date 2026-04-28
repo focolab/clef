@@ -1,8 +1,8 @@
-# Ring Attractor Demo Logic Configuration
+# Limit Cycle Demo Logic Configuration
 
 logic_algorithms:
-  - logic_algorithm_name: "ring_attractor"
-    logic_class: "ring_attractor_logic"
+  - logic_algorithm_name: "limit_cycle"
+    logic_class: "limit_cycle_logic"
     logic_parameters:
       visualize_real_time: true
       fading_trajectory_samples: 100
@@ -11,7 +11,7 @@ logic_algorithms:
       outer_radius: 10.0
       image_width: 100
       image_height: 100
-      save_dir: "./demo_output/ring_attractor"
+      save_dir: "./demo_output/limit_cycle"
     io_parameters:
       output_device_names:
         - "ring_stimulus"

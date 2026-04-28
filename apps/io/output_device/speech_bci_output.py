@@ -2,7 +2,7 @@
 SpeechBCI Output Device for CLEF.
 
 Applies adaptive streaming parameters to the linked SpeechBCI input device.
-Follows the same linked-device pattern as RingAttractorOutputDevice.
+Follows the same linked-device pattern as LimitCycleOutputDevice.
 """
 
 import logging

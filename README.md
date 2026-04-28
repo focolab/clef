@@ -1,17 +1,23 @@
-# CLEF
+# CLEF (Closed-Loop Experimental Framework)
 
-Closed-Loop Experimental Framework
+CLEF is a lightweight, modular framework for custom closed-loop control.
 
 ## What's it for
 
+### Discovery
 
+Biology is full of complex, dynamic, interacting processes that span from proteins to cells to brain regions. If you want to understand causality in these kind of recurrent and interconnected systems, you need closed-loop experimental design. You can use CLEF to implement these experiments.
+
+### Adaptation
+
+CLEF lets you adjust your acquisition system in response to real-time data. If your quality control metrics degrade, you can use CLEF to apply the appropriate adjustments.
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/focolab/clef.git
+git clone https://github.com/focolab/clef
 cd clef
 ```
 
@@ -21,13 +27,7 @@ cd clef
 pip install -e .
 ```
 
-**`core`** — adds pytest for running the core test suite:
-
-```bash
-pip install -e ".[core]"
-```
-
-**`demos`** — adds everything needed to run the ring attractor, recording playback, screenshot, and speechbci demos:
+**`demos`** — adds everything needed to run the limit cycle, recording playback, screenshot, and speechbci demos:
 
 ```bash
 pip install -e ".[demos]"
@@ -46,20 +46,23 @@ pip install -e ".[all]"
 Install with the `demos` extra (see above), then run:
 
 ```bash
-clef ring_attractor
+clef limit_cycle
 ```
 
-`clef <name>` searches `apps/config/` for a directory named `ring_attractor`, finds the three config files inside it (`session_config.yaml`, `io_config.yaml`, `logic_config.yaml`), validates them, and prompts before starting the loop. Other available demos:
+`clef <name>` searches `apps/config/` for a directory named `limit_cycle`, finds the three config files inside it (`session_config.yaml`, `io_config.yaml`, `logic_config.yaml`), validates them, and prompts before starting the loop. Other available demos:
 
 ```bash
-clef recording_playback # playback an existing .tiff recording you already have, for model workflow development
-clef speech_bci # have a ML model from brain2text? visualize it here (requires setting up your own model first)
+# playback an existing .tiff recording you already have, for model workflow development
+clef recording_playback
+
+# have a ML model from brain2text? visualize it here (requires setting up your own model first)
+clef speech_bci
 ```
 
 To validate configs without running:
 
 ```bash
-clef ring_attractor --validate-config
+clef limit_cycle --validate-config
 ```
 
 To pass config files explicitly:
@@ -70,15 +73,16 @@ clef --session s.yaml --io io.yaml --logic l.yaml
 
 ---
 
-## What is CLEF?
+## Key Concepts
 
-CLEF is entirely directed by YAML configuration files. There are three:
+CLEF is directed by three YAML configuration files, each corresponding to one of the core concepts below:
 
-| File | Purpose |
-|---|---|
-| `session_config.yaml` | Session metadata: name, user, output directory, number of samples, save flags. Also a good place for any experiment-specific metadata you want saved with the session — subject ID, genotype, treatment condition, etc. — structured however you like (see [`apps/config/physical_hardware/session_config.yaml`](apps/config/physical_hardware/session_config.yaml) for an example). |
-| `io_config.yaml` | Which input devices and output devices to use, and their parameters |
-| `logic_config.yaml` | Which closed-loop logic algorithm(s) to run, their parameters, and which devices they read from / write to |
+| Keyword   | Purpose                                                                                                                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `device`  | Components or endpoints that you want CLEF to interact with. They can be an `input_device` or an `output_device`. Input devices provide data streams (e.g. camera → images), and output devices are what you want to adapt/control (e.g. z-stage, light source, or a solenoid). |
+| `logic`   | Your control algorithms, which process samples from your input device data streams and emit updates for your output devices.                                                                                                                                                    |
+| `session` | Essential contextual metadata, for example about your data subject (a cell line, treatment condition, etc), highly specific to your application.                                                                                                                                |
+| `engine`  | An event loop.                                                                                                                                                                                                                                                                  |
 
 At runtime, the engine reads from input devices, passes samples to the logic algorithm, and dispatches output commands to output devices:
 
@@ -91,6 +95,20 @@ The loop runs for `num_samples` iterations (or indefinitely if set to `-1`).
 ---
 
 ## How do I use CLEF for my experiments?
+
+### Vibe coding quickstart
+
+Load `core/` and a few example apps from `apps/` into your AI assistant's context, then send a prompt like:
+
+> I'm trying to make a new CLEF app. I need an input device for [ABC], and an output device for [XYZ]. Here are some scripts where I demonstrate control of the devices:
+>
+> [paste your existing device control scripts]
+>
+> Format them to work with CLEF. For the closed-loop logic algorithm, make me [describe the feedback rule]. Finally, make me config files in a new app directory named `your_app_name`.
+
+That should get you 90% of the way there, but complex control will require testing.
+
+### Manual instructions
 
 Drop your application-specific code in the appropriate folder under `apps/`:
 
@@ -106,7 +124,7 @@ apps/
 
 CLEF auto-discovers any class with a `device_class`, `data_interface_class`, or `logic_class` ClassVar at startup — no registration step needed.
 
-### Create an input device
+#### Create an input device
 
 Say you want to connect to a new camera. If it's compatible with Micro-Manager, you can use the existing `micromanager_camera_input` device. Otherwise, create a new class in `apps/io/input_device/` that extends `BaseInputDevice`:
 
@@ -131,7 +149,7 @@ class MyCameraInput(BaseInputDevice):
 
 Then reference `input_device_class: my_camera_input` in your `io_config.yaml`.
 
-### Create an output device
+#### Create an output device
 
 Say you want to drive a stimulating LED or a motorized stage. Create a class in `apps/io/output_device/` that extends `BaseOutputDevice`:
 
@@ -158,7 +176,7 @@ Then reference `output_device_class: my_stage_output` in your `io_config.yaml`.
 
 Output devices are driven by the return value of `_check_logic` (see below). The engine routes a dict of `{output_device_name: {kwargs}}` to each named device's `update_output`, which records a timestamp and calls `_update_output(**kwargs)`.
 
-### Create a closed-loop logic algorithm
+#### Create a closed-loop logic algorithm
 
 Create a class in `apps/logic/` that extends `BaseClosedLoopLogic`:
 
@@ -195,20 +213,6 @@ If you're new to this, a good first algorithm is an interactive GUI that display
 
 ---
 
-## Extending CLEF: vibe coding quickstart
-
-Load `core/` and a few example apps from `apps/` into your AI assistant's context, then send a prompt like:
-
-> I'm trying to make a new CLEF app. I need an input device for [ABC], and an output device for [XYZ]. Here are some scripts where I demonstrate control of the devices:
->
-> [paste your existing device control scripts]
->
-> Format them to work with CLEF. For the closed-loop logic algorithm, make me [describe the feedback rule]. Finally, make me config files in a new app directory named `your_app_name`.
-
-That should get you 90% of the way there.
-
----
-
 ## Output data
 
 Each input device controls how its data is saved — see the `save_data` method on your input device and its associated `DataInterface`. At the end of every session, CLEF writes a JSON metadata file containing all configuration, events, and per-device timestamps.
@@ -241,12 +245,9 @@ High-level steps to follow this pattern for your own model:
 
 ---
 
-## Development
+## Contributing
 
-```bash
-pip install -e ".[core]"
-pytest tests/ -v
-```
+Contributions are welcome. Fork the repo, create a branch off `main`, and open a pull request — the [PR template](.github/pull_request_template.md) will guide you through summary, changes, and testing notes. For non-trivial changes, please open an issue first to discuss scope.
 
 ---
 

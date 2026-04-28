@@ -2,9 +2,9 @@
 CLEF Command-Line Interface
 
 Usage:
-    python -m core.utils.clef_cli ring_attractor
+    python -m core.utils.clef_cli limit_cycle
     python -m core.utils.clef_cli --session s.yaml --io io.yaml --logic l.yaml
-    python -m core.utils.clef_cli ring_attractor --validate-config
+    python -m core.utils.clef_cli limit_cycle --validate-config
 """
 
 import argparse
@@ -168,9 +168,9 @@ def setup_argparser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  clef ring_attractor          # auto-discover configs by root name
+  clef limit_cycle          # auto-discover configs by root name
   clef --session s.yaml --io io.yaml --logic l.yaml  # explicit paths
-  clef ring_attractor --validate-config               # validate only
+  clef limit_cycle --validate-config               # validate only
         """
     )
 
@@ -178,7 +178,7 @@ Examples:
         'config_root',
         nargs='?',
         default=None,
-        help='Root name to search for configs (e.g. "ring_attractor")'
+        help='Root name to search for configs (e.g. "limit_cycle")'
     )
     parser.add_argument('--session', type=str, metavar='PATH', help='Path to session config YAML')
     parser.add_argument('--io', type=str, metavar='PATH', help='Path to IO config YAML')
