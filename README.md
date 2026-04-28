@@ -2,7 +2,7 @@
 
 CLEF is a lightweight, modular framework for custom closed-loop control.
 
-## What's it for
+CLEF is a customizable software platform to specify and run "closed-loop" experiments in neuroscience, biology or other physical sciences. It provides tooling for interfacing with input (data acquisition, such as microscopes or electrodes) and output (control and perturbation, such as optogenetic lasers or stimulus delivery) hardware systems, for design of on-the-fly computational analysis and logic that that executes during experimental sessions, and for GUI-based interactive human monitoring and control of live experimental sessions.
 
 ### Discovery
 
@@ -11,8 +11,6 @@ Biology is full of complex, dynamic, interacting processes that span from protei
 ### Adaptation
 
 CLEF lets you adjust your acquisition system in response to real-time data. If your quality control metrics degrade, you can use CLEF to apply the appropriate adjustments.
-
----
 
 ## Installation
 
@@ -41,7 +39,7 @@ pip install -e ".[all]"
 
 ---
 
-## Quickstart: demos
+## Quickstart: play with the demos
 
 Install with the `demos` extra (see above), then run:
 
@@ -94,7 +92,7 @@ The loop runs for `num_samples` iterations (or indefinitely if set to `-1`).
 
 ---
 
-## How do I use CLEF for my experiments?
+## How do I set up CLEF for my experiments?
 
 ### Vibe coding quickstart
 
