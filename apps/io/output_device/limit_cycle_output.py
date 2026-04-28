@@ -1,7 +1,7 @@
 """
-Ring Attractor Output Device for CLEF.
+Limit Cycle Output Device for CLEF.
 
-Applies radial and angular perturbations to the ring attractor dynamics
+Applies radial and angular perturbations to the limit cycle dynamics
 owned by the linked input device.
 """
 
@@ -13,10 +13,10 @@ from core.io.output_device.BaseOutputDevice import BaseOutputDevice
 logger = logging.getLogger(__name__)
 
 
-class RingAttractorOutputDevice(BaseOutputDevice):
-    """Output device that perturbs ring attractor dynamics via a linked input device."""
+class LimitCycleOutputDevice(BaseOutputDevice):
+    """Output device that perturbs limit cycle dynamics via a linked input device."""
 
-    device_class: ClassVar[Optional[str]] = "ring_attractor_output"
+    device_class: ClassVar[Optional[str]] = "limit_cycle_output"
     device_type: ClassVar[Optional[str]] = "demo"
 
     def __init__(self, name: str, config: Dict[str, Any] | None = None, io_manager: Any = None):
@@ -28,7 +28,7 @@ class RingAttractorOutputDevice(BaseOutputDevice):
         linked_name = self.config.get("linked_input_device")
         if linked_name is None:
             raise ValueError(
-                f"RingAttractorOutputDevice '{self.name}' requires "
+                f"LimitCycleOutputDevice '{self.name}' requires "
                 f"'linked_input_device' in output_device_parameters"
             )
         input_dev = self.io_manager.get_input_device(linked_name)
@@ -36,7 +36,7 @@ class RingAttractorOutputDevice(BaseOutputDevice):
         logger.info(f"Output device '{self.name}' linked to input device '{linked_name}'")
 
     def _update_output(self, **kwargs):
-        """Apply radial and angular perturbation to the ring attractor dynamics."""
+        """Apply radial and angular perturbation to the limit cycle dynamics."""
         if self._dynamics is None:
             self._resolve_dynamics()
 

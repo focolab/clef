@@ -1,5 +1,5 @@
 """
-Ring Attractor Logic for CLEF.
+Limit Cycle Logic for CLEF.
 
 Extracts puncta position from uint16 images, tracks XY/theta/ring state,
 provides interactive GUI with manual and closed-loop stimulus control.
@@ -16,15 +16,15 @@ from utils.style.demo_stylization import DemoStyle
 logger = logging.getLogger(__name__)
 
 
-class RingAttractorLogic(BaseClosedLoopLogic):
+class LimitCycleLogic(BaseClosedLoopLogic):
     """
-    Closed-loop logic for ring attractor demo.
+    Closed-loop logic for limit cycle demo.
 
     Extracts puncta position, monitors trajectory, and provides
     manual/ROI-based stimulus control with visualization.
     """
 
-    logic_class: ClassVar[Optional[str]] = "ring_attractor_logic"
+    logic_class: ClassVar[Optional[str]] = "limit_cycle_logic"
 
     def __init__(
         self,
@@ -78,23 +78,23 @@ class RingAttractorLogic(BaseClosedLoopLogic):
 
         # GUI screenshot freq
         self.gui_screenshot_freq = self.gui_parameters.get("gui_screenshot_freq", 0)
-        self.saveroot = cfg.get("save_dir", "./demo_output/ring_attractor")
+        self.saveroot = cfg.get("save_dir", "./demo_output/limit_cycle")
 
         # Initialize visualizer
         self.visualizer = None
         if self.visualize_real_time:
             try:
-                self.visualizer = RingVisualizer(self)
+                self.visualizer = LimitCycleVisualizer(self)
             except Exception as e:
                 logger.warning(f"Could not initialize visualizer: {e}")
 
         logger.info(
-            f"RingAttractorLogic '{name}' initialized with rings at "
+            f"LimitCycleLogic '{name}' initialized with rings at "
             f"r={self.inner_radius}, {self.outer_radius}"
         )
 
     def initialize_model(self):
-        logger.info("RingAttractorLogic model initialized")
+        logger.info("LimitCycleLogic model initialized")
 
     def _find_puncta_centroid(self, image: np.ndarray) -> Tuple[float, float]:
         threshold = np.percentile(image, 99)
@@ -283,7 +283,7 @@ class RingAttractorLogic(BaseClosedLoopLogic):
 
         savefilename = kwargs.get("savefilename")
         if savefilename is None:
-            savefilename = str(Path(self.saveroot) / "ring_attractor_trajectory.png")
+            savefilename = str(Path(self.saveroot) / "limit_cycle_trajectory.png")
 
         try:
             import matplotlib.pyplot as plt
@@ -357,7 +357,7 @@ class RingAttractorLogic(BaseClosedLoopLogic):
         if self.visualizer:
             self.visualizer.close()
         logger.info(
-            f"RingAttractorLogic closing. {self.frame_count} frames, "
+            f"LimitCycleLogic closing. {self.frame_count} frames, "
             f"{self.transition_count} transitions, {len(self.stim_events)} stimuli"
         )
 
@@ -371,7 +371,7 @@ class _RotatedLabel:
     pass  # Defined at runtime when Qt is available
 
 
-class RingVisualizer:
+class LimitCycleVisualizer:
     """Real-time visualization with XY state space plot."""
 
     COLOR_INNER_RING = "#2EC4B6"
@@ -381,7 +381,7 @@ class RingVisualizer:
     COLOR_HEAD_COOLDOWN = "#E84855"
     COLOR_STIM_MARKER = "#E84855"
 
-    def __init__(self, logic: RingAttractorLogic):
+    def __init__(self, logic: LimitCycleLogic):
         self.logic = logic
 
         try:
@@ -397,7 +397,7 @@ class RingVisualizer:
 
         self._rois = []
 
-        self.app = pg.mkQApp("RingVisualizer")
+        self.app = pg.mkQApp("LimitCycleVisualizer")
         DemoStyle.load_qss(self.app)
 
         # --- Build _RotatedLabel using the actual Qt classes ---
@@ -418,7 +418,7 @@ class RingVisualizer:
         self._RotatedLabel = RotatedLabel
 
         self.window = QtWidgets.QWidget()
-        self.window.setWindowTitle("Ring Attractor — Closed-Loop Demo")
+        self.window.setWindowTitle("Limit Cycle — Closed-Loop Demo")
         self.window.resize(1280, 780)
 
         self.layout = QtWidgets.QGridLayout()
@@ -504,7 +504,7 @@ class RingVisualizer:
 
         instructions = DemoStyle.make_info_box(
             "<b>Instructions</b><br>"
-            "1. Watch the puncta orbit the ring attractors.<br>"
+            "1. Watch the puncta orbit the two limit cycles.<br>"
             "2. Use <i>Manual Stimulation</i> to push<br>"
             "&nbsp;&nbsp;&nbsp;the system between rings.<br>"
             "3. Draw a <i>Closed-Loop ROI</i> on the state<br>"
@@ -604,7 +604,7 @@ class RingVisualizer:
         self.layout.addWidget(ctrl_container, 0, 2, 2, 1)
 
         self.window.show()
-        logger.info("RingVisualizer initialized")
+        logger.info("LimitCycleVisualizer initialized")
 
     def _draw_ring_circles(self):
         theta = np.linspace(0, 2 * np.pi, 200)
@@ -728,4 +728,4 @@ class RingVisualizer:
 
     def close(self):
         self.window.close()
-        logger.info("RingVisualizer closed")
+        logger.info("LimitCycleVisualizer closed")

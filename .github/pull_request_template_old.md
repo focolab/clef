@@ -1,3 +1,8 @@
+### Linked Issue
+[Linear Issue ID](https://linear.app/...)
+
+---
+
 ### Summary
 Briefly describe what this PR does.
 
@@ -10,11 +15,12 @@ Briefly describe what this PR does.
 ---
 
 ### Testing
+Describe how you verified that the changes work:
 - [ ] Unit tests added or updated
 - [ ] Manual validation done
 - [ ] CI passes
 
 ---
 
-### Notes
+### Impact / Notes
 Mention any follow-up tasks, breaking changes, or known limitations.

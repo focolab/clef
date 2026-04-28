@@ -1,9 +1,9 @@
 """
-Ring Attractor Input Device for CLEF.
+Limit Cycle Input Device for CLEF.
 
-Simulates a camera observing a ring attractor system with dual concentric rings.
-Generates 100x100 uint16 images with a Gaussian blob puncta whose position
-is governed by continuous dynamical systems with stable limit cycles.
+Simulates a camera observing a polar-coordinate dynamical system with dual
+concentric stable limit cycles. Generates 100x100 uint16 images with a
+Gaussian blob puncta whose position is governed by the continuous dynamics.
 """
 
 import logging
@@ -16,9 +16,9 @@ from core.io.input_device.BaseInputDevice import BaseInputDevice
 logger = logging.getLogger(__name__)
 
 
-class RingAttractorDynamics:
+class LimitCycleDynamics:
     """
-    Ring attractor with dual stable limit cycles.
+    Polar-coordinate dynamics with dual stable limit cycles.
 
     Implements continuous dynamics:
     - dr/dt = -k(r-r1)(r-r_mid)(r-r2) + u_r(t)
@@ -54,7 +54,7 @@ class RingAttractorDynamics:
         self.ring_index = 0  # 0=inner, 1=outer
 
         logger.info(
-            f"Ring attractor initialized: r1={inner_radius}, r2={outer_radius}, "
+            f"Limit cycle dynamics initialized: r1={inner_radius}, r2={outer_radius}, "
             f"k={k_radial}, omega={omega}, dt={dt}"
         )
 
@@ -118,10 +118,10 @@ class RingAttractorDynamics:
         return self.x, self.y
 
 
-class RingAttractorInputDevice(BaseInputDevice):
-    """Input device that generates ring attractor images."""
+class LimitCycleInputDevice(BaseInputDevice):
+    """Input device that generates limit cycle images."""
 
-    device_class: ClassVar[Optional[str]] = "ring_attractor_input"
+    device_class: ClassVar[Optional[str]] = "limit_cycle_input"
     device_type: ClassVar[Optional[str]] = "demo"
 
     def __init__(self, name: str, config: Dict[str, Any] | None = None, io_manager: Any = None):
@@ -131,7 +131,7 @@ class RingAttractorInputDevice(BaseInputDevice):
         width = cfg.get("image_width", 100)
         height = cfg.get("image_height", 100)
 
-        self.dynamics = RingAttractorDynamics(
+        self.dynamics = LimitCycleDynamics(
             inner_radius=cfg.get("inner_radius", 3.0),
             outer_radius=cfg.get("outer_radius", 6.0),
             k_radial=cfg.get("k_radial", 5.0),
@@ -154,7 +154,7 @@ class RingAttractorInputDevice(BaseInputDevice):
         self.center_x = width / 2.0
         self.center_y = height / 2.0
 
-        logger.info(f"RingAttractorInputDevice '{name}' initialized: {width}x{height}")
+        logger.info(f"LimitCycleInputDevice '{name}' initialized: {width}x{height}")
 
     def _get_input(self) -> np.ndarray:
         """Advance dynamics and generate a uint16 image with puncta."""

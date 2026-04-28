@@ -1,7 +1,7 @@
 """
 Centralized styling constants and widget factories for CLEF demo GUIs.
 
-Both BrainalyzerWorker and RingVisualizer pull shared colors, stylesheet
+Both BrainalyzerWorker and LimitCycleVisualizer pull shared colors, stylesheet
 fragments, and pre-configured widget builders from this module so that
 visual appearance stays consistent across demos.
 """
