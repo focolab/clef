@@ -1,16 +1,21 @@
 # CLEF (Closed-Loop Experimental Framework)
 
-CLEF is a lightweight, modular framework for custom closed-loop control.
+Meet CLEF: A lightweight, modular framework for custom closed-loop control.
 
-CLEF is a customizable software platform to specify and run "closed-loop" experiments in neuroscience, biology or other physical sciences. It provides tooling for interfacing with input (data acquisition, such as microscopes or electrodes) and output (control and perturbation, such as optogenetic lasers or stimulus delivery) hardware systems, for design of on-the-fly computational analysis and logic that that executes during experimental sessions, and for GUI-based interactive human monitoring and control of live experimental sessions.
+You can use CLEF to specify and run "closed-loop" experiments in neuroscience, biology or other physical sciences. It provides tooling for:
+* Input (data acquisition, such as cameras or electrodes)
+* Output (control and perturbation, such as optogenetic lasers, stimulus delivery, or mechanical actuators)
+* Hardware systems (such as the microscopy ecosystem Micro-Manager)
+* Design of on-the-fly computational analysis and logic that that executes during experimental sessions
+* GUI-based human-in-the-loop monitoring and control of live experimental sessions.
 
 ### Discovery
 
-Biology is full of complex, dynamic, interacting processes that span from proteins to cells to brain regions. If you want to understand causality in these kind of recurrent and interconnected systems, you need closed-loop experimental design. You can use CLEF to implement these experiments.
+The world is full of complex, dynamic, interacting processes. Think neurons in a network, or proteins in a cell. If you want to understand causality in these kind of recurrent and interconnected systems, you need closed-loop experimental design. You can use CLEF to implement these experiments.
 
 ### Adaptation
 
-CLEF lets you adjust your acquisition system in response to real-time data. If your quality control metrics degrade, you can use CLEF to apply the appropriate adjustments.
+CLEF lets you adjust your acquisition system in response to real-time data. If your quality control metrics degrade, you can use CLEF to apply the appropriate adjustments, or resample the data under better conditions.
 
 ## Installation
 
@@ -73,24 +78,25 @@ clef --session s.yaml --io io.yaml --logic l.yaml
 
 ## Key Concepts
 
-CLEF is directed by three YAML configuration files, each corresponding to one of the core concepts below:
+If you're thinking of applying CLEF to solve your problem, see if it decomposes into the following Key Concepts that CLEF is organized around:  
 
 | Keyword   | Purpose                                                                                                                                                                                                                                                                         |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `device`  | Components or endpoints that you want CLEF to interact with. They can be an `input_device` or an `output_device`. Input devices provide data streams (e.g. camera → images), and output devices are what you want to adapt/control (e.g. z-stage, light source, or a solenoid). |
 | `logic`   | Your control algorithms, which process samples from your input device data streams and emit updates for your output devices.                                                                                                                                                    |
 | `session` | Essential contextual metadata, for example about your data subject (a cell line, treatment condition, etc), highly specific to your application.                                                                                                                                |
-| `engine`  | An event loop.                                                                                                                                                                                                                                                                  |
+| `engine`  | A discrete event loop that orchestrates iterations of data sampling, data processing, and actuation |
 
 At runtime, the engine reads from input devices, passes samples to the logic algorithm, and dispatches output commands to output devices:
 
 ```
 input_devices → engine → closed-loop logic → engine → output_devices
 ```
-
-The loop runs for `num_samples` iterations (or indefinitely if set to `-1`).
-
 ---
+
+### CLEF CLI
+
+CLEF ships with a command-line entry point that loads your three configs, runs the closed loop engine, and writes outputs to a timestamped session directory.
 
 ## How do I set up CLEF for my experiments?
 
@@ -211,9 +217,17 @@ If you're new to this, a good first algorithm is an interactive GUI that display
 
 ---
 
+#### Create configuration files
+
+CLEF is entirely directed by three YAML configuration files, each corresponding to one of the core concepts listed above: io.yaml, logic.yaml, and session.yaml. YAML files are validated by Pydantic on initialization.
+
+- io.yaml — Lists the input and output devices for the experiment. Each entry names a device_class (the registered Python plugin to load) along with any device-specific parameters you want to vary across experiments (camera exposure, ROI, illumination properties, serial port, etc.).
+- logic.yaml — Selects the closed-loop algorithm via logic_class and supplies its tunable parameters (thresholds, gains, target regions, etc.).
+- session.yaml — Describes the run itself rather than the hardware or algorithm. This is where you record the contextual metadata needed to interpret your data later: who ran the session, when, on what subject, under what conditions, where the outputs are written, and how long the run lasts.
+  
 ## Output data
 
-Each input device controls how its data is saved — see the `save_data` method on your input device and its associated `DataInterface`. At the end of every session, CLEF writes a JSON metadata file containing all configuration, events, and per-device timestamps.
+Each input device controls how its data is saved — see the `save_data` method on your input device and its associated `DataInterface`. The `DataInterface` is a useful abstraction for working with data that has a common structure (e.g. an XY uint16 matrix from a camera), but it's not required. At the end of every session, CLEF writes a JSON metadata file containing all configuration, events, and per-device timestamps.
 
 ---
 
