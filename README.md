@@ -87,15 +87,15 @@ If you're thinking of applying `clef` to solve your problem, see if it decompose
 | `session` | Essential contextual metadata about a `clef` experiment. For example about your data subject (a cell line, treatment condition, etc), highly specific to your application.                                                                                                        |
 | `engine`  | A discrete event loop that orchestrates iterations of data sampling, data processing, and actuation.                                                                                                                                                                              |
 
-At runtime, the engine reads from input devices, passes samples to the logic algorithm, and dispatches output commands to output devices:
+An experiment can use one or more input devices and one or more output devices — multiple cameras, a camera plus a stage readout, a DMD plus a laser plus a stage, etc. At runtime, the engine reads from every registered input device, passes the samples to the logic algorithm, and dispatches output commands to any subset of the registered output devices:
 
 ```
 input_devices → engine → closed-loop logic → engine → output_devices
 ```
 
-## Step 1: Create a module for your input device
+## Step 1: Create a module for your input device(s)
 
-Say you want to connect to a new camera. If it's compatible with Micro-Manager, you can use the existing `micromanager_camera_input` device. Otherwise, create a new class in `apps/io/input_device/` that extends `BaseInputDevice`:
+You can have one or many. Say you want to connect to a new camera. If it's compatible with Micro-Manager, you can use the existing `micromanager_camera_input` device. Otherwise, create a new class in `apps/io/input_device/` that extends `BaseInputDevice`:
 
 ```python
 from core.io.input_device.BaseInputDevice import BaseInputDevice
@@ -118,9 +118,9 @@ class MyCameraInput(BaseInputDevice):
 
 Then reference `input_device_class: my_camera_input` in your `io_config.yaml`. Each input device gets linked with a matching `data_interface` — This controls how data is saved. The `DataInterface` is a useful abstraction for working with data that has a common structure (e.g. an XY uint16 matrix from a camera).
 
-## Step 2: Create a module for your output device
+## Step 2: Create a module for your output device(s)
 
-Say you want to drive a stimulating LED or a motorized stage. Create a class in `apps/io/output_device/` that extends `BaseOutputDevice`:
+Same here — one or many. Say you want to drive a stimulating LED or a motorized stage (or both). Create a class in `apps/io/output_device/` that extends `BaseOutputDevice`:
 
 ```python
 from core.io.output_device.BaseOutputDevice import BaseOutputDevice
@@ -143,7 +143,7 @@ class MyStageOutput(BaseOutputDevice):
 
 Then reference `output_device_class: my_stage_output` in your `io_config.yaml`.
 
-Output devices are driven by the return value of `_check_logic` (see below). The engine routes a dict of `{output_device_name: {kwargs}}` to each named device's `update_output`, which records a timestamp and calls `_update_output(**kwargs)`.
+Output devices are driven by the return value of `_check_logic` (see below). The engine routes a dict of `{output_device_name: {kwargs}}` to each named device's `update_output`, which records a timestamp and calls `_update_output(**kwargs)`. A single `_check_logic` call can address multiple output devices in the same iteration by including more than one key.
 
 ## Step 3: Create a module for your closed-loop logic algorithm
 
