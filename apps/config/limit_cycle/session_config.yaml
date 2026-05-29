@@ -5,6 +5,6 @@ user_name: "CLEF_Demo"
 sample_data_dir: "./demo_output/limit_cycle"
 
 session_parameters:
-  num_samples: 2000
+  num_samples: 3000
   save_samples: false
   save_metadata: true

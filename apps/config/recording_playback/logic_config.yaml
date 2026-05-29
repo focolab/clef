@@ -12,4 +12,4 @@ logic_algorithms:
       output_device_names: []
       input_device_names: ["camera"]
     gui_parameters:
-      gui_screenshot_freq: 0
+      gui_screenshot_freq: 10
