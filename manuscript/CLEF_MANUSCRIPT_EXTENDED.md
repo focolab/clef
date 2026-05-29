@@ -1,6 +1,10 @@
 # CLEF: A Python Framework for Closed-Loop Neuroscience Experiments
 
-Raymond L. Dunn, Saul Kato
+**Raymond L. Dunn**<sup>1</sup> (ORCID: [0000-0003-4443-5519](https://orcid.org/0000-0003-4443-5519)), **Saul Kato**<sup>1,\*</sup> (ORCID: [0000-0003-2990-8306](https://orcid.org/0000-0003-2990-8306))
+
+<sup>1</sup> Department of Neurology, Weill Institute for Neurosciences, University of California, San Francisco, CA, USA
+
+<sup>\*</sup> Corresponding author.
 
 ## Summary
 
@@ -10,7 +14,7 @@ The core philosophy behind CLEF is that a flexible framework will allow rapid de
 
 ## Closed-Loop Experimentation for Advancing Neuroscience
 
-Traditional neuroscience experiments typically follow a fixed, open-loop protocol: researchers design the experiment, set parameters, collect data subject to a fixed stimulus protocol, and analyze results afterward. This approach has yielded insight for many questions, but it is fundamentally impoverished about how dynamical biological systems operate. Brains are highly recurrent networks where activity patterns influence future states in complex ways. To understand causal relationships in these systems, we need experiments that can perturbatively and adaptively probe a system, responsive to the evolving system state itself.
+Traditional neuroscience experiments typically follow a fixed, open-loop protocol: researchers design the experiment, set parameters, collect data subject to a fixed stimulus protocol, and analyze results afterward. This approach has yielded insight for many questions, but it is fundamentally impoverished approach to how dynamical biological systems operate. Brains are highly recurrent networks where activity patterns influence future states in complex ways. To understand causal relationships in these systems, we need experiments that can perturbatively and adaptively probe a system, responsive to the evolving system state itself.
 
 Closed-loop experimental design allows real-time adaptation of stimulus protocols based on ongoing measurements. The value of this approach has been recognized across multiple areas of study and model systems (Grosenick et al., 2015). As measurement technologies scale to capture hundreds or thousands of neurons simultaneously, closed-loop methods become increasingly important for understanding network-level mechanisms of brain function.
 
@@ -18,7 +22,7 @@ Closed-loop experimental design allows real-time adaptation of stimulus protocol
 
 Closed-loop experiments require coordinated control of multiple hardware components (cameras, stages, stimulation devices) while performing low-latency, real-time computation on streaming data. The computational pipeline must extract features from raw measurements, decide what to do based on the current state of the interrogated system, and execute stimulus protocols with precise timing. Building this coordination layer from scratch for every new experiment is a barrier to wider adoption of closed-loop methods.
 
-Existing tools cover individual parts of the problem (see Related Projects). While Python is the predominant programming language in the biosciences, many existing libraries require non-Python languages (C#, MATLAB, C++). Other libraries target exclusively electrophysiology rather than imaging (RTXI, Open Ephys). Others provide offline analysis libraries without experiment orchestration (CaImAn, Suite2p). Commercial microscopy software exposes limited scripting that works for simple automated protocols but lacks the sophistication needed for responsive, state-dependent experiments. Pycro-Manager (Pinkard et al., 2021) established convenient Python-based microscope control and enabled more complex acquisition sequences, but it does not, on its own, supply the architecture needed for closed-loop experimentation with multiple hardware components and real-time decision-making outside of the Micro-Manager ecosystem. The CLEF framework is written entirely in Python, so it is accessible to the large community of scientists already using Python. Researchers can use NumPy, SciPy, scikit-learn, and PyTorch directly inside their experimental logic, as well as any other code libraries.
+Existing tools cover individual parts of the problem (see Related Projects). While Python is the predominant programming language in the biosciences, many established frameworks are written in non-Python languages: Bonsai in C# (Lopes et al., 2015), the Open Ephys GUI in C++ (Siegle et al., 2017), and ScanImage in MATLAB (Pologruto et al., 2003). Several otherwise-Python tools target a different domain or stage of the workflow: Open Ephys focuses on electrophysiology rather than imaging (Siegle et al., 2017), while CaImAn (Giovannucci et al., 2019) and Suite2p (Pachitariu et al., 2017) provide offline calcium-imaging analysis without experiment orchestration. Tools such as Stytra (Stih et al., 2019), ACQ4 (Campagnola et al., 2014), and Autopilot (Saunders & Wehr, 2019) provide closed-loop control but are specialized to particular rigs or behavioral paradigms. Commercial microscopy software exposes limited scripting that works for simple automated protocols but lacks the sophistication needed for responsive, state-dependent experiments. Pycro-Manager (Pinkard et al., 2021) established convenient Python-based microscope control on top of Micro-Manager (Edelstein et al., 2014) and enabled more complex acquisition sequences, but it does not, on its own, supply the architecture needed for closed-loop experimentation with multiple hardware components and real-time decision-making outside of the Micro-Manager ecosystem. The CLEF framework is written entirely in Python, so it is accessible to the large community of scientists already using Python. Researchers can use NumPy (Harris et al., 2020), SciPy (Virtanen et al., 2020), scikit-learn (Pedregosa et al., 2011), and PyTorch (Paszke et al., 2019) directly inside their experimental logic, as well as any other code libraries.
 
 ## Architecture
 
@@ -76,7 +80,7 @@ Logic algorithms (`apps/logic/`) implement the experiment's online analysis and 
 
 Each input device can be paired in `io.yaml` with a `data_interface` that defines the structure of its samples, separating data acquisition from intrinsic data structure. The `BaseDataInterface` abstraction separates _how a sample looks_ from _how it is stored_. The data interface defines sample shape, dtype, and end-of-session serialization.
 
-Because the data interface is a separate registered class, the same input device can serve different downstream pipelines by switching its data interface in YAML. A new modality (an audio stream, or a 1-D timeseries) can be added by writing a new `BaseDataInterface` subclass with no engine changes.
+Because the data interface is a separate registered class, the same input device can serve different downstream pipelines by switching its data interface in YAML. A new modality (an audio stream, or a 1-D timeseries) can be added by writing a new `BaseDataInterface` subclass with no engine changes. For labs already using minimo (Borchardt et al., 2021), a linked data and metadata storage system that pairs object storage for large raw files with a document database for searchable metadata, the per-session output bundle maps cleanly onto its model: the raw input-device files written by each data interface become immutable objects and the JSON metadata file becomes the searchable document.
 
 ### Step 5: Write the three configuration files
 
@@ -136,7 +140,7 @@ The limit cycle demo captures the core conceptual motivation for CLEF. Closed-lo
 
 The `limit_cycle_input` device generates 2-D image frames showing a punctum orbiting on one of two concentric rings. The system state is defined by an angular position and a radial mode (inner or outer ring). The `limit_cycle_output` device delivers stimuli that perturb the angular position or toggle the system between rings. An auto-trigger mode is available, in which the logic fires stimuli when the system enters a specified angular region. The demo illustrates how CLEF separates data generation, online analysis, and stimulus control into independently configurable components.
 
-![Limit Cycle Demo](diagrams/screenshot_limit_cycle.png)
+![Limit Cycle Demo](media/screenshot_limit_cycle.png)
 **Figure 1.** Screenshot of the limit cycle demo during a live session. The visualization shows the punctum orbiting on one of two concentric rings, with a fading trajectory trail indicating recent history. The experimenter can deliver angular perturbations or toggle the system between rings using the GUI controls, observing the effect of each intervention in real time.
 
 Run with `clef limit_cycle`.
@@ -145,7 +149,7 @@ Run with `clef limit_cycle`.
 
 The recording playback demo provides the same GUI and analysis interface as the physical hardware configuration, but reads data from an existing volumetric calcium imaging dataset (a TIFF stack) via `recording_playback_input` rather than acquiring live from a microscope. Users can develop, test, and refine their analysis pipelines against real neural data without needing access to microscope hardware. The `brainalyzer_logic` algorithm performs real-time quantification of neural activity across z-planes (offloaded to `brainalyzer_worker.py` over shared memory) and supports stimulus parameter exploration through the interactive GUI. This demo illustrates how application-specific workflows can be integrated and tested with CLEF prior to deployment. 
 
-![Brainalyzer Demo](diagrams/screenshot_brainalyzer.png)
+![Brainalyzer Demo](media/screenshot_brainalyzer.png)
 **Figure 2.** Screenshot of the "brainalyzer" pipeline running over the recording-playback demo. The interface displays volumetric calcium imaging data read from a TIFF stack, with real-time quantification of neural activity across z-planes. This demo provides the same analysis and stimulus control interface as the physical hardware configuration, allowing algorithm development and parameter exploration without a connected microscope.
 
 Run with `clef recording_playback`.
@@ -158,7 +162,7 @@ Run with `clef speech_bci` (after building/deploying the decoder service). Note 
 
 ### Physical Hardware Demo (`apps/config/physical_hardware/`)
 
-The physical hardware demo runs a full volumetric calcium imaging experiment with real-time quantification and patterned optogenetic illumination using the Mightex Polygon1000 digital micromirror device. It can only be run with the appropriate microscope hardware configured (camera, stage, Micro-Manager device adapters, and Polygon1000, 89North LDI LS). This is the primary production use case for CLEF: acquiring volumetric calcium imaging data, processing it online via the brainalyzer logic, and delivering spatially patterned optogenetic stimuli in a closed loop. We include this demo as an illustration of CLEF being applied daily in our own lab.
+The physical hardware demo runs a full volumetric calcium imaging experiment with real-time quantification and patterned optogenetic illumination using the Mightex Polygon1000 digital micromirror device. It can only be run with the appropriate microscope hardware configured (camera, stage, Micro-Manager device adapters, and Polygon1000, 89North LDI LS). This is the primary production use case for CLEF: acquiring volumetric calcium imaging data, processing it online via the brainalyzer logic, and delivering spatially patterned optogenetic stimuli in a closed loop. We include this demo as an illustration of CLEF being applied daily in our own lab (Dunn et al., 2025).
 
 Run with `clef hardware_physical`.
 
@@ -203,7 +207,6 @@ The full pipeline completes in under 100 milliseconds, so the system can respond
 | **pycro-manager**  | Python/Java | Microscope control (Python)      | No               | No                        | Pinkard et al., 2021     |
 | **ScanImage**      | MATLAB      | Two-photon microscopy            | Partial          | No                        | Pologruto et al., 2003   |
 | **Stytra**         | Python      | Zebrafish behavior + light-sheet | Yes              | Partial                   | Stih et al., 2019        |
-| **RTXI**           | C++         | Hard real-time electrophysiology | Yes              | No                        | Patel et al., 2017       |
 | **ACQ4**           | Python      | Patch-clamp + imaging            | Partial          | No                        | Campagnola et al., 2014  |
 | **Autopilot**      | Python      | Distributed behavioral rigs      | Yes              | Yes                       | Saunders & Wehr, 2019    |
 | **LabVIEW**        | G (visual)  | General instrument control       | Partial          | No                        | National Instruments     |
@@ -213,6 +216,10 @@ The full pipeline completes in under 100 milliseconds, so the system can respond
 CLEF is open-source software released under the MIT license. The code is available on GitHub at [https://github.com/focolab/clef](https://github.com/focolab/clef). Documentation includes installation instructions, configuration guides, a vibe-coding quickstart for AI-assisted app development, and the demo configurations described above.
 
 We welcome contributions from the community. The modular architecture supports adding new hardware devices or new logic types without modifying framework code. Issues and pull requests can be opened on the GitHub repository.
+
+## AI Usage Statement
+
+AI coding assistants were used during development to facilitate refactoring of the codebase for a general audience and to facilitate test coverage. All scientific content, architectural decisions, and final code were authored and reviewed by the listed authors.
 
 ## Acknowledgements
 
@@ -224,18 +231,23 @@ This work was supported by NIH grants NS115572 (R.L.D), R35GM124735 (S.K.), and 
 
 ## References
 
-- Borchardt, J., Dunn, R. & Kato, S. "minimo: a linked data and metadata storage system for small labs." _J. Open Source Softw._ 6, 2979 (2021). DOI: 10.21105/joss.02979
-- Campagnola, L., Kratz, M.B. & Bhatt, D.B. "ACQ4: An open-source software platform for data acquisition and analysis in neurophysiology research." _Front. Neuroinform._ 8, 3 (2014). DOI: 10.3389/fninf.2014.00003
+- Borchardt, J.M., Dunn, R. & Kato, S. "minimo: a linked data and metadata storage system for small labs." _J. Open Source Softw._ 6, 2979 (2021). DOI: 10.21105/joss.02979
+- Campagnola, L., Kratz, M.B. & Manis, P.B. "ACQ4: An open-source software platform for data acquisition and analysis in neurophysiology research." _Front. Neuroinform._ 8, 3 (2014). DOI: 10.3389/fninf.2014.00003
+- Dunn, R.L., Costello, C.M., Borchardt, J.M., Sprague, D.Y., Chiu, G.C., Miller, J.M., L'Etoile, N.D. & Kato, S. "Short-term memory by distributed neural network oscillators in a simple nervous system." _Curr. Biol._ 35, 5582-5593.e4 (2025). DOI: 10.1016/j.cub.2025.10.018
 - Edelstein, A.D., Tsuchida, M.A., Amodaj, N., Pinkard, H., Vale, R.D. & Stuurman, N. "Advanced methods of microscope control using μManager software." _J. Biol. Methods_ 1, e10 (2014). DOI: 10.14440/jbm.2014.36
 - Giovannucci, A. et al. "CaImAn: An open source tool for scalable calcium imaging data analysis." _eLife_ 8, e38173 (2019). DOI: 10.7554/eLife.38173
 - Grosenick, L., Marshel, J.H. & Deisseroth, K. "Closed-loop and activity-guided optogenetic control." _Neuron_ 86, 106-139 (2015). DOI: 10.1016/j.neuron.2015.03.034
-- Lopes, G. et al. "Bonsai: An event-driven framework for processing and controlling data streams." _Front. Neuroinform._ 9, 7 (2015). DOI: 10.3389/fninf.2015.00007
+- Harris, C.R. et al. "Array programming with NumPy." _Nature_ 585, 357-362 (2020). DOI: 10.1038/s41586-020-2649-2
+- Lopes, G. et al. "Bonsai: An event-based framework for processing and controlling data streams." _Front. Neuroinform._ 9, 7 (2015). DOI: 10.3389/fninf.2015.00007
 - Lorenz, E.N. "Deterministic nonperiodic flow." _J. Atmos. Sci._ 20, 130-141 (1963). DOI: 10.1175/1520-0469(1963)020<0130:DNF>2.0.CO;2
 - Newman, J.P. et al. "Optogenetic feedback control of neural activity." _eLife_ 4, e07192 (2015). DOI: 10.7554/eLife.07192
-- Pachitariu, M. et al. "Suite2p: beyond 10,000 neurons with standard two-photon microscopy." _bioRxiv_ (2017). DOI: 10.1101/061507
+- Pachitariu, M. et al. "Suite2p: beyond 10,000 neurons with standard two-photon microscopy." _bioRxiv_ (2016). DOI: 10.1101/061507
 - Packer, A.M., Russell, L.E., Dalgleish, H.W.P. & Hausser, M. "Simultaneous all-optical manipulation and recording of neural circuit activity with cellular resolution in vivo." _Nat. Methods_ 12, 140-146 (2015). DOI: 10.1038/nmeth.3217
+- Paszke, A. et al. "PyTorch: An Imperative Style, High-Performance Deep Learning Library." _Advances in Neural Information Processing Systems 32_, 8024-8035 (2019).
+- Pedregosa, F. et al. "Scikit-learn: Machine Learning in Python." _J. Mach. Learn. Res._ 12, 2825-2830 (2011).
 - Pinkard, H., Stuurman, N., Ivanov, I.E., Anthony, N.M., Ouyang, W., Li, B., Yang, B., Tsuchida, M.A., Chhun, B., Zhang, G., Mei, R., Anderson, M., Shepherd, D.P., Hunt-Isaak, I., Dunn, R.L., Jahr, W., Kato, S., Royer, L.A., Thiagarajah, J.R., . . . Waller, L. "Pycro-Manager: open-source software for customized and reproducible microscope control." _Nat. Methods_ 18, 226-228 (2021). DOI: 10.1038/s41592-021-01087-6
-- Pologruto, T.A., Sabatini, B.L. & Bhatt, D.B. "ScanImage: Flexible software for operating laser scanning microscopes." _BioMed. Eng. Online_ 2, 13 (2003). DOI: 10.1186/1475-925X-2-13
-- Saunders, J. & Wehr, M. "Autopilot: Automating behavioral experiments with lots of Raspberry Pis." _bioRxiv_ (2019). DOI: 10.1101/807693
+- Pologruto, T.A., Sabatini, B.L. & Svoboda, K. "ScanImage: Flexible software for operating laser scanning microscopes." _BioMed. Eng. Online_ 2, 13 (2003). DOI: 10.1186/1475-925X-2-13
+- Saunders, J.L., Ott, L.A. & Wehr, M. "Autopilot: Automating experiments with lots of Raspberry Pis." _bioRxiv_ (2019). DOI: 10.1101/807693
 - Siegle, J.H. et al. "Open Ephys: An open-source, plugin-based platform for multichannel electrophysiology." _J. Neural Eng._ 14, 045003 (2017). DOI: 10.1088/1741-2552/aa5eea
 - Stih, V., Petrucco, L., Kist, A.M. & Portugues, R. "Stytra: An open-source, integrated system for stimulation, tracking and closed-loop behavioral experiments." _PLOS Comput. Biol._ 15, e1006699 (2019). DOI: 10.1371/journal.pcbi.1006699
+- Virtanen, P. et al. "SciPy 1.0: fundamental algorithms for scientific computing in Python." _Nat. Methods_ 17, 261-272 (2020). DOI: 10.1038/s41592-019-0686-2
