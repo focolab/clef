@@ -80,41 +80,16 @@ input_devices → engine → closed-loop logic → engine → output_devices
 
 # Customizing CLEF for your New Experiment
 
-A new closed-loop experiment is built by writing (or reusing) one or more input devices, one or more output devices, one or more logic algorithms, and three configuration files. The four base abstractions (`BaseInputDevice`, `BaseOutputDevice`, `BaseDataInterface`, and `BaseClosedLoopLogic`) each define a small interface that researchers fill in for their own hardware and analysis. A single experiment can fan in samples from several cameras, electrode signals, or stage readouts, and fan out to multiple actuators (a DMD plus a light source plus a stage, for example). The remainder of this section walks through the customization workflow in the order a researcher encounters it.
+A new closed-loop experiment is built by writing (or reusing) one or more input devices, one or more output devices, one or more logic algorithms, and three configuration files. The four base abstractions (`BaseInputDevice`, `BaseOutputDevice`, `BaseDataInterface`, and `BaseClosedLoopLogic`) each define a small interface that researchers fill in for their own hardware and analysis. A single experiment can fan in samples from several cameras, electrode signals, or stage readouts, and fan out to multiple actuators (a DMD plus a light source plus a stage, for example). The customization workflow follows these steps:
 
-## Step 1: Create a module for your input device(s)
+1. **Create an input device.** Subclass `BaseInputDevice` to wrap any source of streaming data (a camera, an electrode amplifier, a stage readout, a TIFF stack), implementing `connect()`, `configure()`, `_get_input()`, and `close()`.
+2. **Create an output device.** Subclass `BaseOutputDevice` to wrap any actuator (an LED, a DMD, a motorized stage), implementing `connect()`, `configure()`, `_update_output(**kwargs)`, and `close()`.
+3. **Create a closed-loop logic algorithm.** Subclass `BaseClosedLoopLogic` to implement the experiment's online analysis and decision rules via `initialize_model()`, `process_sample(sample)`, `_check_logic()`, and `close()`.
+4. **Pair input devices with a data interface (optional).** Subclass `BaseDataInterface` to separate *how a sample looks* from *how it is stored*, defining sample shape, dtype, and end-of-session serialization. New modalities can be added with no engine changes, and the per-session output bundle maps cleanly onto storage systems such as minimo [@borchardt2021].
+5. **Write the three configuration files.** `io.yaml` lists the input and output devices and their parameters; `logic.yaml` selects the algorithm and its tunable parameters; `session.yaml` describes the run itself (operator, subject, conditions, output location, duration). All three are validated by Pydantic at startup, before any hardware is initialized.
+6. **Run the experiment.** The CLI shorthand `clef <app_name>` resolves to `apps/config/<app_name>/` and loads all three files. At the end of every session, CLEF writes per-device data files plus a single JSON metadata file capturing the merged configuration, every output event with its timestamp, and per-device sample timestamps.
 
-Input devices (`apps/io/input_device/`) wrap any source of streaming data: a camera, an electrode amplifier, a tracking stage's position readout, or a TIFF stack on disk. A new input device subclasses `BaseInputDevice`, declares a unique `device_class` string used for registry lookup, and implements four methods. `connect()` opens the connection to the hardware. `configure()` applies settings drawn from `self.config`. `_get_input()` returns the next sample. `close()` releases the hardware at the end of the session. A single experiment can list any number of input devices in `io.yaml` (for example, one camera per imaged region plus a stage-position readout); the engine acquires from all of them on each iteration of the loop.
-
-## Step 2: Create a module for your output device(s)
-
-Output devices (`apps/io/output_device/`) wrap any actuator the experiment needs to drive: a stimulating LED, a DMD, a motorized stage, or others. A new output device subclasses `BaseOutputDevice`, declares a `device_class` string, and implements `connect()`, `configure()`, `_update_output(**kwargs)` (which actually updates the actuator), and `close()`. As with input devices, any number of output devices can be listed in `io.yaml`, and a single iteration of the closed loop can address several at once (for example, configuring a DMD pattern and triggering a laser in the same step). The engine routes a dict of `{output_device_name: {kwargs}}` returned by the logic algorithm (Step 3) to each named device's `update_output`, which records a timestamp and calls `_update_output(**kwargs)`.
-
-## Step 3: Create a module for your closed-loop logic algorithm(s)
-
-Logic algorithms (`apps/logic/`) implement the experiment's online analysis and decision rules. A new algorithm subclasses `BaseClosedLoopLogic`, declares a `logic_class` string, and implements four methods. `initialize_model()` runs once before the loop starts (load weights, allocate buffers, open GUI windows). `process_sample(sample)` receives the next sample from the input devices and updates internal state. `_check_logic()` decides whether to drive an output device on this frame, returning either `None` (do nothing) or a dict of `{output_device_name: {kwargs}}`. `close()` cleans up at the end of the session.
-
-## Step 4: Pair input devices with a data interface (optional)
-
-Each input device can be paired in `io.yaml` with a `data_interface` that defines the structure of its samples, separating data acquisition from intrinsic data structure. The `BaseDataInterface` abstraction separates *how a sample looks* from *how it is stored*. The data interface defines sample shape, dtype, and end-of-session serialization.
-
-Because the data interface is a separate registered class, the same input device can serve different downstream pipelines by switching its data interface in YAML. A new modality (an audio stream, or a 1-D timeseries) can be added by writing a new `BaseDataInterface` subclass with no engine changes. For labs already using minimo [@borchardt2021], a linked data and metadata storage system that pairs object storage for large raw files with a document database for searchable metadata, the per-session output bundle maps cleanly onto its model: the raw input-device files written by each data interface become immutable objects and the JSON metadata file becomes the searchable document.
-
-## Step 5: Write the three configuration files
-
-CLEF is entirely directed by three YAML configuration files, each corresponding to one of the framework's core concepts and validated by Pydantic at startup:
-
-- `io.yaml`. Lists input and output devices for the experiment. Each entry names a `device_class` (the registered Python plugin to load) along with any device-specific parameters that vary across experiments (camera exposure, ROI, illumination properties, serial port, etc.). Each input device entry also names a `data_interface` for storage.
-- `logic.yaml`. Selects the closed-loop algorithm via `logic_class` and supplies its tunable parameters (thresholds, gains, target regions, model URLs, etc.).
-- `session.yaml`. Describes the run itself rather than the hardware or algorithm: who ran the session, when, on what subject, under what conditions, where outputs are written, and how long the run lasts.
-
-The YAML files for a given application live together under `apps/config/<app_name>/`. Validation catches invalid parameters before any hardware is initialized.
-
-## Step 6: Run the experiment
-
-The CLI shorthand `clef <app_name>` resolves to `apps/config/<app_name>/` and loads all three files. `clef --session s.yaml --io io.yaml --logic l.yaml` accepts arbitrary paths instead. `clef <app_name> --validate-config` runs full Pydantic validation without starting the loop, which is useful when iterating on configuration during development.
-
-At the end of every session, CLEF writes per-device data files (using each device's `data_interface`) plus a single JSON metadata file capturing the merged configuration, every output event with its timestamp, and per-device sample timestamps.
+Full descriptions of each base class's interface, the registry mechanism, configuration schemas, and the CLI are provided in the online documentation.
 
 # Demos
 
@@ -159,6 +134,3 @@ We thank members of the Kato lab for valuable discussion.
 Data for this study were acquired at the UCSF Innovation Core at the Weill Institute for Neurosciences on a custom imaging system controlled by the open-source software packages Micro-Manager and Pycro-Manager.
 
 This work was supported by NIH grants NS115572 (R.L.D.), R35GM124735 (S.K.), and the Weill Institute for Neurosciences (S.K.).
-
-# References
-
