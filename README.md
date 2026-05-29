@@ -76,6 +76,14 @@ clef --session s.yaml --io io.yaml --logic l.yaml
 
 # Setup: Customizing `clef` for your experiments
 
+<p align="center">
+  <img src="manuscript/media/clef_architecture.svg" alt="CLEF architecture diagram" width="100%">
+</p>
+
+<p align="center">
+  <em>CLEF system architecture</em>
+</p>
+
 ## Key Concepts
 
 If you're thinking of applying `clef` to solve your problem, see if it decomposes into the following Key Concepts that `clef` is organized around:
@@ -251,6 +259,10 @@ High-level steps to follow this pattern for your own model:
 # Contributing
 
 Contributions are welcome. Fork the repo, create a branch off `main`, and open a pull request — the [PR template](.github/pull_request_template.md) will guide you through summary, changes, and testing notes. For non-trivial changes, please open an issue first to discuss scope.
+
+# Citation
+
+If you use CLEF in your research, please cite it. Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
 
 # License
 
