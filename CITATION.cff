@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "CLEF: A Python Framework for Closed-Loop Neuroscience Experiments"
+abstract: >-
+  CLEF (Closed-Loop Experimental Framework) is an open-source Python platform
+  for real-time closed-loop experiments with automated stimulus control,
+  targeting microscopic imaging modalities for neuroscience research.
+type: software
+authors:
+  - given-names: Raymond L.
+    family-names: Dunn
+    orcid: "https://orcid.org/0000-0003-4443-5519"
+    affiliation: "Department of Neurology, Weill Institute for Neurosciences, University of California, San Francisco, CA, USA"
+  - given-names: Saul
+    family-names: Kato
+    orcid: "https://orcid.org/0000-0003-2990-8306"
+    affiliation: "Department of Neurology, Weill Institute for Neurosciences, University of California, San Francisco, CA, USA"
+repository-code: "https://github.com/focolab/clef"
+license: MIT
+keywords:
+  - Python
+  - neuroscience
+  - closed-loop
+  - microscopy
+  - calcium imaging
+  - optogenetics
+  - real-time
