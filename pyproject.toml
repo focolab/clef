@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clef"
-version = "2.0.0"
+version = "1.0.0"
 description = "Closed-Loop Experimental Framework for real-time microscopy and stimulus control"
 requires-python = ">=3.10"
 license = "MIT"
@@ -40,13 +40,9 @@ demos = [
     "pyopengl-accelerate>=3.1",
 ]
 
-core = [
-    "pytest>=7.0",
-]
-
 all = [
-    "clef[core]",
     "clef[demos]",
+    "pytest>=7.0",
     "pycromanager>=0.45",
     "opencv-python>=4.8",
     "scikit-image>=0.21",
