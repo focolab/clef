@@ -60,7 +60,7 @@ CLEF is organized around four concepts used throughout the rest of this manuscri
 
 An experiment can use one or more input devices and one or more output devices: multiple cameras, a camera plus a stage readout, or a DMD (digital micromirror device) plus a laser plus a stage. At runtime, the engine reads from every registered input device, passes the samples to the logic algorithm, and dispatches output commands to any subset of the registered output devices (\autoref{fig:overview}).
 
-![System overview of CLEF. Three YAML configuration files (`io.yaml`, `logic.yaml`, `session.yaml`) are validated by Pydantic models and passed to the ClosedLoopEngine, which orchestrates the real-time acquisition loop. The engine reads samples from one or more registered `input_devices`, passes data samples to the active `logic` algorithms, and dispatches return values to one or more named `output_devices`. The `engine` collects per-device and per-algorithm metadata generated during a `session`.\label{fig:overview}](media/clef_architecture.svg)
+![System overview of CLEF. Three YAML configuration files (`io.yaml`, `logic.yaml`, `session.yaml`) are validated by Pydantic models and passed to the ClosedLoopEngine, which orchestrates the real-time acquisition loop. The engine reads samples from one or more registered `input_devices`, passes data samples to the active `logic` algorithms, and dispatches return values to one or more named `output_devices`. The `engine` collects per-device and per-algorithm metadata generated during a `session`.\label{fig:overview}](media/clef_architecture.png)
 
 ## Code Architecture
 
