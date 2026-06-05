@@ -51,12 +51,24 @@ CLEF uses a layered architecture in which independent components communicate thr
 
 CLEF is organized around four concepts used throughout the rest of this manuscript:
 
-| Concept   | Purpose                                                                                                                                                                                                                                                          |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `device`  | Components or endpoints that CLEF interacts with. A `device` is either an `input_device` or an `output_device`. Input devices provide data streams (e.g. camera images), and output devices are what the experimenter wants to control (e.g. a stage or a laser). |
-| `logic`   | A control algorithm. It processes samples from the input devices and emits updates for the output devices.                                                                                                                                                       |
-| `session` | Contextual metadata for an experiment. For example, information about the data subject (cell line, treatment condition), highly specific to the application.                                                                                                      |
-| `engine`  | A discrete event loop that orchestrates iterations of data sampling, data processing, and actuation.                                                                                                                                                             |
++-------------+--------------------------------------------------------------------+
+| Concept     | Purpose                                                            |
++=============+====================================================================+
+| `device`    | Components or endpoints that CLEF interacts with. A `device` is    |
+|             | either an `input_device` or an `output_device`. Input devices      |
+|             | provide data streams (e.g. camera images), and output devices are  |
+|             | what the experimenter wants to control (e.g. a stage or a laser).  |
++-------------+--------------------------------------------------------------------+
+| `logic`     | A control algorithm. It processes samples from the input devices   |
+|             | and emits updates for the output devices.                          |
++-------------+--------------------------------------------------------------------+
+| `session`   | Contextual metadata for an experiment. For example, information    |
+|             | about the data subject (cell line, treatment condition), highly    |
+|             | specific to the application.                                       |
++-------------+--------------------------------------------------------------------+
+| `engine`    | A discrete event loop that orchestrates iterations of data         |
+|             | sampling, data processing, and actuation.                          |
++-------------+--------------------------------------------------------------------+
 
 An experiment can use one or more input devices and one or more output devices: multiple cameras, a camera plus a stage readout, or a DMD (digital micromirror device) plus a laser plus a stage. At runtime, the engine reads from every registered input device, passes the samples to the logic algorithm, and dispatches output commands to any subset of the registered output devices (\autoref{fig:overview}).
 
