@@ -7,7 +7,6 @@ Responsible for:
 3. Providing access to device instances by name
 """
 
-import importlib
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -16,6 +15,7 @@ from core.io.input_device.BaseInputDevice import BaseInputDevice
 from core.io.input_device.BaseDataInterface import BaseDataInterface
 from core.io.output_device.BaseOutputDevice import BaseOutputDevice
 from core.config.config_manager import ConfigManager
+from core.utils.plugin_discovery import import_plugins_from
 
 logger = logging.getLogger(__name__)
 
@@ -54,21 +54,7 @@ class IOManager:
     @staticmethod
     def _import_modules_from(directory: Path):
         """Import all .py files in a directory to trigger __init_subclass__ registration."""
-        if not directory.is_dir():
-            logger.debug(f"Plugin directory does not exist: {directory}")
-            return
-
-        for py_file in directory.glob("*.py"):
-            if py_file.name.startswith("_"):
-                continue
-            try:
-                parts = py_file.resolve().parts
-                apps_idx = parts.index("apps")
-                dotted = ".".join(parts[apps_idx:]).removesuffix(".py")
-                importlib.import_module(dotted)
-                logger.debug(f"Loaded plugin module: {dotted}")
-            except Exception as e:
-                logger.warning(f"Failed to import plugin {py_file}: {e}")
+        import_plugins_from(directory)
 
     # ------------------------------------------------------------------
     # Device instantiation
