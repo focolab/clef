@@ -40,9 +40,11 @@ class MMDACLightSourceOutput(BaseOutputDevice):
         self._dac_property = cfg.get("dac_property", "Volts")
         self._max_volts = float(cfg.get("max_volts", 3.5))
 
+        # Apply configured intensity (defaults to 0 = off), clamped to [0, max_volts]
+        intensity = max(0.0, min(float(cfg.get("intensity", 0)), self._max_volts))
         if self._dac_device and self._dac_property:
-            self.mmc.setProperty(self._dac_device, self._dac_property, 0)
-            logger.debug(f"Initialized {self._dac_device}.{self._dac_property} to 0")
+            self.mmc.setProperty(self._dac_device, self._dac_property, intensity)
+            logger.debug(f"Initialized {self._dac_device}.{self._dac_property} to {intensity}")
 
         logger.info(
             f"MMDACLightSourceOutput '{self.name}' configured: "

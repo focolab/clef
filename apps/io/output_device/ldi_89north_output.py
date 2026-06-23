@@ -41,10 +41,11 @@ class LDI89NorthOutput(BaseOutputDevice):
         self._intensity_property = cfg.get("intensity_property")
         self._shutter_device = cfg.get("shutter_device")
 
-        # Initialize intensity to 0
+        # Apply configured intensity (defaults to 0 = off)
+        intensity = int(cfg.get("intensity", 0))
         if self._intensity_device and self._intensity_property:
-            self.mmc.setProperty(self._intensity_device, self._intensity_property, 0)
-            logger.debug(f"Initialized {self._intensity_device}.{self._intensity_property} to 0")
+            self.mmc.setProperty(self._intensity_device, self._intensity_property, intensity)
+            logger.debug(f"Initialized {self._intensity_device}.{self._intensity_property} to {intensity}")
 
         # Open shutter
         if self._shutter_device:
