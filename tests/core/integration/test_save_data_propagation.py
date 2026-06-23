@@ -122,10 +122,18 @@ class TestSaveDataFromEngine:
 
     def test_kwargs_propagate_through_engine(self, engine, io_manager, logic_manager):
         engine.save_data(path="/tmp/out", fmt="tiff")
-        for dev in io_manager.input_devices.values():
-            assert dev.save_calls[0] == {"prefix": "", "path": "/tmp/out", "fmt": "tiff"}
-        for logic in logic_manager.logic_instances.items():
-            assert logic[1].save_calls[0] == {"prefix": "", "path": "/tmp/out", "fmt": "tiff"}
+        # Devices receive a computed `filepath` plus the passthrough kwargs.
+        for name, dev in io_manager.input_devices.items():
+            call = dev.save_calls[0]
+            assert call["path"] == "/tmp/out"
+            assert call["fmt"] == "tiff"
+            assert Path(call["filepath"]).name == name
+        # Logic instances receive a computed `savefilename` plus the kwargs.
+        for name, logic in logic_manager.logic_instances.items():
+            call = logic.save_calls[0]
+            assert call["path"] == "/tmp/out"
+            assert call["fmt"] == "tiff"
+            assert Path(call["savefilename"]).name == name
 
 
 # ---------------------------------------------------------------------------
