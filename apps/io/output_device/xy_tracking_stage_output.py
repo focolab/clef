@@ -45,19 +45,26 @@ class XYTrackingStageOutput(BaseOutputDevice):
             self.shared_stage_offset_xy = shared_memory.ShareableList(
                 name=self._shm_name
             )
+            # A stale segment from a prior/crashed run may still hold a nonzero
+            # offset; zero it so we never apply a spurious move on first update.
+            self.shared_stage_offset_xy[0] = 0
+            self.shared_stage_offset_xy[1] = 0
         logger.info(f"XYTrackingStageOutput '{self.name}' configured with SHM '{self._shm_name}'")
 
     def _update_output(self, **kwargs):
-        if self.shared_stage_offset_xy is None:
+        if self.shared_stage_offset_xy is None or self.mmc is None:
             return
 
-        offset_x = self.shared_stage_offset_xy[0]
-        offset_y = self.shared_stage_offset_xy[1]
+        offset_0 = self.shared_stage_offset_xy[0]
+        offset_1 = self.shared_stage_offset_xy[1]
 
-        if offset_x or offset_y:
+        if offset_0 or offset_1:
+            # Reset before moving so a correction written by the worker while
+            # the (blocking) move is in flight is not lost.
             self.shared_stage_offset_xy[0] = 0
             self.shared_stage_offset_xy[1] = 0
-            self.mmc.setRelativeXYPosition(int(offset_x), int(offset_y))
+            self.mmc.setRelativeXYPosition(int(offset_0), int(offset_1))
+            logger.debug(f"Applied relative stage move ({offset_0}, {offset_1})")
 
     def close(self):
         if self.shared_stage_offset_xy is not None:

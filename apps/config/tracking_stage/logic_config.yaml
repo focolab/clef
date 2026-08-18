@@ -7,8 +7,18 @@ logic_algorithms:
     logic_parameters:
       input_device_name: "camera"
       stage_output_name: "xy_stage_output"
-      micron_to_pix_ratio: 1.3514  # 100/74
-      stage_dampening_factor: 0.5
+      micron_to_pix_ratio: 1.3514      # 100/74; refined in calibration mode
+      stage_dampening_factor: 0.5      # 0-1, fraction of the error corrected per frame
+      threshold_frac: 0.5              # blob threshold = mean + frac*(max-mean)
+      deadband_px: 2.0                 # ignore centroid error below this (anti-jitter)
+      centroid_smoothing: 0.0          # 0-0.95 EMA on the centroid (noise rejection)
+      max_step_um: 200.0               # clamp per correction (rejects outliers)
+      roi_radius_px: 30                # fluorescence extraction circle radius
+      jog_step_um: 50                  # manual jog D-pad step
+      cal_step_um: 100                 # stage step used to measure um/pixel
+      cal_settle_frames: 8             # frames to wait for the move to settle
+      ratio_increment: 0.02            # +/- nudge for um/pixel
+      save_dir: "./demo_output/tracking_stage"  # fluorescence trace output dir
     io_parameters:
       output_device_names: ["xy_stage_output"]
       input_device_names: ["camera"]
