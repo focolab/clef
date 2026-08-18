@@ -7,10 +7,10 @@ logic_algorithms:
     logic_parameters:
       input_device_name: "camera"
       stage_output_name: "xy_stage_output"
-      micron_to_pix_ratio: 1.3514      # 100/74; refined in calibration mode
+      micron_to_pix_ratio: 0.815       # um/pixel at current binning; refine in calibration mode
       stage_dampening_factor: 0.5      # 0-1, fraction of the error corrected per frame
       threshold_frac: 0.5              # blob threshold = mean + frac*(max-mean)
-      deadband_px: 2.0                 # ignore centroid error below this (anti-jitter)
+      deadband_px: 0.0                 # correct every frame (0 = keep as centered as possible)
       centroid_smoothing: 0.0          # 0-0.95 EMA on the centroid (noise rejection)
       max_step_um: 200.0               # clamp per correction (rejects outliers)
       # Stage/camera orientation. Defaults below match a stage rotated 90 deg vs
@@ -18,8 +18,8 @@ logic_algorithms:
       # differs. Jog and tracking share this mapping, so a correct D-pad = correct
       # tracking signs.
       swap_axes: true                  # vertical error -> axis1, horizontal -> axis0
-      invert_axis0: true               # flip physical stage axis0 sign
-      invert_axis1: false              # flip physical stage axis1 sign
+      invert_axis0: false              # flip physical stage axis0 sign (set from rig test)
+      invert_axis1: true               # flip physical stage axis1 sign (set from rig test)
       enable_axis0: true               # allow tracking to drive axis0
       enable_axis1: true               # allow tracking to drive axis1
       roi_radius_px: 30                # fluorescence extraction circle radius

@@ -705,11 +705,14 @@ class XYTrackingWorker(Process):
         now = time.time()
         if now - self._last_track_log >= 0.25:
             self._last_track_log = now
-            logger.info(
+            # print (not logger): this runs in the GUI subprocess, which on
+            # Windows spawn has no console log handler.
+            print(
                 f"[track] err(dy={dy:+.1f}, dx={dx:+.1f}) px  "
                 f"corr(axis0={correction0:+d}, axis1={correction1:+d}) um  "
                 f"blob=({self.sm_cx:.1f}, {self.sm_cy:.1f}) "
-                f"target=({self.cx}, {self.cy})  um/px={self.micron_to_pix_ratio:.3f}"
+                f"target=({self.cx}, {self.cy})  um/px={self.micron_to_pix_ratio:.3f}",
+                flush=True,
             )
 
     def _axis_correction(self, err_px, gain, enabled, inverted):
