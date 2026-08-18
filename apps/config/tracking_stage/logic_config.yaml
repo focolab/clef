@@ -8,9 +8,10 @@ logic_algorithms:
       input_device_name: "camera"
       stage_output_name: "xy_stage_output"
       micron_to_pix_ratio: 0.815       # um/pixel at current binning; refine in calibration mode
-      stage_dampening_factor: 0.5      # 0-1, fraction of the error corrected per frame
+      stage_dampening_factor: 0.25     # 0-1, fraction of the error corrected per frame
       threshold_frac: 0.5              # blob threshold = mean + frac*(max-mean)
       deadband_px: 0.0                 # correct every frame (0 = keep as centered as possible)
+      min_puncta_snr: 6.0              # peak SNR to accept a puncta; below this, hold still
       centroid_smoothing: 0.0          # 0-0.95 EMA on the centroid (noise rejection)
       max_step_um: 200.0               # clamp per correction (rejects outliers)
       # Stage/camera orientation. Defaults below match a stage rotated 90 deg vs
