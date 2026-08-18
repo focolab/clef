@@ -266,6 +266,15 @@ class XYTrackingWorker(Process):
         )
         layout.addWidget(self.show_processed_button)
 
+        # Auto-adjust contrast each frame (re-levels the LUT from the current
+        # image). Off by default so the manual histogram sliders stay in control
+        # and we skip the per-frame min/max scan.
+        self.auto_contrast_button = DemoStyle.make_action_button(
+            "Auto-adjust Contrast", QtWidgets, color=DemoStyle.COLOR_NEUTRAL
+        )
+        self.auto_contrast_button.setCheckable(True)
+        layout.addWidget(self.auto_contrast_button)
+
         self.enable_tracking_button = DemoStyle.make_action_button(
             "Enable Stage Tracking", QtWidgets, color=DemoStyle.COLOR_NEUTRAL
         )
@@ -751,7 +760,8 @@ class XYTrackingWorker(Process):
             display = tracking_numba.bright_blob_mask(frame, self.threshold_frac)
         else:
             display = frame
-        self.ii.setImage(display, autoLevels=self.first_img_flag)
+        auto = self.first_img_flag or self.auto_contrast_button.isChecked()
+        self.ii.setImage(display, autoLevels=auto)
         self.first_img_flag = False
 
     def _refresh_readouts(self):
