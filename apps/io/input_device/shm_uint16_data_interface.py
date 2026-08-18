@@ -37,10 +37,18 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
             "shm_name_prefix", "shared_frame_memory"
         )
 
-        # Save buffer (heap-allocated, optional)
+        # Save buffer (heap-allocated, optional) — used for finite-length runs.
         self._save_buffer: Optional[np.ndarray] = None
         self._sample_index = 0
         self._image_count = 0
+
+        # Streaming save state — used when num_samples <= 0 (continuous runs),
+        # where preallocating the whole recording in RAM is impossible. Frames
+        # are appended to a BigTIFF on disk as they arrive instead.
+        self._streaming = False
+        self._stream_dir: Optional[str] = None
+        self._tiff_writer = None
+        self._stream_tmp_path: Optional[str] = None
 
     @property
     def shm_names(self) -> List[str]:
@@ -70,6 +78,7 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
         self,
         num_samples: int = 1,
         save_samples: bool = False,
+        save_dir: Optional[str] = None,
         **kwargs,
     ):
         """Create shared memory segments and optionally a save buffer.
@@ -77,8 +86,12 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
         Reads height/width from self.input_device and num_z_planes from self.config.
 
         Args:
-            num_samples: Number of frames to preallocate for saving (ignored if save_samples=False).
-            save_samples: If True, preallocate a numpy buffer for post-session TIFF saving.
+            num_samples: Number of frames to preallocate for saving. A value <= 0
+                means continuous acquisition; saving then streams to disk instead
+                of preallocating a fixed buffer (ignored if save_samples=False).
+            save_samples: If True, retain frames for post-session TIFF saving.
+            save_dir: Directory the streamed TIFF is written into. Kept on the same
+                filesystem as the final output so finalizing is an atomic rename.
         """
         # Read dimensions from input device
         height = getattr(self.input_device, "height", 0) if self.input_device else 0
@@ -117,11 +130,20 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
             f"frame=({height}, {width}), prefix='{shm_name_prefix}'"
         )
 
-        # Optional save buffer
+        # Optional saving. Finite runs preallocate a buffer; continuous runs
+        # (num_samples <= 0) stream frames to a BigTIFF on disk instead.
         if save_samples:
-            shape = (num_samples, height, width)
-            self._save_buffer = np.zeros(shape, dtype=np.uint16)
-            logger.info(f"Preallocated save buffer: shape={shape}")
+            if num_samples <= 0:
+                self._streaming = True
+                self._stream_dir = save_dir or "."
+                logger.info(
+                    f"Continuous acquisition: streaming frames to disk in "
+                    f"'{self._stream_dir}' (no RAM preallocation)"
+                )
+            else:
+                shape = (num_samples, height, width)
+                self._save_buffer = np.zeros(shape, dtype=np.uint16)
+                logger.info(f"Preallocated save buffer: shape={shape}")
 
     @staticmethod
     def _create_or_attach_shm(name: str, size: int) -> shared_memory.SharedMemory:
@@ -141,8 +163,13 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
         if self._shm_ndarray_list:
             self._shm_ndarray_list[z][:] = sample
 
-        # Copy 2 (optional): frame -> save buffer
-        if (
+        # Copy 2 (optional): frame -> save buffer (finite) or disk (continuous)
+        if self._streaming:
+            if self._tiff_writer is None:
+                self._open_stream_writer()
+            if self._tiff_writer is not None:
+                self._tiff_writer.write(sample, contiguous=True)
+        elif (
             self._save_buffer is not None
             and self._sample_index < self._save_buffer.shape[0]
         ):
@@ -158,11 +185,48 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
             self._shm_ndarray_list[z] if self._shm_ndarray_list else sample
         )
 
+    def _open_stream_writer(self):
+        """Lazily open a BigTIFF writer on the first frame of a continuous run."""
+        import os
+        try:
+            import tifffile as tf
+        except ImportError:
+            logger.error("tifffile not installed, cannot stream frames to disk")
+            self._streaming = False
+            return
+        os.makedirs(self._stream_dir, exist_ok=True)
+        self._stream_tmp_path = os.path.join(
+            self._stream_dir, f"{self._shm_name_prefix}_stream.partial.tiff"
+        )
+        self._tiff_writer = tf.TiffWriter(self._stream_tmp_path, bigtiff=True)
+        logger.info(f"Streaming frames to {self._stream_tmp_path}")
+
     def save_data(self, **kwargs):
-        """Save stored images as a TIFF stack."""
+        """Save stored images as a TIFF stack.
+
+        For continuous runs the frames were already streamed to disk; here we
+        just close the writer and atomically rename the file into place.
+        """
+        import os
         filepath = kwargs.get("filepath")
         if filepath is None:
             logger.warning("No filepath provided to save_data, skipping")
+            return
+
+        if self._streaming:
+            if self._tiff_writer is not None:
+                self._tiff_writer.close()
+                self._tiff_writer = None
+            filepath = str(filepath)
+            if not filepath.endswith(".tiff"):
+                filepath += ".tiff"
+            if self._stream_tmp_path and os.path.exists(self._stream_tmp_path):
+                os.replace(self._stream_tmp_path, filepath)
+                logger.info(
+                    f"Saved {self._sample_index} streamed frames to {filepath}"
+                )
+            else:
+                logger.warning("Streaming enabled but no frames were written")
             return
 
         if self._save_buffer is None:
@@ -201,6 +265,19 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
 
     def close(self):
         """Unlink all shared memory segments."""
+        # Flush the stream writer if save_data never ran (e.g. aborted session)
+        # so streamed frames are not lost; the file stays as *.partial.tiff.
+        if self._tiff_writer is not None:
+            try:
+                self._tiff_writer.close()
+                logger.info(
+                    f"Flushed streamed frames to {self._stream_tmp_path} "
+                    "(session ended without save)"
+                )
+            except Exception as e:
+                logger.warning(f"Error closing stream writer: {e}")
+            self._tiff_writer = None
+
         for shm in self._shm_list:
             try:
                 shm.close()

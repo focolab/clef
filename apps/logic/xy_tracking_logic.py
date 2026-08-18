@@ -53,6 +53,11 @@ class XYTrackingLogic(BaseClosedLoopLogic):
         self.deadband_px = cfg.get("deadband_px", 2.0)
         self.centroid_smoothing = cfg.get("centroid_smoothing", 0.0)
         self.max_step_um = cfg.get("max_step_um", 200.0)
+        self.enable_axis0 = cfg.get("enable_axis0", True)
+        self.enable_axis1 = cfg.get("enable_axis1", True)
+        self.invert_axis0 = cfg.get("invert_axis0", False)
+        self.invert_axis1 = cfg.get("invert_axis1", False)
+        self.swap_axes = cfg.get("swap_axes", False)
         self.roi_radius_px = cfg.get("roi_radius_px", 30)
         self.jog_step_um = cfg.get("jog_step_um", 50)
         self.cal_step_um = cfg.get("cal_step_um", 100)
@@ -139,6 +144,11 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             "deadband_px": self.deadband_px,
             "centroid_smoothing": self.centroid_smoothing,
             "max_step_um": self.max_step_um,
+            "enable_axis0": self.enable_axis0,
+            "enable_axis1": self.enable_axis1,
+            "invert_axis0": self.invert_axis0,
+            "invert_axis1": self.invert_axis1,
+            "swap_axes": self.swap_axes,
             "roi_radius_px": self.roi_radius_px,
             "jog_step_um": self.jog_step_um,
             "cal_step_um": self.cal_step_um,

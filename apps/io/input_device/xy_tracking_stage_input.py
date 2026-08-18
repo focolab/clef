@@ -25,6 +25,13 @@ class XYTrackingStageInput(BaseInputDevice):
         self.mmc = None
         self._xy_stage_device = None
         self.xy_stage_position_list = []
+        # Position reads hit the stage controller (often a slow serial query,
+        # tens of ms). The control loop doesn't use this value — it's metadata —
+        # so poll every Nth frame instead of every frame to keep the loop fast.
+        self._poll_interval = 1
+        self._counter = 0
+        self._last = {"x": 0.0, "y": 0.0}
+        self._warned_slow = False
 
     def connect(self):
         from pycromanager import Core
@@ -37,13 +44,34 @@ class XYTrackingStageInput(BaseInputDevice):
             self._xy_stage_device = self.mmc.getXYStageDevice()
         else:
             self._xy_stage_device = device
-        logger.info(f"XYTrackingStageInput '{self.name}' using XY stage device: {self._xy_stage_device}")
+        self._poll_interval = max(1, int(self.config.get("poll_interval_frames", 1)))
+        logger.info(
+            f"XYTrackingStageInput '{self.name}' using XY stage device: "
+            f"{self._xy_stage_device} (poll every {self._poll_interval} frame(s))"
+        )
 
     def _get_input(self) -> Dict[str, float]:
+        # Reuse the cached position on non-poll frames so we don't stall the loop
+        # on a slow controller query.
+        self._counter += 1
+        if self._poll_interval > 1 and self._counter % self._poll_interval != 0:
+            return self._last
+
+        t0 = time.perf_counter()
         x = self.mmc.getXPosition()
         y = self.mmc.getYPosition()
+        dt = time.perf_counter() - t0
+        if dt > 0.02 and not self._warned_slow:
+            logger.warning(
+                f"XY stage position query took {dt * 1000:.1f} ms — this runs "
+                f"every {self._poll_interval} frame(s) and can throttle the loop. "
+                "Raise poll_interval_frames to reduce it."
+            )
+            self._warned_slow = True
+
+        self._last = {"x": x, "y": y}
         self.xy_stage_position_list.append([x, y])
-        return {"x": x, "y": y}
+        return self._last
 
     def get_metadata(self) -> Dict[str, Any]:
         base = super().get_metadata()

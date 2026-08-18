@@ -13,6 +13,15 @@ logic_algorithms:
       deadband_px: 2.0                 # ignore centroid error below this (anti-jitter)
       centroid_smoothing: 0.0          # 0-0.95 EMA on the centroid (noise rejection)
       max_step_um: 200.0               # clamp per correction (rejects outliers)
+      # Stage/camera orientation. Defaults below match a stage rotated 90 deg vs
+      # the camera; verify with the D-pad (Up moves up) and adjust if your rig
+      # differs. Jog and tracking share this mapping, so a correct D-pad = correct
+      # tracking signs.
+      swap_axes: true                  # vertical error -> axis1, horizontal -> axis0
+      invert_axis0: true               # flip physical stage axis0 sign
+      invert_axis1: false              # flip physical stage axis1 sign
+      enable_axis0: true               # allow tracking to drive axis0
+      enable_axis1: true               # allow tracking to drive axis1
       roi_radius_px: 30                # fluorescence extraction circle radius
       jog_step_um: 50                  # manual jog D-pad step
       cal_step_um: 100                 # stage step used to measure um/pixel
