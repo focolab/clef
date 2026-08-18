@@ -113,6 +113,7 @@ class XYTrackingWorker(Process):
         self.sm_cy = float(self.cy)
         self.sm_cx = float(self.cx)
         self.blob_ok = False
+        self._last_track_log = 0.0  # throttle for the tracking-diagnostic log
 
         # Fluorescence trace: rolling display buffer + full recording
         self.recent_f = np.full(PLOT_TSIZE, np.nan)
@@ -696,6 +697,23 @@ class XYTrackingWorker(Process):
         correction1 = self._axis_correction(err1, gain, self.enable_axis1, self.invert_axis1)
         self.shared_stage_offset_xy[0] = correction0
         self.shared_stage_offset_xy[1] = correction1
+
+        # Throttled diagnostic: watch the error sequence. Shrinking |dy|,|dx| =
+        # healthy negative feedback; growing = wrong sign on that axis; ping-
+        # ponging = dead-time/gain (loop commanding faster than the blob's new
+        # position becomes visible, or um/px miscalibrated).
+        now = time.time()
+        if now - self._last_track_log >= 0.25:
+            self._last_track_log = now
+            # print (not logger): this runs in the GUI subprocess, which on
+            # Windows spawn has no console log handler.
+            print(
+                f"[track] err(dy={dy:+.1f}, dx={dx:+.1f}) px  "
+                f"corr(axis0={correction0:+d}, axis1={correction1:+d}) um  "
+                f"blob=({self.sm_cx:.1f}, {self.sm_cy:.1f}) "
+                f"target=({self.cx}, {self.cy})  um/px={self.micron_to_pix_ratio:.3f}",
+                flush=True,
+            )
 
     def _axis_correction(self, err_px, gain, enabled, inverted):
         if not enabled:
