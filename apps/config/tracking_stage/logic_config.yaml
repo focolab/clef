@@ -18,7 +18,7 @@ logic_algorithms:
       cal_step_um: 100                 # stage step used to measure um/pixel
       cal_settle_frames: 8             # frames to wait for the move to settle
       ratio_increment: 0.02            # +/- nudge for um/pixel
-      save_dir: "./demo_output/tracking_stage"  # fluorescence trace output dir
+      save_dir: "D:/shen lab/20260818/"  # fluorescence trace output dir
     io_parameters:
       output_device_names: ["xy_stage_output"]
       input_device_names: ["camera"]

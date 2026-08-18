@@ -5,6 +5,6 @@ user_name: "CLEF_Demo"
 sample_data_dir: "./demo_output/tracking_stage"
 
 session_parameters:
-  num_samples: 800
+  num_samples: 15000
   save_samples: true
   save_metadata: true
