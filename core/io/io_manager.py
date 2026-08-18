@@ -208,9 +208,14 @@ class IOManager:
 
         num_samples = session_params.get("num_samples", 0)
         save_samples = session_params.get("save_samples", False)
+        save_dir = getattr(session_cfg, "sample_data_dir", None) if session_cfg else None
 
         for name, di in self.data_interfaces.items():
-            di.configure_sampling(num_samples=num_samples, save_samples=save_samples)
+            di.configure_sampling(
+                num_samples=num_samples,
+                save_samples=save_samples,
+                save_dir=save_dir,
+            )
 
     def close(self, name: Optional[str] = None):
         """Close devices. If name is given, close only that device; otherwise close all."""

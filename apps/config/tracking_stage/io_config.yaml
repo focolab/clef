@@ -13,6 +13,11 @@ input_devices:
       device_properties: null
       use_strobed_acquisition: false
       strobe_inter_frame_interval_ms: 100.0
+      drop_to_latest: true   # always process newest frame; drop stale backlog
+      report_timing: true    # log loop fps + buffer backlog (~1 Hz)
+      capture_frame_metadata: true  # per-frame sensor timestamp into event log;
+                                    # watch the first [frame metadata] log line —
+                                    # set false if the pull is slow on this rig
 
   - input_device_name: "xy_stage"
     input_device_type: "stage"
@@ -20,6 +25,7 @@ input_devices:
     data_interface_class: "base_data_interface"
     input_device_parameters:
       xy_stage_device: null  # auto-detect from Micro-Manager
+      poll_interval_frames: 20  # metadata only; reading position stalls the loop
 
 output_devices:
   - output_device_name: "xy_stage_output"

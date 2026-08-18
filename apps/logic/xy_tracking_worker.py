@@ -82,6 +82,11 @@ class XYTrackingWorker(Process):
         self.enable_axis1 = vis_args.get("enable_axis1", True)
         self.invert_axis0 = vis_args.get("invert_axis0", False)
         self.invert_axis1 = vis_args.get("invert_axis1", False)
+        # Stage axes rotated 90 deg vs the camera: route vertical image error to
+        # stage axis1 and horizontal to axis0 (instead of the default 1:1). Jog
+        # and tracking share this transform, so an intuitive D-pad guarantees
+        # correct tracking signs.
+        self.swap_axes = vis_args.get("swap_axes", False)
 
         # Fluorescence ROI
         self.roi_radius_px = vis_args.get("roi_radius_px", 30)
@@ -341,15 +346,16 @@ class XYTrackingWorker(Process):
         )
         grid.addWidget(self.jog_step_spinbox, 0, 1)
 
-        # D-pad: Up/Down move stage axis0, Left/Right move stage axis1.
-        up = DemoStyle.make_action_button("Up (+axis0)", QtWidgets)
-        down = DemoStyle.make_action_button("Down (-axis0)", QtWidgets)
-        left = DemoStyle.make_action_button("Left (-axis1)", QtWidgets)
-        right = DemoStyle.make_action_button("Right (+axis1)", QtWidgets)
-        up.clicked.connect(lambda: self._jog(0, +1))
-        down.clicked.connect(lambda: self._jog(0, -1))
-        left.clicked.connect(lambda: self._jog(1, -1))
-        right.clicked.connect(lambda: self._jog(1, +1))
+        # D-pad in screen directions. The swap/invert transform below maps these
+        # to physical stage axes; adjust it until the buttons feel intuitive.
+        up = DemoStyle.make_action_button("Up", QtWidgets)
+        down = DemoStyle.make_action_button("Down", QtWidgets)
+        left = DemoStyle.make_action_button("Left", QtWidgets)
+        right = DemoStyle.make_action_button("Right", QtWidgets)
+        up.clicked.connect(lambda: self._jog_screen(vert=-1))
+        down.clicked.connect(lambda: self._jog_screen(vert=+1))
+        left.clicked.connect(lambda: self._jog_screen(horiz=-1))
+        right.clicked.connect(lambda: self._jog_screen(horiz=+1))
         grid.addWidget(up, 1, 1)
         grid.addWidget(left, 2, 0)
         grid.addWidget(right, 2, 2)
@@ -376,10 +382,19 @@ class XYTrackingWorker(Process):
         self.invert1_checkbox.toggled.connect(
             lambda v: setattr(self, "invert_axis1", v)
         )
+        # Swap which physical axis each screen direction drives (90 deg
+        # stage/camera rotation). Applies to both jog and tracking.
+        self.swap_checkbox = QtWidgets.QCheckBox("Swap axes (90 deg rotation)")
+        self.swap_checkbox.setChecked(self.swap_axes)
+        self.swap_checkbox.toggled.connect(
+            lambda v: setattr(self, "swap_axes", v)
+        )
+
         grid.addWidget(self.enable0_checkbox, 4, 0)
         grid.addWidget(self.invert0_checkbox, 4, 1)
         grid.addWidget(self.enable1_checkbox, 5, 0)
         grid.addWidget(self.invert1_checkbox, 5, 1)
+        grid.addWidget(self.swap_checkbox, 6, 0, 1, 2)
         return group
 
     def _build_calibration_group(self):
@@ -541,12 +556,31 @@ class XYTrackingWorker(Process):
         self.open_epoch = None
         self._send({"type": "recording_stop", **ep})
 
-    def _jog(self, axis, sign):
-        """Write a raw relative stage move (microns) into the offset buffer."""
-        move = int(sign * self.jog_step_um)
-        self.shared_stage_offset_xy[axis] = move
-        self.shared_stage_offset_xy[1 - axis] = 0
-        logger.info(f"Jog axis{axis} by {move} um")
+    def _screen_to_axes(self, vert, horiz):
+        """Map a desired screen motion to (axis0, axis1) stage offsets.
+
+        vert/horiz are signed magnitudes in the image frame (+vert = toward
+        larger row / down on screen, +horiz = toward larger col / right).
+        swap_axes handles a 90 deg stage/camera rotation; invert flips each
+        physical axis. Shared by manual jog and automatic tracking so both stay
+        sign-consistent.
+        """
+        if self.swap_axes:
+            a0, a1 = horiz, vert
+        else:
+            a0, a1 = vert, horiz
+        if self.invert_axis0:
+            a0 = -a0
+        if self.invert_axis1:
+            a1 = -a1
+        return a0, a1
+
+    def _jog_screen(self, vert=0, horiz=0):
+        """Jog the stage one step in a screen direction (Up/Down/Left/Right)."""
+        a0, a1 = self._screen_to_axes(vert, horiz)
+        self.shared_stage_offset_xy[0] = int(a0 * self.jog_step_um)
+        self.shared_stage_offset_xy[1] = int(a1 * self.jog_step_um)
+        logger.info(f"Jog (vert={vert}, horiz={horiz}) -> axes ({a0}, {a1})")
 
     def _ratio_edited(self):
         try:
@@ -640,8 +674,17 @@ class XYTrackingWorker(Process):
         # ratio is microns per pixel at the current imaging condition (that is
         # what calibration measures), so binning needs no extra factor here.
         gain = self.micron_to_pix_ratio * self.stage_dampening_factor
-        correction0 = self._axis_correction(dy, gain, self.enable_axis0, self.invert_axis0)
-        correction1 = self._axis_correction(dx, gain, self.enable_axis1, self.invert_axis1)
+
+        # Route each image-error component to its physical stage axis. swap_axes
+        # sends vertical error (dy) to axis1 and horizontal (dx) to axis0 when
+        # the stage is rotated 90 deg vs the camera. invert is applied per
+        # physical axis inside _axis_correction. Same mapping as manual jog.
+        if self.swap_axes:
+            err0, err1 = dx, dy
+        else:
+            err0, err1 = dy, dx
+        correction0 = self._axis_correction(err0, gain, self.enable_axis0, self.invert_axis0)
+        correction1 = self._axis_correction(err1, gain, self.enable_axis1, self.invert_axis1)
         self.shared_stage_offset_xy[0] = correction0
         self.shared_stage_offset_xy[1] = correction1
 
