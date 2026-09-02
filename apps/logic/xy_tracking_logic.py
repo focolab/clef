@@ -53,6 +53,7 @@ class XYTrackingLogic(BaseClosedLoopLogic):
         self.deadband_px = cfg.get("deadband_px", 2.0)
         self.centroid_smoothing = cfg.get("centroid_smoothing", 0.0)
         self.max_step_um = cfg.get("max_step_um", 200.0)
+        self.min_puncta_snr = cfg.get("min_puncta_snr", 6.0)
         self.enable_axis0 = cfg.get("enable_axis0", True)
         self.enable_axis1 = cfg.get("enable_axis1", True)
         self.invert_axis0 = cfg.get("invert_axis0", False)
@@ -144,6 +145,7 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             "deadband_px": self.deadband_px,
             "centroid_smoothing": self.centroid_smoothing,
             "max_step_um": self.max_step_um,
+            "min_puncta_snr": self.min_puncta_snr,
             "enable_axis0": self.enable_axis0,
             "enable_axis1": self.enable_axis1,
             "invert_axis0": self.invert_axis0,

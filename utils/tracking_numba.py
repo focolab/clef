@@ -42,12 +42,32 @@ def _relative_threshold(frame, frac):
 def bright_blob_centroid(frame, frac):
     """Intensity-weighted centroid of pixels brighter than the threshold.
 
-    Returns (row, col, npix). Weighting by (intensity - threshold) gives a
-    sub-pixel centroid biased toward the brightest core of the blob.
-    Returns (nan, nan, 0) if no pixel clears the threshold.
+    Returns (row, col, npix, snr). Weighting by (intensity - threshold) gives a
+    sub-pixel centroid biased toward the brightest core of the blob. snr is the
+    peak prominence over background, (max - mean) / std: a real puncta sits many
+    sigma above the mean, whereas a blank/noisy frame peaks only ~4-5 sigma, so
+    snr lets the caller reject frames with no genuine puncta. The relative
+    threshold alone can't — some pixels always clear mean + frac*(max - mean).
+    Returns (nan, nan, 0, snr) if no pixel clears the threshold.
     """
-    thr = _relative_threshold(frame, frac)
     h, w = frame.shape
+    n = h * w
+    fmax = frame[0, 0]
+    fsum = 0.0
+    fsqsum = 0.0
+    for i in range(h):
+        for j in range(w):
+            v = frame[i, j]
+            if v > fmax:
+                fmax = v
+            fsum += v
+            fsqsum += v * v
+    fmean = fsum / n
+    var = fsqsum / n - fmean * fmean
+    fstd = np.sqrt(var) if var > 0.0 else 0.0
+    snr = (fmax - fmean) / fstd if fstd > 0.0 else 0.0
+    thr = fmean + frac * (fmax - fmean)
+
     wsum = 0.0
     ysum = 0.0
     xsum = 0.0
@@ -62,8 +82,8 @@ def bright_blob_centroid(frame, frac):
                 xsum += weight * j
                 count += 1
     if wsum <= 0.0:
-        return np.nan, np.nan, 0
-    return ysum / wsum, xsum / wsum, count
+        return np.nan, np.nan, 0, snr
+    return ysum / wsum, xsum / wsum, count, snr
 
 
 @njit(cache=True)

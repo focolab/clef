@@ -76,6 +76,9 @@ class XYTrackingWorker(Process):
         self.deadband_px = vis_args.get("deadband_px", 2.0)
         self.centroid_smoothing = vis_args.get("centroid_smoothing", 0.0)
         self.max_step_um = vis_args.get("max_step_um", 200.0)
+        # Minimum peak SNR to accept a puncta; below this the frame has no real
+        # blob and tracking holds still instead of chasing noise.
+        self.min_puncta_snr = vis_args.get("min_puncta_snr", 6.0)
 
         # Per-axis control
         self.enable_axis0 = vis_args.get("enable_axis0", True)
@@ -113,6 +116,7 @@ class XYTrackingWorker(Process):
         self.sm_cy = float(self.cy)
         self.sm_cx = float(self.cx)
         self.blob_ok = False
+        self.blob_snr = 0.0
         self._last_track_log = 0.0  # throttle for the tracking-diagnostic log
 
         # Fluorescence trace: rolling display buffer + full recording
@@ -274,6 +278,12 @@ class XYTrackingWorker(Process):
             "Auto-adjust Contrast", QtWidgets, color=DemoStyle.COLOR_NEUTRAL
         )
         self.auto_contrast_button.setCheckable(True)
+        self.auto_contrast_button.toggled.connect(
+            lambda on: self.auto_contrast_button.setStyleSheet(
+                "background-color: "
+                f"{DemoStyle.COLOR_SUCCESS if on else DemoStyle.COLOR_NEUTRAL}"
+            )
+        )
         layout.addWidget(self.auto_contrast_button)
 
         self.enable_tracking_button = DemoStyle.make_action_button(
@@ -362,10 +372,14 @@ class XYTrackingWorker(Process):
         down = DemoStyle.make_action_button("Down", QtWidgets)
         left = DemoStyle.make_action_button("Left", QtWidgets)
         right = DemoStyle.make_action_button("Right", QtWidgets)
-        up.clicked.connect(lambda: self._jog_screen(vert=-1))
-        down.clicked.connect(lambda: self._jog_screen(vert=+1))
-        left.clicked.connect(lambda: self._jog_screen(horiz=-1))
-        right.clicked.connect(lambda: self._jog_screen(horiz=+1))
+        # Jog convention is intentionally inverted from tracking: pressing a
+        # direction pans the stage that way, so the sample appears to move the
+        # opposite way (standard microscopy feel). Do NOT re-align these with
+        # _screen_to_axes — tracking depends on that transform and is correct.
+        up.clicked.connect(lambda: self._jog_screen(vert=+1))
+        down.clicked.connect(lambda: self._jog_screen(vert=-1))
+        left.clicked.connect(lambda: self._jog_screen(horiz=+1))
+        right.clicked.connect(lambda: self._jog_screen(horiz=-1))
         grid.addWidget(up, 1, 1)
         grid.addWidget(left, 2, 0)
         grid.addWidget(right, 2, 2)
@@ -474,6 +488,8 @@ class XYTrackingWorker(Process):
                          self.centroid_smoothing, "centroid_smoothing"); row += 1
         self._add_slider(grid, row, "deadband (px)", 0.0, 50.0, 1,
                          self.deadband_px, "deadband_px"); row += 1
+        self._add_slider(grid, row, "min puncta SNR", 0.0, 50.0, 1,
+                         self.min_puncta_snr, "min_puncta_snr"); row += 1
         self._add_slider(grid, row, "max step (um)", 1.0, 2000.0, 0,
                          self.max_step_um, "max_step_um"); row += 1
         self._add_slider(grid, row, "ROI radius (px)", 1.0, 300.0, 0,
@@ -728,8 +744,9 @@ class XYTrackingWorker(Process):
     def update_display(self):
         frame = self.current_frame()
 
-        cy, cx, npix = tracking_numba.bright_blob_centroid(frame, self.threshold_frac)
-        self.blob_ok = npix > 0 and np.isfinite(cy)
+        cy, cx, npix, snr = tracking_numba.bright_blob_centroid(frame, self.threshold_frac)
+        self.blob_snr = snr
+        self.blob_ok = npix > 0 and np.isfinite(cy) and snr >= self.min_puncta_snr
         if self.blob_ok:
             self.raw_cy, self.raw_cx = cy, cx
             s = self.centroid_smoothing
@@ -787,10 +804,12 @@ class XYTrackingWorker(Process):
         f_last = self.recent_f[-1]
         f_str = "--" if not np.isfinite(f_last) else f"{f_last:.1f}"
         rec = "REC" if self.recording else "off"
+        puncta = "puncta" if self.blob_ok else "no puncta"
         self.status_label.setText(
             f"frame: {self.image_count}   "
             f"blob: ({self.sm_cx:.1f}, {self.sm_cy:.1f})   "
             f"target: ({self.cx}, {self.cy})   "
+            f"SNR: {self.blob_snr:.1f} ({puncta})   "
             f"F: {f_str}   "
             f"um/px: {self.micron_to_pix_ratio:.4f}   "
             f"tracking: {'ON' if tracking else 'off'}   "
