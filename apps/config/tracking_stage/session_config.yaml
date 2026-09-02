@@ -2,9 +2,9 @@
 
 session_name: "tracking_stage"
 user_name: "CLEF_Demo"
-sample_data_dir: "./demo_output/tracking_stage"
+sample_data_dir: "D:/shen lab/20260818/"
 
 session_parameters:
-  num_samples: 15000
+  num_samples: 5000
   save_samples: true
   save_metadata: true
