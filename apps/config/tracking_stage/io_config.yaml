@@ -25,7 +25,9 @@ input_devices:
     data_interface_class: "base_data_interface"
     input_device_parameters:
       xy_stage_device: null  # auto-detect from Micro-Manager
-      poll_interval_frames: 20  # metadata only; reading position stalls the loop
+      poll_interval_frames: 50  # metadata only; reading position stalls the loop.
+                                # ~1 s at 50 fps - a serial position query can eat
+                                # most of a 20 ms frame budget, so keep it rare.
 
 output_devices:
   - output_device_name: "xy_stage_output"

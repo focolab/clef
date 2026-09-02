@@ -9,12 +9,19 @@ XYTrackingStageOutput applies each sample.
 
 Tracking control law (all parameters live-adjustable):
   * intensity-weighted sub-pixel centroid of the bright blob (numba);
-  * exponential smoothing of the centroid to reject pixel noise;
-  * a per-axis deadband so a nearly-centered blob triggers no motion
-    (avoids the constant micro-jitter that blurs a small blob);
-  * proportional correction scaled by microns-per-pixel and a dampening
-    factor, clamped to a maximum step to reject centroid outliers;
+  * optional exponential smoothing of the centroid to reject pixel noise;
+  * a per-axis deadband so a nearly-centered blob triggers no motion;
+  * the pixel error converted to stage-axis microns, then handed to the
+    selected control algorithm (proportional / PID / Kalman — see
+    xy_tracking_controllers.py), which is chosen live from the GUI;
+  * the resulting command clamped to a maximum step to reject outliers;
   * independent enable + invert toggles per stage axis.
+
+Stage commands are accumulated as a running total in shared memory and the
+output device reports back what it has actually issued, so the worker can see
+both what is still pending and what has already moved. The estimators use that
+to avoid commanding the same error twice while a correction is in flight, which
+is the main thing that limits how hard the loop can be driven.
 
 Fluorescence: the mean intensity inside a fixed-radius circular ROI centered
 on the blob is extracted every frame (numba), plotted live, and saved to a
@@ -26,22 +33,27 @@ fluorescence plot, and two tabs:
   * "Calibration & Testing" - manual jog D-pad, guided um/pixel calibration,
                               and sliders for every tuning parameter.
 
-Stage offsets are written into shared memory as [axis0, axis1]; the output
-device applies them via setRelativeXYPosition(axis0, axis1) and resets them.
+Stage commands are written into shared memory as a running per-axis total in
+microns; the output device moves by whatever difference it has not yet issued
+via setRelativeXYPosition, and reports back what it applied and when. See
+xy_tracking_stage_output.py for the slot layout.
 """
 
 import csv
+import json
 import logging
 import os
 import time
 import warnings
 import numpy as np
+from collections import deque
 from datetime import datetime
 from multiprocessing import Process, shared_memory
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 import pyqtgraph as pg
 
+from apps.logic.xy_tracking_controllers import REGISTRY, make_tracker
 from utils import tracking_numba
 from utils.style.demo_stylization import DemoStyle
 
@@ -71,7 +83,6 @@ class XYTrackingWorker(Process):
 
         # Tracking parameters (all live-adjustable via sliders)
         self.micron_to_pix_ratio = vis_args.get("micron_to_pix_ratio", 100.0 / 74.0)
-        self.stage_dampening_factor = vis_args.get("stage_dampening_factor", 0.5)
         self.threshold_frac = vis_args.get("threshold_frac", 0.5)
         self.deadband_px = vis_args.get("deadband_px", 2.0)
         self.centroid_smoothing = vis_args.get("centroid_smoothing", 0.0)
@@ -79,6 +90,16 @@ class XYTrackingWorker(Process):
         # Minimum peak SNR to accept a puncta; below this the frame has no real
         # blob and tracking holds still instead of chasing noise.
         self.min_puncta_snr = vis_args.get("min_puncta_snr", 6.0)
+
+        # Control algorithm. Every algorithm sees the same error and writes the
+        # same command path, so they can be compared by switching live.
+        self.tracking_algorithm = vis_args.get("tracking_algorithm", "kalman")
+        self.algorithm_params = vis_args.get("algorithm_params", {})
+        self.trackers = {}   # built after the process starts, in initialize_display
+        self.tracker = None
+        # How long the blob may be missing before the estimator's state is too
+        # stale to trust and is thrown away.
+        self.reset_after_lost_frames = vis_args.get("reset_after_lost_frames", 25)
 
         # Per-axis control
         self.enable_axis0 = vis_args.get("enable_axis0", True)
@@ -119,13 +140,29 @@ class XYTrackingWorker(Process):
         self.blob_snr = 0.0
         self._last_track_log = 0.0  # throttle for the tracking-diagnostic log
 
-        # Fluorescence trace: rolling display buffer + full recording
+        # Control-loop bookkeeping (all in stage-axis microns / seconds)
+        self.cmd_total = np.zeros(2)      # cumulative motion we have asked for
+        self._prev_applied = np.zeros(2)  # applied total as of the previous frame
+        self._prev_cam_s = None
+        self._prev_host_ts = None
+        self._nominal_dt = 0.02           # fallback frame period, refined live
+        self._dt_s = 0.02
+        self._clock = "host"
+        self._lost_frames = 0
+        self._have_frame_ts = False
+        # Frame capture -> stage move issued. A diagnostic for how much dead
+        # time the loop is carrying; it is an upper bound on, not the value for,
+        # the Kalman horizon, since commanded motion is already accounted for.
+        self._latency_ms = float("nan")
+        self._cmd_log = deque(maxlen=64)  # (write_time, frame_ts) pairs
+        # ~5 s of history at 50 fps: long enough to average out centroid noise,
+        # short enough to respond when you switch algorithm.
+        self._err_hist = deque(maxlen=250)  # |error| px, for the RMS readout
+        self._last_cmd = np.zeros(2)
+
+        # Fluorescence trace: rolling display buffer + full per-frame record
         self.recent_f = np.full(PLOT_TSIZE, np.nan)
-        self.rec_frame = []
-        self.rec_f = []
-        self.rec_cy = []
-        self.rec_cx = []
-        self.rec_sub = []  # which sub-acquisition each sample belongs to (-1 = none)
+        self.rec_rows = []
 
         # Sub-acquisitions: recording epochs triggered live during the session
         self.recording = False
@@ -161,18 +198,120 @@ class XYTrackingWorker(Process):
         )
         self.shared_image_count = shared_memory.ShareableList(name=image_count_name)
 
+        # Slot 0 is the image count; slots 1-2 carry the camera and host
+        # timestamps of that frame. An older layout has only the count, in which
+        # case we fall back to timing frames as they arrive here.
+        self._have_frame_ts = len(self.shared_image_count) >= 3
+
         stage_shm_name = self.vis_args.get("stage_shm_name", "shared_stage_offset_xy")
         self.shared_stage_offset_xy = shared_memory.ShareableList(name=stage_shm_name)
+        # Start from whatever the output device has already accounted for, so
+        # the pending/applied difference is zero before the first command.
+        self.cmd_total = np.array(
+            [float(self.shared_stage_offset_xy[0]),
+             float(self.shared_stage_offset_xy[1])]
+        )
+        self._prev_applied = np.array(
+            [float(self.shared_stage_offset_xy[2]),
+             float(self.shared_stage_offset_xy[3])]
+        )
 
     def current_frame(self):
         """Return the most-recently-written ring-buffer frame."""
         buf = (self.image_count - 1) % self.ring_size
         return self.img_list[buf]
 
+    def _command(self, axis0, axis1, frame_ts=None):
+        """Add a move to the running command total in shared memory.
+
+        The output device applies the difference between this total and what it
+        has already issued, so a command written while a previous move is still
+        in flight is carried rather than overwritten. Jog, calibration and
+        tracking all go through here, which is what keeps the estimators from
+        being surprised by a manual move.
+        """
+        self.cmd_total += (axis0, axis1)
+        self.shared_stage_offset_xy[0] = float(self.cmd_total[0])
+        self.shared_stage_offset_xy[1] = float(self.cmd_total[1])
+        if frame_ts is not None:
+            self._cmd_log.append((time.perf_counter(), frame_ts))
+
+    def _frame_timing(self):
+        """Return (frame_ts, dt) in seconds for the frame just published.
+
+        dt comes from the camera's own acquisition clock when it is available,
+        since that is immune to jitter in the host loop; otherwise from the host
+        time the frame was stored. frame_ts is always a host perf_counter value
+        so it is comparable with the stage's applied timestamp.
+        """
+        cam_s = None
+        if self._have_frame_ts:
+            cam_ms = float(self.shared_image_count[1])
+            frame_ts = float(self.shared_image_count[2])
+            if np.isfinite(cam_ms):
+                cam_s = cam_ms / 1000.0
+        else:
+            frame_ts = time.perf_counter()
+        if not np.isfinite(frame_ts) or frame_ts <= 0.0:
+            frame_ts = time.perf_counter()
+
+        if cam_s is not None:
+            self._clock = "cam"
+            dt = cam_s - self._prev_cam_s if self._prev_cam_s is not None else np.nan
+            self._prev_cam_s = cam_s
+        else:
+            self._clock = "host"
+            dt = (
+                frame_ts - self._prev_host_ts
+                if self._prev_host_ts is not None else np.nan
+            )
+        self._prev_host_ts = frame_ts
+
+        # Reject a nonsensical interval (first frame, a clock glitch, a long
+        # stall) in favour of the running estimate, so one bad dt cannot make
+        # the controllers lurch.
+        if np.isfinite(dt) and 0.0 < dt <= 1.0:
+            self._nominal_dt += 0.1 * (dt - self._nominal_dt)
+        else:
+            dt = self._nominal_dt
+        self._dt_s = dt
+        return frame_ts, dt
+
+    def _stage_feedback(self, frame_ts):
+        """Return (u_pre, u_post, pending), all in stage-axis microns.
+
+        Motion issued since the previous frame is split on whether it landed
+        before or after this frame was captured: motion applied before capture
+        is already reflected in the measured error, motion applied after it is
+        not yet visible. pending is written but not yet issued at all.
+
+        The split uses the timestamp of the most recent move, which is exact at
+        the usual one move per frame and approximate if several were issued.
+        """
+        shl = self.shared_stage_offset_xy
+        applied = np.array([float(shl[2]), float(shl[3])])
+        applied_ts = float(shl[5])
+        delta = applied - self._prev_applied
+        self._prev_applied = applied
+        pending = self.cmd_total - applied
+
+        # Attribute the move to the frame whose command produced it, so the
+        # reported latency is capture -> stage move, not just apply time.
+        if np.any(delta):
+            for write_ts, cmd_frame_ts in reversed(self._cmd_log):
+                if write_ts <= applied_ts:
+                    self._latency_ms = (applied_ts - cmd_frame_ts) * 1000.0
+                    break
+
+        if applied_ts <= frame_ts:
+            return delta, np.zeros(2), pending
+        return np.zeros(2), delta, pending
+
     # ------------------------------------------------------------------ GUI
 
     def initialize_display(self):
         self.initialize_shm()
+        self._build_trackers()
 
         self.app = pg.Qt.mkQApp(name="XYTrackingWorker")
         DemoStyle.load_qss(self.app)
@@ -196,6 +335,21 @@ class XYTrackingWorker(Process):
         self.window.resize(860, 1000)
         self.window.show()
         self._refresh_readouts()
+
+    def _build_trackers(self):
+        """Instantiate every algorithm up front so switching between them is
+        instant and each keeps its own tuning."""
+        self.trackers = {
+            name: make_tracker(name, self.algorithm_params.get(name, {}))
+            for name in REGISTRY
+        }
+        if self.tracking_algorithm not in self.trackers:
+            logger.warning(
+                f"Unknown tracking_algorithm '{self.tracking_algorithm}', "
+                f"falling back to 'proportional'"
+            )
+            self.tracking_algorithm = "proportional"
+        self.tracker = self.trackers[self.tracking_algorithm]
 
     def _build_image_panel(self):
         self.graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -338,7 +492,8 @@ class XYTrackingWorker(Process):
             "so tracking drives the blob toward center.\n"
             "3. Set a calibration step (um) and click Run Calibration; um/pixel "
             "is measured from how far the blob moved, then the stage returns.\n"
-            "4. Tune the tracking sliders for smooth, artifact-free centering.",
+            "4. Pick a tracking algorithm and tune it for smooth, artifact-free "
+            "centering. Compare algorithms on the RMS error in the status bar.",
             QtWidgets, style=DemoStyle.INSTRUCTIONS_BOX_STYLE,
         )
         layout.addWidget(instructions)
@@ -346,6 +501,7 @@ class XYTrackingWorker(Process):
         layout.addWidget(self._build_jog_group())
         layout.addWidget(self._build_calibration_group())
         layout.addWidget(self._build_tuning_group())
+        layout.addWidget(self._build_algorithm_group())
         layout.addStretch()
 
         scroll.setWidget(inner)
@@ -482,8 +638,6 @@ class XYTrackingWorker(Process):
         row = 0
         self._add_slider(grid, row, "blob threshold frac", 0.0, 1.0, 2,
                          self.threshold_frac, "threshold_frac"); row += 1
-        self._add_slider(grid, row, "dampening factor", 0.0, 1.0, 2,
-                         self.stage_dampening_factor, "stage_dampening_factor"); row += 1
         self._add_slider(grid, row, "centroid smoothing", 0.0, 0.95, 2,
                          self.centroid_smoothing, "centroid_smoothing"); row += 1
         self._add_slider(grid, row, "deadband (px)", 0.0, 50.0, 1,
@@ -496,8 +650,74 @@ class XYTrackingWorker(Process):
                          float(self.roi_radius_px), "roi_radius_px"); row += 1
         return group
 
-    def _add_slider(self, grid, row, label, lo, hi, decimals, value, attr):
-        """A labeled slider + spinbox that live-writes self.<attr>."""
+    def _build_algorithm_group(self):
+        """Algorithm selector over a stack of per-algorithm parameter pages.
+
+        The algorithms are interchangeable — same error in, same command path
+        out — so switching is safe mid-run; only the accumulated estimator state
+        is dropped, so the new algorithm starts from the current frame.
+        """
+        group = QtWidgets.QGroupBox("Tracking Algorithm")
+        group.setStyleSheet(DemoStyle.GROUP_BOX_STYLE)
+        layout = QtWidgets.QVBoxLayout(group)
+
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(QtWidgets.QLabel("algorithm:"))
+        self.algorithm_combo = QtWidgets.QComboBox()
+        self.algorithm_names = list(REGISTRY)
+        self.algorithm_combo.addItems(self.algorithm_names)
+        self.algorithm_combo.setCurrentIndex(
+            self.algorithm_names.index(self.tracking_algorithm)
+        )
+        self.algorithm_combo.currentIndexChanged.connect(self._algorithm_changed)
+        row.addWidget(self.algorithm_combo, stretch=1)
+        layout.addLayout(row)
+
+        self.algorithm_stack = QtWidgets.QStackedWidget()
+        for name in self.algorithm_names:
+            tracker = self.trackers[name]
+            page = QtWidgets.QWidget()
+            grid = QtWidgets.QGridLayout(page)
+            for i, (attr, label, lo, hi, decimals) in enumerate(tracker.param_spec):
+                self._add_slider(grid, i, label, lo, hi, decimals,
+                                 getattr(tracker, attr), attr, target=tracker)
+            self.algorithm_stack.addWidget(page)
+        self.algorithm_stack.setCurrentIndex(
+            self.algorithm_names.index(self.tracking_algorithm)
+        )
+        layout.addWidget(self.algorithm_stack)
+
+        layout.addWidget(DemoStyle.make_info_box(
+            "Proportional corrects a fraction of the current error and will trail "
+            "a steadily drifting target by a fixed offset.\n"
+            "PID adds an integral term that walks that offset out over a few "
+            "seconds.\n"
+            "Kalman estimates the target's velocity and commands where it will "
+            "be once the stage arrives.\n"
+            "Tune the horizon by minimising the RMS error against a drifting "
+            "target: raise it while RMS falls, and back off once it climbs "
+            "again. It only covers the stage's settle time (typically a frame "
+            "or two) because motion already commanded is accounted for exactly, "
+            "so it is much shorter than the latency shown above. Leave centroid "
+            "smoothing at 0 so the filter is not fed a pre-lagged position.",
+            QtWidgets, style=DemoStyle.INSTRUCTIONS_BOX_STYLE,
+        ))
+        return group
+
+    def _algorithm_changed(self, index):
+        self.tracking_algorithm = self.algorithm_names[index]
+        self.tracker = self.trackers[self.tracking_algorithm]
+        self.algorithm_stack.setCurrentIndex(index)
+        self._reset_control_state()
+        logger.info(f"Tracking algorithm -> {self.tracking_algorithm}")
+
+    def _add_slider(self, grid, row, label, lo, hi, decimals, value, attr,
+                    target=None):
+        """A labeled slider + spinbox that live-writes <target>.<attr>.
+
+        Defaults to writing on the worker itself; algorithm pages pass their
+        tracker so its parameters can be tuned while the loop runs.
+        """
         scale = 10 ** decimals
         grid.addWidget(QtWidgets.QLabel(label + ":"), row, 0)
 
@@ -518,26 +738,42 @@ class XYTrackingWorker(Process):
             spin.blockSignals(True)
             spin.setValue(val)
             spin.blockSignals(False)
-            self._set_param(attr, val)
+            self._set_param(attr, val, target)
 
         def on_spin(val):
             slider.blockSignals(True)
             slider.setValue(int(val * scale))
             slider.blockSignals(False)
-            self._set_param(attr, val)
+            self._set_param(attr, val, target)
 
         slider.valueChanged.connect(on_slider)
         spin.valueChanged.connect(on_spin)
 
-    def _set_param(self, attr, val):
+    def _set_param(self, attr, val, target=None):
         # roi_radius_px is used as an int extent
-        setattr(self, attr, int(val) if attr == "roi_radius_px" else val)
+        setattr(target or self, attr, int(val) if attr == "roi_radius_px" else val)
 
     # -------------------------------------------------------------- callbacks
 
     def _tracking_toggled(self, checked):
         color = DemoStyle.COLOR_WARNING if checked else DemoStyle.COLOR_NEUTRAL
         self.enable_tracking_button.setStyleSheet(f"background-color: {color}")
+        if checked:
+            # Start clean: whatever the stage did while tracking was off (jogs,
+            # a calibration step) is history, not control input.
+            self._reset_control_state()
+
+    def _reset_control_state(self):
+        """Drop estimator state and re-baseline against the stage's totals."""
+        if self.tracker is not None:
+            self.tracker.reset()
+        self._prev_applied = np.array(
+            [float(self.shared_stage_offset_xy[2]),
+             float(self.shared_stage_offset_xy[3])]
+        )
+        self._lost_frames = 0
+        self._cmd_log.clear()
+        self._err_hist.clear()
 
     def _send(self, msg):
         try:
@@ -604,8 +840,7 @@ class XYTrackingWorker(Process):
     def _jog_screen(self, vert=0, horiz=0):
         """Jog the stage one step in a screen direction (Up/Down/Left/Right)."""
         a0, a1 = self._screen_to_axes(vert, horiz)
-        self.shared_stage_offset_xy[0] = int(a0 * self.jog_step_um)
-        self.shared_stage_offset_xy[1] = int(a1 * self.jog_step_um)
+        self._command(a0 * self.jog_step_um, a1 * self.jog_step_um)
         logger.info(f"Jog (vert={vert}, horiz={horiz}) -> axes ({a0}, {a1})")
 
     def _ratio_edited(self):
@@ -636,8 +871,7 @@ class XYTrackingWorker(Process):
         self.cal_centroid_before = (self.raw_cy, self.raw_cx)
         self.cal_start_count = self.image_count
         # Command a known move on stage axis0.
-        self.shared_stage_offset_xy[0] = int(self.cal_step_um)
-        self.shared_stage_offset_xy[1] = 0
+        self._command(self.cal_step_um, 0.0)
         self.cal_state = "settling"
         self.cal_readout.setText(
             f"Moving stage {self.cal_step_um} um, waiting to settle..."
@@ -656,8 +890,7 @@ class XYTrackingWorker(Process):
         self.cal_state = "idle"
 
         # Return the stage to where it started so the blob ends up recentered.
-        self.shared_stage_offset_xy[0] = -int(self.cal_step_um)
-        self.shared_stage_offset_xy[1] = 0
+        self._command(-self.cal_step_um, 0.0)
 
         if pix < 1.0 or not np.isfinite(pix):
             self.cal_readout.setText(
@@ -686,8 +919,13 @@ class XYTrackingWorker(Process):
 
     # ------------------------------------------------------------------ track
 
-    def update_stage_offset(self):
-        """Compute and write the stage correction from the smoothed centroid."""
+    def update_stage_offset(self, dt, frame_ts):
+        """Run the selected control algorithm and command the stage.
+
+        Everything except the middle line is shared by all algorithms: the same
+        error goes in, the same clamp and per-axis enable come out, so switching
+        algorithm changes only the position asked for.
+        """
         dy = self.cy - self.sm_cy
         dx = self.cx - self.sm_cx
 
@@ -697,22 +935,26 @@ class XYTrackingWorker(Process):
         if abs(dx) < self.deadband_px:
             dx = 0.0
 
-        # ratio is microns per pixel at the current imaging condition (that is
-        # what calibration measures), so binning needs no extra factor here.
-        gain = self.micron_to_pix_ratio * self.stage_dampening_factor
+        # Pixel error -> microns on each physical stage axis. swap_axes routes
+        # vertical error to axis1 when the stage is rotated 90 deg vs the camera,
+        # and invert flips a physical axis; this is the same transform manual jog
+        # uses, so a D-pad that feels right means correct tracking signs. The
+        # ratio is microns per pixel at the current imaging condition (what
+        # calibration measures), so binning needs no extra factor.
+        a0, a1 = self._screen_to_axes(dy, dx)
+        err_um = np.array([a0, a1]) * self.micron_to_pix_ratio
 
-        # Route each image-error component to its physical stage axis. swap_axes
-        # sends vertical error (dy) to axis1 and horizontal (dx) to axis0 when
-        # the stage is rotated 90 deg vs the camera. invert is applied per
-        # physical axis inside _axis_correction. Same mapping as manual jog.
-        if self.swap_axes:
-            err0, err1 = dx, dy
-        else:
-            err0, err1 = dy, dx
-        correction0 = self._axis_correction(err0, gain, self.enable_axis0, self.invert_axis0)
-        correction1 = self._axis_correction(err1, gain, self.enable_axis1, self.invert_axis1)
-        self.shared_stage_offset_xy[0] = correction0
-        self.shared_stage_offset_xy[1] = correction1
+        u_pre, u_post, pending = self._stage_feedback(frame_ts)
+        cmd = self.tracker.update(err_um, dt, u_pre, u_post, pending)
+
+        # Clamp to reject outlier corrections (e.g. a momentarily lost blob).
+        cmd = np.clip(cmd, -self.max_step_um, self.max_step_um)
+        if not self.enable_axis0:
+            cmd[0] = 0.0
+        if not self.enable_axis1:
+            cmd[1] = 0.0
+        self._last_cmd = cmd
+        self._command(cmd[0], cmd[1], frame_ts=frame_ts)
 
         # Throttled diagnostic: watch the error sequence. Shrinking |dy|,|dx| =
         # healthy negative feedback; growing = wrong sign on that axis; ping-
@@ -721,27 +963,29 @@ class XYTrackingWorker(Process):
         now = time.time()
         if now - self._last_track_log >= 0.25:
             self._last_track_log = now
+            extra = self.tracker.readout()
             # print (not logger): this runs in the GUI subprocess, which on
             # Windows spawn has no console log handler.
             print(
-                f"[track] err(dy={dy:+.1f}, dx={dx:+.1f}) px  "
-                f"corr(axis0={correction0:+d}, axis1={correction1:+d}) um  "
-                f"blob=({self.sm_cx:.1f}, {self.sm_cy:.1f}) "
-                f"target=({self.cx}, {self.cy})  um/px={self.micron_to_pix_ratio:.3f}",
+                f"[track:{self.tracking_algorithm}] "
+                f"err(dy={dy:+.1f}, dx={dx:+.1f}) px  "
+                f"cmd(axis0={cmd[0]:+.2f}, axis1={cmd[1]:+.2f}) um  "
+                f"pending=({pending[0]:+.2f}, {pending[1]:+.2f})  "
+                f"rms={self._rms_error_px():.2f} px  "
+                f"dt={dt * 1000:.1f} ms  latency={self._latency_ms:.0f} ms"
+                + (f"  {extra}" if extra else ""),
                 flush=True,
             )
 
-    def _axis_correction(self, err_px, gain, enabled, inverted):
-        if not enabled:
-            return 0
-        step = err_px * gain
-        # Clamp to reject outlier corrections (e.g. a momentarily lost blob).
-        step = max(-self.max_step_um, min(self.max_step_um, step))
-        if inverted:
-            step = -step
-        return int(step)
+    def _rms_error_px(self):
+        """RMS centering error over the recent window — the number to compare
+        algorithms on."""
+        if not self._err_hist:
+            return float("nan")
+        return float(np.sqrt(np.mean(np.square(self._err_hist))))
 
     def update_display(self):
+        frame_ts, dt = self._frame_timing()
         frame = self.current_frame()
 
         cy, cx, npix, snr = tracking_numba.bright_blob_centroid(frame, self.threshold_frac)
@@ -753,17 +997,28 @@ class XYTrackingWorker(Process):
             self.sm_cy = s * self.sm_cy + (1.0 - s) * cy
             self.sm_cx = s * self.sm_cx + (1.0 - s) * cx
             self.centroid_marker.setData(x=[self.sm_cx], y=[self.sm_cy])
+            self._err_hist.append(np.hypot(self.cy - self.sm_cy, self.cx - self.sm_cx))
         else:
             self.centroid_marker.setData(x=[], y=[])
 
-        self._extract_fluorescence(frame)
+        f_mean = self._extract_fluorescence(frame)
         self._update_image(frame)
 
         # Closed-loop correction (skipped while a calibration step is settling).
+        self._last_cmd = np.zeros(2)
         if self.cal_state == "idle" and self.enable_tracking_button.isChecked():
             if self.blob_ok:
-                self.update_stage_offset()
+                self._lost_frames = 0
+                self.update_stage_offset(dt, frame_ts)
+            else:
+                # Hold still while the blob is missing, and once it has been gone
+                # long enough that the estimate is stale, start the algorithm over
+                # rather than resuming from a stale velocity or integral.
+                self._lost_frames += 1
+                if self._lost_frames == self.reset_after_lost_frames:
+                    self.tracker.reset()
 
+        self._record_row(frame_ts, f_mean)
         self._advance_calibration()
         self._refresh_readouts()
 
@@ -783,12 +1038,28 @@ class XYTrackingWorker(Process):
         self.recent_f[:-1] = self.recent_f[1:]
         self.recent_f[-1] = f_mean
         self.f_curve.setData(self.recent_f, connect="finite")
+        return f_mean
 
-        self.rec_frame.append(self.image_count)
-        self.rec_f.append(f_mean)
-        self.rec_cy.append(self.sm_cy if self.blob_ok else np.nan)
-        self.rec_cx.append(self.sm_cx if self.blob_ok else np.nan)
-        self.rec_sub.append(self.open_epoch["index"] if self.recording else -1)
+    def _record_row(self, frame_ts, f_mean):
+        """Append this frame's trace sample: fluorescence, where the blob was,
+        the error that implies, and what the controller did about it."""
+        cam_ms = float(self.shared_image_count[1]) if self._have_frame_ts else np.nan
+        ok = self.blob_ok
+        nan = float("nan")
+        self.rec_rows.append((
+            self.image_count,
+            f"{frame_ts:.6f}",
+            f"{cam_ms:.3f}",
+            f"{f_mean:.4f}",
+            f"{self.sm_cy if ok else nan:.4f}",
+            f"{self.sm_cx if ok else nan:.4f}",
+            f"{self.cy - self.sm_cy if ok else nan:.4f}",
+            f"{self.cx - self.sm_cx if ok else nan:.4f}",
+            f"{self._last_cmd[0]:.4f}",
+            f"{self._last_cmd[1]:.4f}",
+            self.tracking_algorithm,
+            self.open_epoch["index"] if self.recording else -1,
+        ))
 
     def _update_image(self, frame):
         if self.show_processed_button.isChecked():
@@ -805,6 +1076,13 @@ class XYTrackingWorker(Process):
         f_str = "--" if not np.isfinite(f_last) else f"{f_last:.1f}"
         rec = "REC" if self.recording else "off"
         puncta = "puncta" if self.blob_ok else "no puncta"
+        lat = (
+            "--" if not np.isfinite(self._latency_ms)
+            else f"{self._latency_ms:.0f} ms"
+        )
+        rms = self._rms_error_px()
+        rms_str = "--" if not np.isfinite(rms) else f"{rms:.2f} px"
+        extra = self.tracker.readout() if self.tracker is not None else ""
         self.status_label.setText(
             f"frame: {self.image_count}   "
             f"blob: ({self.sm_cx:.1f}, {self.sm_cy:.1f})   "
@@ -814,6 +1092,12 @@ class XYTrackingWorker(Process):
             f"um/px: {self.micron_to_pix_ratio:.4f}   "
             f"tracking: {'ON' if tracking else 'off'}   "
             f"rec: {rec}"
+            "\n"
+            f"alg: {self.tracking_algorithm}   "
+            f"RMS error: {rms_str}   "
+            f"latency: {lat}   "
+            f"dt: {self._dt_s * 1000:.1f} ms ({self._clock} clock)"
+            + (f"   {extra}" if extra else "")
         )
         if hasattr(self, "record_status"):
             self.record_status.setText(self._recording_summary())
@@ -881,8 +1165,13 @@ class XYTrackingWorker(Process):
         except Exception as err:
             logger.warning(f"numba spool failed: {err}")
 
+        zero = np.zeros(2)
+        for tracker in self.trackers.values():
+            tracker.update(zero, self._nominal_dt, zero, zero, zero)
+            tracker.reset()
+
     def _save_trace(self):
-        if not self.rec_frame:
+        if not self.rec_rows:
             return
         try:
             os.makedirs(self.save_dir, exist_ok=True)
@@ -890,21 +1179,54 @@ class XYTrackingWorker(Process):
             logger.warning(f"Cannot create save dir '{self.save_dir}': {err}")
             return
 
-        # Per-frame fluorescence, tagged with its sub-acquisition (-1 = none).
+        # Per-frame fluorescence and tracking record, tagged with its
+        # sub-acquisition (-1 = none). The error and command columns are what
+        # you post-hoc compare algorithms on.
         try:
             path = os.path.join(self.save_dir, f"{self.rec_id}_fluorescence.csv")
-            data = np.column_stack(
-                [self.rec_frame, self.rec_f, self.rec_cy, self.rec_cx, self.rec_sub]
-            )
-            np.savetxt(
-                path, data, delimiter=",",
-                fmt=["%d", "%.4f", "%.4f", "%.4f", "%d"],
-                header="frame,fluorescence,centroid_y,centroid_x,sub_acquisition",
-                comments="",
-            )
-            logger.info(f"Saved {len(self.rec_frame)} fluorescence samples to {path}")
+            with open(path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    "frame", "host_time_s", "camera_time_ms", "fluorescence",
+                    "centroid_y", "centroid_x", "error_y_px", "error_x_px",
+                    "command_axis0_um", "command_axis1_um", "algorithm",
+                    "sub_acquisition",
+                ])
+                writer.writerows(self.rec_rows)
+            logger.info(f"Saved {len(self.rec_rows)} tracking samples to {path}")
         except Exception as err:
             logger.warning(f"Failed to save fluorescence trace: {err}")
+
+        # Tuning actually used. The sliders are live, so the config file is not
+        # a record of what ran — this is, and it is what makes an algorithm
+        # comparison reproducible after the fact.
+        try:
+            path = os.path.join(self.save_dir, f"{self.rec_id}_tracking_params.json")
+            with open(path, "w") as f:
+                json.dump({
+                    "tracking_algorithm": self.tracking_algorithm,
+                    "micron_to_pix_ratio": self.micron_to_pix_ratio,
+                    "deadband_px": self.deadband_px,
+                    "centroid_smoothing": self.centroid_smoothing,
+                    "max_step_um": self.max_step_um,
+                    "min_puncta_snr": self.min_puncta_snr,
+                    "threshold_frac": self.threshold_frac,
+                    "swap_axes": self.swap_axes,
+                    "invert_axis0": self.invert_axis0,
+                    "invert_axis1": self.invert_axis1,
+                    "enable_axis0": self.enable_axis0,
+                    "enable_axis1": self.enable_axis1,
+                    "algorithms": {
+                        name: tracker.describe()
+                        for name, tracker in self.trackers.items()
+                    },
+                    "measured_latency_ms": self._latency_ms,
+                    "measured_frame_interval_ms": self._dt_s * 1000.0,
+                    "rms_error_px": self._rms_error_px(),
+                }, f, indent=2)
+            logger.info(f"Saved tracking parameters to {path}")
+        except Exception as err:
+            logger.warning(f"Failed to save tracking parameters: {err}")
 
         # Sub-acquisition summary: frame ranges + timestamps for video subselection.
         try:

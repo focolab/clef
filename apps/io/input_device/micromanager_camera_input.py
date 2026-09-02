@@ -280,6 +280,16 @@ class MicroManagerCameraInput(BaseInputDevice):
             self._backlog_accum = 0
             self._last_report_t = now
 
+    @property
+    def last_acquisition_ms(self) -> Optional[float]:
+        """MMCore acquisition timestamp (ms) of the most recent frame.
+
+        None when metadata capture is off, unavailable, or in strobed mode. The
+        data interface publishes this alongside the frame so subprocess logic can
+        time its control loop off the camera rather than the host loop.
+        """
+        return self._last_acq_ms
+
     def get_roi(self) -> tuple:
         """Return current ROI as (x, y, width, height)."""
         return self._roi

@@ -2,11 +2,13 @@
 XY Tracking Logic for CLEF.
 
 Orchestrates the XYTrackingWorker GUI subprocess for centroid-based
-stage tracking of a single bright fluorescent blob. The worker writes
-stage offsets directly into shared memory; this logic class calls
-update_output on the stage output device each sample to apply pending
-corrections, and records the microns-per-pixel ratio the worker measures
-during calibration.
+stage tracking of a single bright fluorescent blob. The worker accumulates
+stage commands directly in shared memory; this logic class calls update_output
+on the stage output device each sample to apply whatever motion is still owed,
+and records the microns-per-pixel ratio the worker measures during calibration.
+
+The control algorithm (proportional / PID / Kalman) is selected here from
+config and switchable live in the worker's GUI.
 """
 
 import json
@@ -50,6 +52,20 @@ class XYTrackingLogic(BaseClosedLoopLogic):
         self.micron_to_pix_ratio = cfg.get("micron_to_pix_ratio", 100.0 / 74.0)
         self.stage_dampening_factor = cfg.get("stage_dampening_factor", 0.5)
         self.threshold_frac = cfg.get("threshold_frac", 0.5)
+
+        # Control algorithm and its per-algorithm parameter block. The worker
+        # instantiates all of them so they can be switched live from the GUI.
+        self.tracking_algorithm = cfg.get("tracking_algorithm", "kalman")
+        self.algorithm_params = {
+            name: dict(cfg.get(name, {}) or {})
+            for name in ("proportional", "pid", "kalman")
+        }
+        # stage_dampening_factor was the old single proportional gain; keep it
+        # working as that algorithm's Kp so existing configs behave the same.
+        self.algorithm_params["proportional"].setdefault(
+            "kp", self.stage_dampening_factor
+        )
+        self.reset_after_lost_frames = cfg.get("reset_after_lost_frames", 25)
         self.deadband_px = cfg.get("deadband_px", 2.0)
         self.centroid_smoothing = cfg.get("centroid_smoothing", 0.0)
         self.max_step_um = cfg.get("max_step_um", 200.0)
@@ -140,7 +156,9 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             "image_count_shm_name": self.image_count_shm_name,
             "stage_shm_name": stage_shm_name,
             "micron_to_pix_ratio": self.micron_to_pix_ratio,
-            "stage_dampening_factor": self.stage_dampening_factor,
+            "tracking_algorithm": self.tracking_algorithm,
+            "algorithm_params": self.algorithm_params,
+            "reset_after_lost_frames": self.reset_after_lost_frames,
             "threshold_frac": self.threshold_frac,
             "deadband_px": self.deadband_px,
             "centroid_smoothing": self.centroid_smoothing,
@@ -211,6 +229,8 @@ class XYTrackingLogic(BaseClosedLoopLogic):
         base = super().get_metadata()
         base["micron_to_pix_ratio"] = self.micron_to_pix_ratio
         base["stage_dampening_factor"] = self.stage_dampening_factor
+        base["tracking_algorithm"] = self.tracking_algorithm
+        base["algorithm_params"] = self.algorithm_params
         base["sub_acquisitions"] = self.epochs
         if self.open_epoch is not None:
             base["sub_acquisition_open"] = self.open_epoch

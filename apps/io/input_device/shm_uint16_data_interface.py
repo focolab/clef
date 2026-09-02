@@ -7,6 +7,7 @@ Optionally preallocates a numpy save buffer for post-session TIFF writing.
 """
 
 import logging
+import time
 import numpy as np
 from multiprocessing import shared_memory
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
@@ -14,6 +15,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 from core.io.input_device.BaseDataInterface import BaseDataInterface
 
 logger = logging.getLogger(__name__)
+
+# [count, camera_acquisition_ms, host_perf_counter_s]
+IMAGE_COUNT_SLOTS = 3
 
 
 class SharedMemoryUint16DataInterface(BaseDataInterface):
@@ -118,12 +122,32 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
             self._shm_list.append(shm)
             self._shm_ndarray_list.append(ndarray)
 
-        # Shared image count
+        # Shared image count, plus the timestamps of the frame it refers to:
+        # [count, camera_acquisition_ms, host_perf_counter_s]. Subprocess logic
+        # needs per-frame timing to run a control loop, and the camera's own
+        # clock is immune to host-loop jitter. Readers that only want the count
+        # (e.g. brainalyzer_worker) still just read slot 0.
         count_name = self.image_count_shm_name
         try:
-            self._image_count_shl = shared_memory.ShareableList([0], name=count_name)
+            self._image_count_shl = shared_memory.ShareableList(
+                [0, float("nan"), 0.0], name=count_name
+            )
         except FileExistsError:
-            self._image_count_shl = shared_memory.ShareableList(name=count_name)
+            existing = shared_memory.ShareableList(name=count_name)
+            if len(existing) == IMAGE_COUNT_SLOTS:
+                self._image_count_shl = existing
+            else:
+                # Left by an older build with a different layout; the packing
+                # format would not accept the timestamp slots.
+                logger.warning(
+                    f"Image count SHM '{count_name}' has {len(existing)} slots, "
+                    f"expected {IMAGE_COUNT_SLOTS}; recreating it."
+                )
+                existing.shm.close()
+                existing.shm.unlink()
+                self._image_count_shl = shared_memory.ShareableList(
+                    [0, float("nan"), 0.0], name=count_name
+                )
 
         logger.info(
             f"SHM data interface: {zsize} segments, "
@@ -179,6 +203,13 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
         self._sample_index += 1
 
         if self._image_count_shl is not None:
+            # Timestamps first, count last: a reader that observes the new count
+            # is then guaranteed to see the timestamps belonging to that frame.
+            acq_ms = getattr(self.input_device, "last_acquisition_ms", None)
+            self._image_count_shl[1] = (
+                float(acq_ms) if acq_ms is not None else float("nan")
+            )
+            self._image_count_shl[2] = time.perf_counter()
             self._image_count_shl[0] = self._image_count
 
         self.input_store = (

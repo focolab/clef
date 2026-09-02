@@ -1,21 +1,42 @@
 """
 XY Tracking Stage Output Device for CLEF.
 
-Exposes a SharedMemory list with two elements (offset_x, offset_y).
-On each update_output call, reads the offsets, and if nonzero,
-applies them as a relative XY stage move via Micro-Manager, then resets.
+Exposes a SharedMemory list that carries stage corrections from the
+XYTrackingWorker subprocess, which writes into it directly rather than going
+through the normal logic->instruction path. On each update_output call the
+still-owed motion is applied as a relative XY stage move via Micro-Manager.
 
-An external subprocess (XYTrackingWorker) writes offsets directly
-into the shared memory, bypassing the normal logic→instruction path.
+The buffer is a two-way handshake with one writer per slot, so neither side can
+race the other and no command is lost:
+
+  0,1  cmd_total      cumulative microns ever commanded   (written by the worker)
+  2,3  applied_total  cumulative microns issued to the stage      (written here)
+  4    applied_seq    number of moves issued                      (written here)
+  5    applied_ts     perf_counter() of the most recent move      (written here)
+
+The move owed at any moment is cmd_total - applied_total. Carrying totals rather
+than a one-shot offset means a correction written while a previous move was in
+flight stays owed instead of being overwritten, and it lets the worker see both
+what is still pending and what has already been applied — which is what its
+estimators need in order to not command the same error twice.
+
+All slots are floats. Stage moves are issued in floating-point microns:
+setRelativeXYPosition takes doubles and the stage resolves well under a micron,
+so rounding corrections to whole microns would throw away most of them.
 """
 
 import logging
+import time
 from multiprocessing import shared_memory
 from typing import Any, ClassVar, Dict, Optional
 
 from core.io.output_device.BaseOutputDevice import BaseOutputDevice
 
 logger = logging.getLogger(__name__)
+
+# Slot layout of the shared buffer (see module docstring).
+CMD_0, CMD_1, APPLIED_0, APPLIED_1, APPLIED_SEQ, APPLIED_TS = range(6)
+NUM_SLOTS = 6
 
 
 class XYTrackingStageOutput(BaseOutputDevice):
@@ -37,34 +58,73 @@ class XYTrackingStageOutput(BaseOutputDevice):
 
     def configure(self):
         self._shm_name = self.config.get("shm_name", "shared_stage_offset_xy")
+        self.shared_stage_offset_xy = self._create_or_replace(self._shm_name)
+        # A segment left by a prior run may still hold nonzero totals; zero them
+        # so we never apply a spurious move on the first update.
+        for i in range(NUM_SLOTS):
+            self.shared_stage_offset_xy[i] = 0.0
+        logger.info(
+            f"XYTrackingStageOutput '{self.name}' configured with SHM "
+            f"'{self._shm_name}'"
+        )
+
+    @staticmethod
+    def _create_or_replace(name: str) -> shared_memory.ShareableList:
+        """Attach to the buffer, replacing one with an incompatible layout.
+
+        A segment left behind by an older build has a different slot count and
+        packing format, and writing floats into it would fail or silently
+        truncate — so it is discarded rather than reused.
+        """
         try:
-            self.shared_stage_offset_xy = shared_memory.ShareableList(
-                [0, 0], name=self._shm_name
-            )
+            return shared_memory.ShareableList([0.0] * NUM_SLOTS, name=name)
         except FileExistsError:
-            self.shared_stage_offset_xy = shared_memory.ShareableList(
-                name=self._shm_name
+            existing = shared_memory.ShareableList(name=name)
+            slots = len(existing)  # unreadable once the mapping is closed
+            if slots == NUM_SLOTS:
+                return existing
+            logger.warning(
+                f"Stage offset SHM '{name}' has {slots} slots, expected "
+                f"{NUM_SLOTS}; recreating it."
             )
-            # A stale segment from a prior/crashed run may still hold a nonzero
-            # offset; zero it so we never apply a spurious move on first update.
-            self.shared_stage_offset_xy[0] = 0
-            self.shared_stage_offset_xy[1] = 0
-        logger.info(f"XYTrackingStageOutput '{self.name}' configured with SHM '{self._shm_name}'")
+            existing.shm.close()
+            existing.shm.unlink()
+            try:
+                return shared_memory.ShareableList([0.0] * NUM_SLOTS, name=name)
+            except FileExistsError:
+                # Unlinking only frees the name once every handle is closed, so
+                # this means another process still has the old buffer mapped.
+                # Its layout cannot carry fractional-micron commands, and
+                # reusing it would silently truncate every correction.
+                raise RuntimeError(
+                    f"Stage offset SHM '{name}' is held open by another process "
+                    f"with an incompatible {slots}-slot layout. Stop the other "
+                    f"CLEF session and start this one again."
+                ) from None
 
     def _update_output(self, **kwargs):
-        if self.shared_stage_offset_xy is None or self.mmc is None:
+        shl = self.shared_stage_offset_xy
+        if shl is None or self.mmc is None:
             return
 
-        offset_0 = self.shared_stage_offset_xy[0]
-        offset_1 = self.shared_stage_offset_xy[1]
+        # Snapshot the worker's running total first: anything it adds after this
+        # read stays in the difference and is applied on the next call.
+        cmd_0 = float(shl[CMD_0])
+        cmd_1 = float(shl[CMD_1])
+        move_0 = cmd_0 - float(shl[APPLIED_0])
+        move_1 = cmd_1 - float(shl[APPLIED_1])
 
-        if offset_0 or offset_1:
-            # Reset before moving so a correction written by the worker while
-            # the (blocking) move is in flight is not lost.
-            self.shared_stage_offset_xy[0] = 0
-            self.shared_stage_offset_xy[1] = 0
-            self.mmc.setRelativeXYPosition(int(offset_0), int(offset_1))
-            logger.debug(f"Applied relative stage move ({offset_0}, {offset_1})")
+        if move_0 == 0.0 and move_1 == 0.0:
+            return
+
+        self.mmc.setRelativeXYPosition(move_0, move_1)
+        # Advance to the snapshot, not by the move, so a concurrent write is
+        # carried rather than double-counted.
+        shl[APPLIED_0] = cmd_0
+        shl[APPLIED_1] = cmd_1
+        shl[APPLIED_SEQ] = float(shl[APPLIED_SEQ]) + 1.0
+        shl[APPLIED_TS] = time.perf_counter()
+        logger.debug(f"Applied relative stage move ({move_0:.3f}, {move_1:.3f}) um")
 
     def close(self):
         if self.shared_stage_offset_xy is not None:

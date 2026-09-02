@@ -6,6 +6,7 @@ from multiprocessing import shared_memory
 from types import SimpleNamespace
 
 from apps.io.input_device.shm_uint16_data_interface import (
+    IMAGE_COUNT_SLOTS,
     SharedMemoryUint16DataInterface,
 )
 
@@ -41,6 +42,16 @@ class TestConfigureSampling:
         di.configure_sampling()
         shl = shared_memory.ShareableList(name=di.image_count_shm_name)
         assert shl[0] == 0
+        shl.shm.close()
+        di.close()
+
+    def test_image_count_carries_timestamp_slots(self):
+        """Subprocess logic times its control loop off these."""
+        di = _make_di(height=64, width=64)
+        di.configure_sampling()
+        shl = shared_memory.ShareableList(name=di.image_count_shm_name)
+        assert len(shl) == IMAGE_COUNT_SLOTS
+        assert np.isnan(shl[1])  # no frame stored yet
         shl.shm.close()
         di.close()
 
@@ -88,6 +99,34 @@ class TestStoreInput:
 
         shl = shared_memory.ShareableList(name=di.image_count_shm_name)
         assert shl[0] == 2
+        shl.shm.close()
+        di.close()
+
+    def test_publishes_frame_timestamps(self):
+        """Each stored frame publishes the camera's acquisition time and the
+        host time, so a subprocess can compute dt without its own clock."""
+        di = _make_di()
+        di.input_device.last_acquisition_ms = 1234.5
+        di.configure_sampling()
+        di.store_input(np.zeros((4, 4), dtype=np.uint16))
+
+        shl = shared_memory.ShareableList(name=di.image_count_shm_name)
+        assert shl[0] == 1
+        assert shl[1] == pytest.approx(1234.5)
+        assert shl[2] > 0.0
+        shl.shm.close()
+        di.close()
+
+    def test_frame_timestamp_is_nan_without_camera_metadata(self):
+        """A device that reports no acquisition time leaves the slot NaN so the
+        reader falls back to the host clock rather than trusting a zero."""
+        di = _make_di()
+        di.configure_sampling()
+        di.store_input(np.zeros((4, 4), dtype=np.uint16))
+
+        shl = shared_memory.ShareableList(name=di.image_count_shm_name)
+        assert np.isnan(shl[1])
+        assert shl[2] > 0.0
         shl.shm.close()
         di.close()
 
