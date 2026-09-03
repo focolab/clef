@@ -7,7 +7,11 @@ input_devices:
     input_device_class: "micromanager_camera"
     data_interface_class: "shm_uint16_data_interface"
     data_interface_parameters:
-      shm_buffer_size: 1
+      shm_buffer_size: 4   # frame ring slots, NOT z-planes: successive frames go to
+                           # successive segments (image_count % size). At 1 the camera
+                           # writes the same buffer the tracking worker is reading, so
+                           # the worker can pick up a half-copied frame and compute a
+                           # garbage centroid. Any value > 1 separates them.
       shm_name_prefix: "shared_frame_memory"
     input_device_parameters:
       device_properties: null

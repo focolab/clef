@@ -1,9 +1,16 @@
 """
 Shared-memory Uint16 Data Interface for CLEF.
 
-Stores uint16 image data into shared memory segments (one per z-plane)
-so that subprocess-based logic algorithms can read frames without IPC overhead.
+Stores uint16 image data into a ring of shared memory segments so that
+subprocess-based logic algorithms can read frames without IPC overhead.
 Optionally preallocates a numpy save buffer for post-session TIFF writing.
+
+Successive frames go into successive segments (segment = image_count % size),
+so the ring is over *time*, not over z: it keeps the writer and any reading
+subprocess on different segments. With a single segment they share one buffer
+and a reader can see a frame while it is still being copied in, so size this by
+how far a consumer may lag, not by the number of z-planes. The `zsize` naming
+below is historical.
 """
 
 import logging
@@ -56,7 +63,7 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
 
     @property
     def shm_names(self) -> List[str]:
-        """Shared memory segment names, one per z-plane."""
+        """Shared memory segment names, one per ring slot."""
         return [shm.name for shm in self._shm_list]
 
     @property
@@ -114,7 +121,7 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
 
         buf_size = height * width * np.dtype(np.uint16).itemsize
 
-        # Create one shm segment per z-plane
+        # Create the ring of frame segments
         for z in range(zsize):
             name = f"{shm_name_prefix}_{z}"
             shm = self._create_or_attach_shm(name, buf_size)
@@ -181,6 +188,8 @@ class SharedMemoryUint16DataInterface(BaseDataInterface):
             self.input_store = None
             return
 
+        # Advance to the next ring slot so a subprocess reading the previous
+        # frame is not racing this copy.
         z = self._image_count % self._zsize
 
         # Copy 1: frame -> shared memory (subprocess access)
