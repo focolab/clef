@@ -9,6 +9,11 @@ and records the microns-per-pixel ratio the worker measures during calibration.
 
 The control algorithm (proportional / PID / Kalman) is selected here from
 config and switchable live in the worker's GUI.
+
+Fluorescence excitation is tied to the worker's recording button: the target
+moves faster under excitation light, so it is found and centered under
+brightfield with the excitation off, and the light only comes up once recording
+starts. Stopping the recording puts it back to the idle level.
 """
 
 import json
@@ -66,6 +71,14 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             "kp", self.stage_dampening_factor
         )
         self.reset_after_lost_frames = cfg.get("reset_after_lost_frames", 25)
+
+        # Fluorescence excitation, driven by the worker's recording button. The
+        # sample is found under brightfield with this at idle, because the
+        # target moves faster once the excitation is on.
+        self.light_output_name = cfg.get("light_output_name", "fluorescence_light")
+        self.acquisition_intensity = cfg.get("acquisition_intensity", 100)
+        self.idle_intensity = cfg.get("idle_intensity", 0)
+        self._light_missing_warned = False
         self.deadband_px = cfg.get("deadband_px", 2.0)
         self.centroid_smoothing = cfg.get("centroid_smoothing", 0.0)
         self.max_step_um = cfg.get("max_step_um", 200.0)
@@ -159,6 +172,7 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             "tracking_algorithm": self.tracking_algorithm,
             "algorithm_params": self.algorithm_params,
             "reset_after_lost_frames": self.reset_after_lost_frames,
+            "acquisition_intensity": self.acquisition_intensity,
             "threshold_frac": self.threshold_frac,
             "deadband_px": self.deadband_px,
             "centroid_smoothing": self.centroid_smoothing,
@@ -211,19 +225,49 @@ class XYTrackingLogic(BaseClosedLoopLogic):
                 self.open_epoch = {
                     k: msg.get(k) for k in ("index", "name", "start_frame", "start_ts")
                 }
+                # Excitation comes up as the recording starts, not before, so
+                # the target is only driven hard while it is being recorded.
+                intensity = msg.get("intensity", self.acquisition_intensity)
+                self.open_epoch["intensity"] = intensity
+                self._set_light(intensity)
                 logger.info(f"Sub-acquisition {msg.get('name')} started")
             elif kind == "recording_stop":
-                self.epochs.append({
+                epoch = {
                     k: msg.get(k) for k in (
                         "index", "name", "start_frame", "stop_frame",
                         "start_ts", "stop_ts",
                     )
-                })
+                }
+                epoch["intensity"] = msg.get("intensity", self.acquisition_intensity)
+                self.epochs.append(epoch)
                 self.open_epoch = None
+                self._set_light(self.idle_intensity)
                 logger.info(
                     f"Sub-acquisition {msg.get('name')} stopped: frames "
                     f"{msg.get('start_frame')}-{msg.get('stop_frame')}"
                 )
+
+    def _set_light(self, intensity):
+        """Drive the excitation light, if one is configured.
+
+        A missing device is a warning rather than an error: tracking is useful
+        without programmatic light control, and a rig may not expose it.
+        """
+        device = self.output_devices.get(self.light_output_name)
+        if device is None:
+            if not self._light_missing_warned:
+                self._light_missing_warned = True
+                logger.warning(
+                    f"No output device '{self.light_output_name}' available; "
+                    "excitation light will not be switched automatically. Add it "
+                    "to io_config and to this algorithm's output_device_names."
+                )
+            return
+        try:
+            device.update_output(intensity=intensity)
+            logger.info(f"Excitation light set to {intensity}")
+        except Exception as err:
+            logger.warning(f"Failed to set excitation light to {intensity}: {err}")
 
     def get_metadata(self) -> Dict[str, Any]:
         base = super().get_metadata()
@@ -231,6 +275,8 @@ class XYTrackingLogic(BaseClosedLoopLogic):
         base["stage_dampening_factor"] = self.stage_dampening_factor
         base["tracking_algorithm"] = self.tracking_algorithm
         base["algorithm_params"] = self.algorithm_params
+        base["acquisition_intensity"] = self.acquisition_intensity
+        base["idle_intensity"] = self.idle_intensity
         base["sub_acquisitions"] = self.epochs
         if self.open_epoch is not None:
             base["sub_acquisition_open"] = self.open_epoch
@@ -257,6 +303,8 @@ class XYTrackingLogic(BaseClosedLoopLogic):
             logger.warning(f"Failed to save tracking metadata: {err}")
 
     def close(self):
+        # Never leave the sample under excitation because a session ended badly.
+        self._set_light(self.idle_intensity)
         if self.parent_conn is not None:
             try:
                 self.parent_conn.send("close")

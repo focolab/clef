@@ -101,6 +101,10 @@ class XYTrackingWorker(Process):
         # stale to trust and is thrown away.
         self.reset_after_lost_frames = vis_args.get("reset_after_lost_frames", 25)
 
+        # Fluorescence excitation level applied while recording. The logic
+        # process owns the light device; the worker only reports what it wants.
+        self.acquisition_intensity = vis_args.get("acquisition_intensity", 100)
+
         # Per-axis control
         self.enable_axis0 = vis_args.get("enable_axis0", True)
         self.enable_axis1 = vis_args.get("enable_axis1", True)
@@ -463,6 +467,23 @@ class XYTrackingWorker(Process):
         name_row.addWidget(self.rec_name_edit)
         layout.addLayout(name_row)
 
+        intensity_row = QtWidgets.QHBoxLayout()
+        intensity_row.addWidget(QtWidgets.QLabel("excitation while recording:"))
+        self.intensity_spinbox = QtWidgets.QSpinBox()
+        self.intensity_spinbox.setRange(0, 100)
+        self.intensity_spinbox.setValue(int(self.acquisition_intensity))
+        self.intensity_spinbox.valueChanged.connect(self._intensity_changed)
+        intensity_row.addWidget(self.intensity_spinbox)
+        intensity_row.addStretch()
+        layout.addLayout(intensity_row)
+
+        # The record button has side effects beyond recording, so spell them out
+        # rather than making the operator remember them.
+        self.record_help = DemoStyle.make_info_box(
+            "", QtWidgets, style=DemoStyle.INSTRUCTIONS_BOX_STYLE
+        )
+        layout.addWidget(self.record_help)
+
         self.record_button = DemoStyle.make_action_button(
             "Start Recording", QtWidgets, color=DemoStyle.COLOR_SUCCESS
         )
@@ -474,7 +495,38 @@ class XYTrackingWorker(Process):
             "No sub-acquisitions recorded yet.", QtWidgets
         )
         layout.addWidget(self.record_status)
+        self._refresh_record_help()
         return group
+
+    def _intensity_changed(self, value):
+        self.acquisition_intensity = value
+        self._refresh_record_help()
+
+    def _refresh_record_help(self):
+        """Spell out exactly what the record button will do when pressed."""
+        level = int(self.acquisition_intensity)
+        if self.recording:
+            self.record_help.setText(
+                "RECORDING. Pressing Stop Recording will:\n"
+                f"  1. take the excitation light back down to 0 (from {level})\n"
+                "  2. disarm stage tracking - the stage stops moving\n"
+                "  3. close this sub-acquisition's frame range in the "
+                "saved metadata"
+            )
+            self.record_button.setText("Stop Recording (light off, tracking off)")
+        else:
+            self.record_help.setText(
+                "Center the target under brightfield first, with the "
+                "excitation off. Pressing Start Recording will, in one go:\n"
+                f"  1. bring the excitation light up from 0 to {level}\n"
+                "  2. arm stage tracking - THE STAGE WILL START MOVING "
+                "once a puncta is detected\n"
+                "  3. begin a named sub-acquisition, logging the frame "
+                "range\n"
+                "The target moves faster under excitation, which is why "
+                "the light and the tracking come on together."
+            )
+            self.record_button.setText("Start Recording (light on, tracking on)")
 
     def _build_calibration_tab(self):
         tab = QtWidgets.QWidget()
@@ -791,19 +843,24 @@ class XYTrackingWorker(Process):
                 "name": name,
                 "start_frame": self.image_count,
                 "start_ts": time.time(),
+                "intensity": self.acquisition_intensity,
             }
             self.recording = True
-            self.record_button.setText("Stop Recording")
             self.record_button.setStyleSheet(
                 f"background-color: {DemoStyle.COLOR_DANGER}"
             )
             self._send({"type": "recording_start", **self.open_epoch})
+            # Arm tracking as the excitation comes up: that is the moment the
+            # target starts moving. The SNR gate still holds the stage still
+            # until a real puncta is visible, so nothing chases the ramp-up.
+            self.enable_tracking_button.setChecked(True)
         else:
             self._finalize_epoch()
-            self.record_button.setText("Start Recording")
+            self.enable_tracking_button.setChecked(False)
             self.record_button.setStyleSheet(
                 f"background-color: {DemoStyle.COLOR_SUCCESS}"
             )
+        self._refresh_record_help()
         self._refresh_readouts()
 
     def _finalize_epoch(self):

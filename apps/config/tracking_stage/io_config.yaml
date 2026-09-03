@@ -34,6 +34,18 @@ input_devices:
                                 # most of a 20 ms frame budget, so keep it rare.
 
 output_devices:
+  # Fluorescence excitation. Driven by the worker's record button, not per
+  # sample: the target is found under brightfield with this at 0, because it
+  # moves faster once the excitation is on.
+  - output_device_name: "fluorescence_light"
+    output_device_type: "lightsource"
+    output_device_class: "ldi_89north"
+    output_device_parameters:
+      intensity_device: null   # auto-detect: the loaded device carrying the
+                               # property below. Set a label here to override.
+      intensity_property: "LightEngineIntensity"
+      shutter_device: null     # brightfield/shutter is handled manually at the scope
+
   - output_device_name: "xy_stage_output"
     output_device_type: "stage"
     output_device_class: "xy_tracking_stage_output"

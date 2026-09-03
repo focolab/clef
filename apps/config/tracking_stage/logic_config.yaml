@@ -43,6 +43,12 @@ logic_algorithms:
         r_meas_um: 2.0                 # centroid noise; raise this first if the blob is
                                        # dim and the centroid jitters
       reset_after_lost_frames: 25      # ~0.5 s at 50 fps before the estimate is discarded
+
+      # Fluorescence excitation, switched by the worker's record button so the
+      # target can be found under brightfield before it starts moving fast.
+      light_output_name: "fluorescence_light"
+      acquisition_intensity: 100       # level while recording (live in the GUI)
+      idle_intensity: 0                # level the rest of the time
       deadband_px: 0.0                 # correct every frame (0 = keep as centered as possible)
       # Leave at 0 with the Kalman filter: the EMA adds s/(1-s) frames of lag on
       # top of the dead time the filter is already compensating for.
@@ -65,7 +71,7 @@ logic_algorithms:
       ratio_increment: 0.02            # +/- nudge for um/pixel
       save_dir: "D:/shen lab/20260818/"  # fluorescence trace output dir
     io_parameters:
-      output_device_names: ["xy_stage_output"]
+      output_device_names: ["xy_stage_output", "fluorescence_light"]
       input_device_names: ["camera"]
     gui_parameters:
       gui_screenshot_freq: 0
