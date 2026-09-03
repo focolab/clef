@@ -244,3 +244,26 @@ def test_switching_algorithm_keeps_the_command_total(worker):
 
     assert float(worker.shared_stage_offset_xy[CMD_0]) == pytest.approx(total)
     assert worker._latency_ms is not None
+
+
+def test_non_finite_command_never_enters_the_running_total(worker):
+    """cmd_total is cumulative: one NaN would poison it for the whole session."""
+    place_blob(worker, worker.cy - 10, worker.cx)
+    worker.update_stage_offset(dt=0.05, frame_ts=1.0)
+    good = float(worker.shared_stage_offset_xy[CMD_0])
+
+    worker._command(float("nan"), 0.0)
+    worker._command(float("inf"), 0.0)
+
+    assert float(worker.shared_stage_offset_xy[CMD_0]) == pytest.approx(good)
+    assert np.all(np.isfinite(worker.cmd_total))
+
+
+def test_a_broken_um_per_px_ratio_cannot_reach_the_stage(worker):
+    """float() parses 'inf' and 'nan', so the um/px box can produce one."""
+    worker.micron_to_pix_ratio = float("nan")
+    place_blob(worker, worker.cy - 10, worker.cx)
+    worker.update_stage_offset(dt=0.05, frame_ts=1.0)
+
+    assert np.all(np.isfinite(worker.cmd_total))
+    assert np.isfinite(float(worker.shared_stage_offset_xy[CMD_0]))

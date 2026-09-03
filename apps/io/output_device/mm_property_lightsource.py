@@ -84,13 +84,21 @@ class MMPropertyLightSourceOutput(BaseOutputDevice):
         except Exception as e:
             logger.warning(f"Could not enumerate Micro-Manager devices: {e}")
             return None
+        matches = []
         for device in devices:
             try:
                 if self.mmc.hasProperty(device, prop):
-                    return device
+                    matches.append(device)
             except Exception:
                 continue
-        return None
+        if len(matches) > 1:
+            # Picking one silently would be a coin flip over which light the
+            # session actually drives.
+            logger.warning(
+                f"Property '{prop}' is exposed by {matches}; using "
+                f"'{matches[0]}'. Set intensity_device explicitly to choose."
+            )
+        return matches[0] if matches else None
 
     def _update_output(self, **kwargs):
         """Set the light source intensity.

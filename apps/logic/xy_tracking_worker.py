@@ -234,6 +234,16 @@ class XYTrackingWorker(Process):
         tracking all go through here, which is what keeps the estimators from
         being surprised by a manual move.
         """
+        if not (np.isfinite(axis0) and np.isfinite(axis1)):
+            # cmd_total is cumulative, so a single non-finite value would poison
+            # it - and the output device's owed-motion difference - for the rest
+            # of the session. Drop it rather than carry it forward.
+            print(
+                f"[track] refusing non-finite stage command "
+                f"({axis0}, {axis1}); check the um/px ratio",
+                flush=True,
+            )
+            return
         self.cmd_total += (axis0, axis1)
         self.shared_stage_offset_xy[0] = float(self.cmd_total[0])
         self.shared_stage_offset_xy[1] = float(self.cmd_total[1])
@@ -902,14 +912,22 @@ class XYTrackingWorker(Process):
 
     def _ratio_edited(self):
         try:
-            self.micron_to_pix_ratio = float(self.ratio_edit.text())
-            self._emit_calibration()
+            value = float(self.ratio_edit.text())
         except ValueError:
+            value = float("nan")
+        # float() parses "inf" and "nan", and a negative ratio reverses the
+        # feedback sign into a runaway. Only a positive, finite scale is valid.
+        if not np.isfinite(value) or value <= 0.0:
             self.ratio_edit.setText(f"{self.micron_to_pix_ratio:.5f}")
+            return
+        self.micron_to_pix_ratio = value
+        self._emit_calibration()
 
     def _nudge_ratio(self, sign):
+        # Floor above zero: a zero ratio silently converts every error to a zero
+        # command, which looks like tracking being broken rather than misset.
         self.micron_to_pix_ratio = max(
-            0.0, self.micron_to_pix_ratio + sign * self.ratio_increment
+            1e-6, self.micron_to_pix_ratio + sign * self.ratio_increment
         )
         self.ratio_edit.setText(f"{self.micron_to_pix_ratio:.5f}")
         self._emit_calibration()
@@ -1244,7 +1262,7 @@ class XYTrackingWorker(Process):
             with open(path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    "frame", "host_time_s", "camera_time_ms", "fluorescence",
+                    "frame", "host_monotonic_s", "camera_time_ms", "fluorescence",
                     "centroid_y", "centroid_x", "error_y_px", "error_x_px",
                     "command_axis0_um", "command_axis1_um", "algorithm",
                     "sub_acquisition",
@@ -1277,6 +1295,11 @@ class XYTrackingWorker(Process):
                         name: tracker.describe()
                         for name, tracker in self.trackers.items()
                     },
+                    # host_monotonic_s in the trace CSV is perf_counter, whose
+                    # origin is arbitrary. These two anchor it to wall clock:
+                    # unix_time = host_monotonic_s - perf_counter_at_save + wall_time_at_save
+                    "perf_counter_at_save": time.perf_counter(),
+                    "wall_time_at_save": time.time(),
                     "measured_latency_ms": self._latency_ms,
                     "measured_frame_interval_ms": self._dt_s * 1000.0,
                     "rms_error_px": self._rms_error_px(),

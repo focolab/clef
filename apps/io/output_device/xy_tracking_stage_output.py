@@ -27,6 +27,7 @@ so rounding corrections to whole microns would throw away most of them.
 
 import logging
 import time
+from math import isfinite
 from multiprocessing import shared_memory
 from typing import Any, ClassVar, Dict, Optional
 
@@ -115,6 +116,18 @@ class XYTrackingStageOutput(BaseOutputDevice):
         move_1 = cmd_1 - float(shl[APPLIED_1])
 
         if move_0 == 0.0 and move_1 == 0.0:
+            return
+
+        # Backstop against a non-finite command: NaN fails the zero-check above,
+        # would be handed to the stage, and would leave applied_total NaN so
+        # every later difference is NaN and the loop silently stops moving.
+        if not (isfinite(move_0) and isfinite(move_1)):
+            logger.error(
+                f"Refusing non-finite stage move ({move_0}, {move_1}); "
+                "resetting the command total to what has been applied."
+            )
+            shl[CMD_0] = float(shl[APPLIED_0])
+            shl[CMD_1] = float(shl[APPLIED_1])
             return
 
         self.mmc.setRelativeXYPosition(move_0, move_1)

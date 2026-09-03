@@ -132,3 +132,33 @@ def test_incompatible_segment_held_open_is_reported():
             stale.shm.unlink()
         except FileNotFoundError:
             pass
+
+
+def test_non_finite_move_is_refused(device):
+    """A NaN command passes the zero-check, would be handed to the stage, and
+    would leave applied_total NaN - after which every owed-motion difference is
+    NaN and the loop silently stops moving. Refuse it and resync instead."""
+    command(device, 5.0, 0.0)
+    device.update_output()
+    assert device.mmc.moves == [(5.0, 0.0)]
+
+    shl = device.shared_stage_offset_xy
+    shl[CMD_0] = float("nan")
+    device.update_output()
+
+    assert device.mmc.moves == [(5.0, 0.0)], "NaN must not reach the stage"
+    # Totals stay finite, so the loop recovers instead of dying silently.
+    assert float(shl[CMD_0]) == pytest.approx(5.0)
+    assert float(shl[APPLIED_0]) == pytest.approx(5.0)
+
+    command(device, 2.0, 0.0)
+    device.update_output()
+    assert device.mmc.moves == [(5.0, 0.0), (2.0, 0.0)], "loop recovered"
+
+
+def test_infinite_move_is_refused(device):
+    shl = device.shared_stage_offset_xy
+    shl[CMD_0] = float("inf")
+    device.update_output()
+    assert device.mmc.moves == []
+    assert float(shl[CMD_0]) == pytest.approx(0.0)
