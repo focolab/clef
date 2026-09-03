@@ -39,12 +39,12 @@ output_devices:
   # moves faster once the excitation is on.
   - output_device_name: "fluorescence_light"
     output_device_type: "lightsource"
-    output_device_class: "ldi_89north"
+    output_device_class: "mm_property_lightsource"
     output_device_parameters:
       intensity_device: null   # auto-detect: the loaded device carrying the
                                # property below. Set a label here to override.
       intensity_property: "LightEngineIntensity"
-      shutter_device: null     # brightfield/shutter is handled manually at the scope
+      max_intensity: 100       # commands are clamped to this
 
   - output_device_name: "xy_stage_output"
     output_device_type: "stage"

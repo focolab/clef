@@ -37,30 +37,9 @@ class LDI89NorthOutput(BaseOutputDevice):
     def configure(self):
         """Set initial intensity to 0 and open shutter."""
         cfg = self.config
-        self._intensity_property = cfg.get("intensity_property")
         self._intensity_device = cfg.get("intensity_device")
+        self._intensity_property = cfg.get("intensity_property")
         self._shutter_device = cfg.get("shutter_device")
-
-        # A null device label means "find it in Micro-Manager", matching the
-        # convention used for the XY stage and the DMD. Device labels differ
-        # between rigs but the property name does not, so this avoids having to
-        # hardcode a label that only one machine will have.
-        if self._intensity_device is None and self._intensity_property:
-            self._intensity_device = self._find_device_with_property(
-                self._intensity_property
-            )
-            if self._intensity_device is None:
-                logger.warning(
-                    f"LDI89NorthOutput '{self.name}': no loaded Micro-Manager "
-                    f"device has property '{self._intensity_property}'; light "
-                    "control is disabled for this session."
-                )
-            else:
-                logger.info(
-                    f"LDI89NorthOutput '{self.name}': found "
-                    f"'{self._intensity_property}' on device "
-                    f"'{self._intensity_device}'"
-                )
 
         # Initialize intensity to 0
         if self._intensity_device and self._intensity_property:
@@ -76,21 +55,6 @@ class LDI89NorthOutput(BaseOutputDevice):
             f"LDI89NorthOutput '{self.name}' configured: "
             f"device={self._intensity_device}, property={self._intensity_property}"
         )
-
-    def _find_device_with_property(self, prop):
-        """Return the first loaded device exposing `prop`, or None."""
-        try:
-            devices = self.mmc.getLoadedDevices()
-        except Exception as e:
-            logger.warning(f"Could not enumerate Micro-Manager devices: {e}")
-            return None
-        for device in devices:
-            try:
-                if self.mmc.hasProperty(device, prop):
-                    return device
-            except Exception:
-                continue
-        return None
 
     def _update_output(self, **kwargs):
         """Set LDI intensity.

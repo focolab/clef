@@ -8,7 +8,9 @@ leaves it dark during the recording, so the on/off edges are worth pinning down.
 
 import pytest
 
-from apps.io.output_device.ldi_89north_output import LDI89NorthOutput
+from apps.io.output_device.mm_property_lightsource import (
+    MMPropertyLightSourceOutput,
+)
 from apps.logic.xy_tracking_logic import XYTrackingLogic
 
 
@@ -38,7 +40,7 @@ class FakeCore:
 
 
 def make_light(config=None, core=None):
-    dev = LDI89NorthOutput("fluorescence_light", config or {
+    dev = MMPropertyLightSourceOutput("fluorescence_light", config or {
         "intensity_device": None,
         "intensity_property": "LightEngineIntensity",
     })
@@ -55,6 +57,7 @@ class TestDeviceDiscovery:
         assert dev._intensity_device == "LightEngine"
 
     def test_starts_at_zero(self):
+        """A session must never begin by illuminating the sample."""
         core = FakeCore()
         make_light(core=core)
         assert core.writes == [("LightEngine", "LightEngineIntensity", 0)]
@@ -78,7 +81,30 @@ class TestDeviceDiscovery:
         dev = make_light(core=core)
         core.writes.clear()
         dev.update_output(intensity=100)
-        assert core.writes == [("LightEngine", "LightEngineIntensity", 100)]
+        assert core.writes == [("LightEngine", "LightEngineIntensity", 100.0)]
+
+    def test_intensity_is_clamped(self):
+        """This drives illumination onto a live sample; out-of-range is a
+        photodamage risk, not a rounding detail."""
+        core = FakeCore()
+        dev = make_light({"intensity_device": None,
+                          "intensity_property": "LightEngineIntensity",
+                          "max_intensity": 100}, core)
+        core.writes.clear()
+        dev.update_output(intensity=5000)
+        dev.update_output(intensity=-10)
+        assert core.writes == [
+            ("LightEngine", "LightEngineIntensity", 100.0),
+            ("LightEngine", "LightEngineIntensity", 0.0),
+        ]
+
+    def test_close_leaves_the_source_dark(self):
+        core = FakeCore()
+        dev = make_light(core=core)
+        dev.update_output(intensity=100)
+        core.writes.clear()
+        dev.close()
+        assert core.writes == [("LightEngine", "LightEngineIntensity", 0)]
 
 
 class FakeLight:
